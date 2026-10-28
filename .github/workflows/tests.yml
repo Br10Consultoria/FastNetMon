@@ -19,5 +19,7 @@ jobs:
         run: PYTHONPATH=src python -m unittest discover -s tests -v
       - name: Validar regras
         run: PYTHONPATH=src python -m fmn_filters --rules rules/example-rules.json --validate
+      - name: Validar sintaxe dos scripts de instalacao e consulta
+        run: bash -n scripts/*.sh
       - name: Validar replay de incidentes (sem rede)
         run: bash scripts/test-incidents.sh
