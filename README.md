@@ -1,3 +1,19 @@
+## OrbyMon v0.3 — Teste rápido de incidentes
+
+**Já publicado:** correlação persistente e deduplicação de alertas, identificação de destino/regra e picos PPS/Mbps/RPS, histórico SQLite e API local autenticada. **33 testes unitários aprovados em laboratório, sem equipamentos reais.**
+
+```bash
+git clone https://github.com/Br10Consultoria/FastNetMon.git
+cd FastNetMon
+bash scripts/test-incidents.sh
+```
+
+Manual: [Laboratório e API](docs/TESTING_INCIDENTS.md) · [Posicionamento e limites de cópia](docs/PRODUCT_POSITIONING.md) · [Grafana](docs/GRAFANA.md)
+
+**Limitações:** Sem validação com Huawei NE8000, sem mitigação automática, sem frontend próprio de incidentes, sem isolamento multiusuário de produção e ainda sem sincronização automática do novo SQLite com o Grafana. Use Grafana v0.2 para visualização de alertas/fluxos quando o sink MariaDB estiver configurado e homologado.
+
+---
+
 # OrbyMon 🛡️
 
 **OrbyMon — observabilidade de tráfego e defesa DDoS** (família Orby). Repositório `Br10Consultoria/FastNetMon`. Identidade laranja e azul.
