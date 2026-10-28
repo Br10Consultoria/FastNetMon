@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fastnetmon-combined-filters"
+version = "0.1.0"
+description = "Correlacao de NetFlow/IPFIX e HTTP por regras combinadas de deteccao DDoS"
+requires-python = ">=3.10"
+dependencies = []
+license = {text = "MIT"}
+
+[project.scripts]
+fmn-filters = "fmn_filters.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

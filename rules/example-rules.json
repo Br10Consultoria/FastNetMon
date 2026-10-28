@@ -1,0 +1,153 @@
+{
+  "rules": [
+    {
+      "name": "DNS-query-flood",
+      "kind": "flow",
+      "severity": "critical",
+      "match": {
+        "all_of": [
+          {
+            "protocols": [
+              "udp"
+            ],
+            "dst_ports": [
+              53
+            ]
+          },
+          {
+            "dst_cidrs": [
+              "198.51.100.0/24",
+              "2001:db8:100::/48"
+            ]
+          }
+        ]
+      },
+      "group_by": [
+        "dst_ip",
+        "dst_port"
+      ],
+      "window_seconds": 10,
+      "cooldown_seconds": 60,
+      "thresholds": {
+        "min_pps": 20000,
+        "min_unique_sources": 15
+      }
+    },
+    {
+      "name": "DNS-response-amplification",
+      "kind": "flow",
+      "severity": "critical",
+      "match": {
+        "protocols": [
+          "udp"
+        ],
+        "src_ports": [
+          53
+        ],
+        "dst_cidrs": [
+          "198.51.100.0/24",
+          "2001:db8:100::/48"
+        ]
+      },
+      "group_by": [
+        "dst_ip"
+      ],
+      "window_seconds": 10,
+      "cooldown_seconds": 60,
+      "thresholds": {
+        "min_mbps": 300,
+        "min_unique_sources": 20
+      }
+    },
+    {
+      "name": "TCP-SYN-flood",
+      "kind": "flow",
+      "severity": "critical",
+      "match": {
+        "protocols": [
+          "tcp"
+        ],
+        "tcp_flags_all": "S",
+        "any_of": [
+          {
+            "dst_ports": [
+              80,
+              443
+            ]
+          },
+          {
+            "dst_ports": [
+              22
+            ]
+          }
+        ],
+        "dst_cidrs": [
+          "198.51.100.0/24"
+        ]
+      },
+      "group_by": [
+        "dst_ip",
+        "dst_port"
+      ],
+      "window_seconds": 10,
+      "cooldown_seconds": 60,
+      "thresholds": {
+        "min_pps": 30000,
+        "min_unique_sources": 30
+      }
+    },
+    {
+      "name": "UDP-flood-by-destination",
+      "kind": "flow",
+      "severity": "warning",
+      "match": {
+        "protocols": [
+          "udp"
+        ],
+        "dst_cidrs": [
+          "198.51.100.0/24"
+        ],
+        "exclude_src_cidrs": [
+          "192.0.2.0/24"
+        ]
+      },
+      "group_by": [
+        "dst_ip",
+        "dst_port"
+      ],
+      "window_seconds": 10,
+      "cooldown_seconds": 60,
+      "thresholds": {
+        "min_pps": 50000,
+        "min_mbps": 150
+      }
+    },
+    {
+      "name": "PHP-request-flood",
+      "kind": "http",
+      "severity": "warning",
+      "match": {
+        "protocols": [
+          "tcp"
+        ],
+        "dst_ports": [
+          80,
+          443
+        ],
+        "path_suffix": ".php",
+        "dst_cidrs": [
+          "198.51.100.0/24"
+        ]
+      },
+      "group_by": [
+        "dst_ip"
+      ],
+      "window_seconds": 10,
+      "cooldown_seconds": 120,
+      "thresholds": {
+        "min_rps": 100,
+        "min_unique_sources": 10
+      }
+    }
+  ]
+}

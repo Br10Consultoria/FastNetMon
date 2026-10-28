@@ -1,0 +1,50 @@
+{
+  "rules": [
+    {
+      "name": "DNS-demo",
+      "kind": "flow",
+      "severity": "warning",
+      "match": {
+        "protocols": [
+          "udp"
+        ],
+        "dst_ports": [
+          53
+        ],
+        "dst_cidrs": [
+          "198.51.100.0/24"
+        ]
+      },
+      "group_by": [
+        "dst_ip"
+      ],
+      "window_seconds": 10,
+      "cooldown_seconds": 60,
+      "thresholds": {
+        "min_pps": 30000,
+        "min_unique_sources": 10
+      }
+    },
+    {
+      "name": "PHP-demo",
+      "kind": "http",
+      "severity": "warning",
+      "match": {
+        "dst_ports": [
+          80,
+          443
+        ],
+        "path_suffix": ".php"
+      },
+      "group_by": [
+        "dst_ip"
+      ],
+      "window_seconds": 10,
+      "cooldown_seconds": 60,
+      "thresholds": {
+        "min_rps": 1,
+        "min_unique_sources": 10
+      }
+    }
+  ]
+}
