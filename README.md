@@ -6,7 +6,11 @@
 
 > **Pode instalar num Ubuntu 24.04 LTS ou Debian e receber NetFlow/IPFIX do Huawei e MikroTik.** Isso coleta tráfego normal, mesmo sem qualquer ataque. A consulta inicial funciona com `nfdump`; **o Grafana de tráfego contínuo ainda não está ligado automaticamente ao coletor e não deve ser considerado pronto para produção.** Sem mitigação automática.
 
-## Instalar servidor do zero (HUAWEI + MikroTik)
+## Instalar servidor do zero — começar somente pelo Huawei
+
+**Piloto atual:** [Huawei NE8000 primeiro; MikroTik só após calibração](docs/HUAWEI_PILOT.md). O bootstrap prepara ambas as fontes, mas inicie **apenas** o serviço Huawei no primeiro teste.
+
+## Preparação dos coletores (Huawei + MikroTik)
 
 **[Manual completo, do sistema operacional à recepção do primeiro flow →](docs/INSTALL_PILOT.md)**
 
@@ -22,7 +26,7 @@ sudo bash scripts/bootstrap-pilot.sh
 # Revise firewall (UDP 2056/2057 somente para IPs reais dos roteadores),
 # caminhos de acesso e parametros do serviço antes de iniciar.
 sudo systemctl enable --now orbymon-nfcapd@huawei.service
-sudo systemctl enable --now orbymon-nfcapd@mikrotik.service
+# Nao iniciar o servico MikroTik na fase Huawei
 ```
 
 O `bootstrap-pilot.sh` instala dependências e prepara dois serviços systemd separados; **não inicia serviços nem altera firewall ou roteadores**. Após configurar a exportação de NetFlow/IPFIX no Huawei/MikroTik:
@@ -30,7 +34,7 @@ O `bootstrap-pilot.sh` instala dependências e prepara dois serviços systemd se
 ```bash
 sudo tcpdump -ni any -c 15 'udp port 2056 or udp port 2057'
 sudo bash scripts/inspect-pilot.sh huawei
-sudo bash scripts/inspect-pilot.sh mikrotik
+## Depois de calibrar a coleta Huawei, testaremos o MikroTik separadamente
 ```
 
 A inspeção mostra volume normal, top IPs, portas e protocolos, sem depender de alerta. Os coletores são independentes e persistem após reinício, com diretórios separados.
