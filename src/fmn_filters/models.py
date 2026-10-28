@@ -52,6 +52,27 @@ class Event:
     method: str = ''
     path: str = ''
     status: int = 0
+    src_asn: int = 0
+    dst_asn: int = 0
+    src_asn_name: str = ''
+    dst_asn_name: str = ''
+    src_country: str = ''
+    dst_country: str = ''
+    src_latitude: float | None = None
+    src_longitude: float | None = None
+    dst_latitude: float | None = None
+    dst_longitude: float | None = None
+    input_if: int = 0
+    output_if: int = 0
+    ttl: int = -1
+    icmp_type: int = -1
+    icmp_code: int = -1
+    next_hop: str = ''
+    bgp_next_hop: str = ''
+    src_nat_ip: str = ''
+    dst_nat_ip: str = ''
+    src_nat_port: int = -1
+    dst_nat_port: int = -1
 
     def __post_init__(self):
         if self.kind not in ('flow', 'http'):

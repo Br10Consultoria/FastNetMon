@@ -21,7 +21,7 @@ LOG = logging.getLogger(__name__)
 def scan(directory: Path, db: sqlite3.Connection, detector: Detector,
          nfdump_binary: str = 'nfdump', max_age_minutes: int = 15,
          min_age_seconds: int = 3, emit: Callable[[dict], None] = print,
-         assume_utc: bool = True) -> int:
+         assume_utc: bool = True, enricher=None) -> int:
     db.execute('CREATE TABLE IF NOT EXISTS processed (path TEXT PRIMARY KEY, mtime_ns INTEGER, size INTEGER)')
     db.commit()
     now = time.time()
@@ -49,7 +49,7 @@ def scan(directory: Path, db: sqlite3.Connection, detector: Detector,
                 raise ValueError('nfdump não retornou lista JSON')
             for raw in raw_records:
                 try:
-                    event = parse_record(raw, assume_utc=assume_utc)
+                    event = parse_record(enricher.enrich(raw) if enricher else raw, assume_utc=assume_utc)
                     if event is None:
                         continue
                     for alert in detector.process(event):

@@ -1,0 +1,68 @@
+{
+  "rules": [
+    {
+      "name": "DNS-UDP-ASN-GEO-POR-ORIGEM",
+      "kind": "flow",
+      "severity": "warning",
+      "match": {
+        "all_of": [
+          {"protocols": ["udp"], "src_ports": [53], "dst_cidrs": ["198.51.100.0/24"]},
+          {"not": {"src_countries": ["BR"]}}
+        ],
+        "src_asns": [15169, 13335]
+      },
+      "group_by": ["src_asn", "src_country", "dst_ip"],
+      "window_seconds": 10,
+      "cooldown_seconds": 60,
+      "thresholds": {"min_mbps": 200, "min_unique_sources": 5}
+    },
+    {
+      "name": "TCP-SYN-PURO-POR-IP",
+      "kind": "flow",
+      "severity": "critical",
+      "match": {
+        "protocols": ["tcp"],
+        "tcp_flags_all": "S",
+        "tcp_flags_none": "A",
+        "dst_ports": [80, 443],
+        "dst_cidrs": ["198.51.100.0/24"],
+        "input_interfaces": [10, 20]
+      },
+      "group_by": ["src_ip", "dst_ip", "dst_port"],
+      "window_seconds": 10,
+      "cooldown_seconds": 60,
+      "thresholds": {"min_pps": 20000}
+    },
+    {
+      "name": "ICMP-ECHO-ANORMAL",
+      "kind": "flow",
+      "severity": "warning",
+      "match": {
+        "protocols": ["icmp"],
+        "icmp_types": [8],
+        "icmp_codes": [0],
+        "dst_cidrs": ["198.51.100.0/24"],
+        "packets_min": 5000
+      },
+      "group_by": ["dst_ip"],
+      "window_seconds": 10,
+      "cooldown_seconds": 120,
+      "thresholds": {"min_pps": 20000}
+    },
+    {
+      "name": "UDP-COM-EXCECOES-PORTAS",
+      "kind": "flow",
+      "severity": "warning",
+      "match": {
+        "protocols": ["udp"],
+        "dst_cidrs": ["198.51.100.0/24"],
+        "not": {"dst_ports": [53, 123, 443]},
+        "bytes_max": 2000000
+      },
+      "group_by": ["dst_ip", "dst_port"],
+      "window_seconds": 10,
+      "cooldown_seconds": 60,
+      "thresholds": {"min_pps": 50000}
+    }
+  ]
+}

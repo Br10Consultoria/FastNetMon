@@ -1,0 +1,545 @@
+{
+  "id": null,
+  "uid": "orbymon-ddos-overview",
+  "title": "OrbyMon | Trafego, ASN e Defesa DDoS",
+  "description": "Painel OrbyMon v0.2, eventos detectados e fluxos agregados; geolocalização aproximada (MaxMind).",
+  "tags": [
+    "orbymon",
+    "fastnetmon",
+    "ddos",
+    "asn",
+    "geoip"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 40,
+  "version": 1,
+  "refresh": "30s",
+  "editable": true,
+  "graphTooltip": 1,
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Alertas detectados",
+      "type": "stat",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT COUNT(*) AS value FROM orby_alerts WHERE $__timeFilter(event_time)",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "title": "ASNs distintos em alertas atribuídos",
+      "type": "stat",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT COUNT(DISTINCT src_asn) AS value FROM orby_alerts WHERE $__timeFilter(event_time) AND src_asn IS NOT NULL AND src_asn > 0",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "options": {},
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "title": "Países distintos no tráfego",
+      "type": "stat",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT COUNT(DISTINCT src_country) AS value FROM orby_traffic_minute WHERE $__timeFilter(bucket_utc) AND src_country != ''",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "options": {},
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "title": "Volume estimado no intervalo",
+      "type": "stat",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT ROUND(SUM(total_bytes)/1000000000,2) AS value FROM orby_traffic_minute WHERE $__timeFilter(bucket_utc)",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "decgbytes",
+          "color": {
+            "mode": "continuous-GrYlRd"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "title": "Volume por protocolo — Mbps (média por minuto)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 15,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'), protocol AS metric, ROUND(SUM(total_bytes)*8/60000000,2) AS value FROM orby_traffic_minute WHERE $__timeFilter(bucket_utc) GROUP BY 1,protocol ORDER BY 1",
+          "format": "time_series",
+          "editorMode": "code"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Mbps",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 20
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "title": "Alertas ao longo do tempo",
+      "type": "timeseries",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 15,
+        "y": 4,
+        "w": 9,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT $__timeGroupAlias(event_time,'1m'), COUNT(*) AS value FROM orby_alerts WHERE $__timeFilter(event_time) GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "editorMode": "code"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "title": "Origem aproximada dos alertas por IP",
+      "type": "geomap",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 15,
+        "h": 11
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT src_latitude AS latitude, src_longitude AS longitude, src_country AS country, src_asn_name AS asn_name, src_ip AS source_ip, dst_ip AS destination_ip, rule_name AS attack_type, event_time AS timestamp FROM orby_alerts WHERE $__timeFilter(event_time) AND src_ip IS NOT NULL AND src_latitude IS NOT NULL AND src_longitude IS NOT NULL ORDER BY event_time DESC LIMIT 3000",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "options": {
+        "view": {
+          "id": "coords",
+          "lat": 0,
+          "lon": 0,
+          "zoom": 1
+        },
+        "basemap": {
+          "type": "default",
+          "name": "Open Street Map"
+        },
+        "layers": [
+          {
+            "type": "markers",
+            "name": "Alertas por origem (IP)",
+            "location": {
+              "mode": "coords",
+              "latitude": "latitude",
+              "longitude": "longitude"
+            },
+            "tooltip": true,
+            "config": {
+              "style": {
+                "size": {
+                  "fixed": 7
+                },
+                "color": {
+                  "fixed": "#FF891A"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 8,
+      "title": "Top ASNs de origem — tráfego",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 15,
+        "y": 12,
+        "w": 9,
+        "h": 11
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT src_asn AS 'ASN', MAX(NULLIF(src_asn_name,'')) AS 'Organização', src_country AS 'País', ROUND(SUM(total_bytes)/1000000000,2) AS 'GB', ROUND(SUM(total_packets)/1000000,2) AS 'Milhões de Pacotes' FROM orby_traffic_minute WHERE $__timeFilter(bucket_utc) AND src_asn > 0 GROUP BY src_asn,src_country ORDER BY SUM(total_bytes) DESC LIMIT 25",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "options": {},
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 9,
+      "title": "Top países de origem — tráfego",
+      "type": "barchart",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 23,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT src_country AS 'País', ROUND(SUM(total_bytes)/1000000000,2) AS 'Volume GB' FROM orby_traffic_minute WHERE $__timeFilter(bucket_utc) AND src_country != '' GROUP BY src_country ORDER BY SUM(total_bytes) DESC LIMIT 15",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "xField": "País",
+        "showValue": "auto",
+        "legend": {
+          "displayMode": "hidden"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 10,
+      "title": "Top portas de destino",
+      "type": "barchart",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 23,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT CAST(dst_port AS CHAR) AS 'Porta', ROUND(SUM(total_bytes)/1000000000,2) AS 'Volume GB' FROM orby_traffic_minute WHERE $__timeFilter(bucket_utc) GROUP BY dst_port ORDER BY SUM(total_bytes) DESC LIMIT 15",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "xField": "Porta",
+        "showValue": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 11,
+      "title": "Alertas por regra",
+      "type": "piechart",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 23,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT rule_name AS 'Regra', COUNT(*) AS 'Alertas' FROM orby_alerts WHERE $__timeFilter(event_time) GROUP BY rule_name ORDER BY COUNT(*) DESC LIMIT 12",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right"
+        },
+        "pieType": "donut"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 12,
+      "title": "Últimos incidentes",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 31,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT event_time AS 'Data UTC', rule_name AS 'Regra', severity AS 'Severidade', src_ip AS 'IP Origem', dst_ip AS 'IP Destino', CONCAT('AS',src_asn) AS 'ASN', src_asn_name AS 'Organização', src_country AS 'País', ROUND(pps,0) AS 'PPS', ROUND(mbps,2) AS 'Mbps', unique_sources AS 'Fontes' FROM orby_alerts WHERE $__timeFilter(event_time) ORDER BY event_time DESC LIMIT 500",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "options": {},
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      }
+    }
+  ],
+  "templating": {
+    "list": []
+  }
+}

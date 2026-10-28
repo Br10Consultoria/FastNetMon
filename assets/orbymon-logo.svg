@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="330" viewBox="0 0 1200 330" role="img" aria-label="OrbyMon - Trafego e Seguranca de Redes">
+<defs><linearGradient id="blue" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#29BAFF"/><stop offset="1" stop-color="#087CE8"/></linearGradient><linearGradient id="orange" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FFC16A"/><stop offset="1" stop-color="#FF7500"/></linearGradient></defs>
+<g transform="translate(18 15)"><path d="M147 11c67 0 123 47 134 109 12 72-34 143-105 158-74 16-146-29-165-101-18-68 19-144 87-162 17-5 33-5 49-4Z" fill="none" stroke="url(#blue)" stroke-width="21" stroke-dasharray="520 120" stroke-linecap="round" transform="rotate(-39 147 149)"/>
+<path d="M145 52c45 0 83 27 96 68" stroke="url(#orange)" stroke-width="24" stroke-linecap="round" fill="none"/>
+<path d="M89 116c-17 25-17 57 0 82" stroke="#FF861E" stroke-width="19" stroke-linecap="round" fill="none"/>
+<path d="M148 83l67 24v54c0 54-44 91-67 101-23-10-67-47-67-101v-54Z" fill="#081D30" stroke="url(#blue)" stroke-width="9"/>
+<path d="m117 165 23 25 40-55" stroke="url(#orange)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</g><text x="327" y="190" font-family="DejaVu Sans, Arial, sans-serif" font-size="130" font-weight="700"><tspan fill="#FF891A">Orby</tspan><tspan fill="#269FF4">Mon</tspan></text>
+<text x="339" y="245" fill="#8FB2D4" font-family="DejaVu Sans, Arial, sans-serif" font-size="25" letter-spacing="5">OBSERVABILIDADE E DEFESA DDOS</text></svg>

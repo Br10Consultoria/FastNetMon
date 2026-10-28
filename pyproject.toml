@@ -10,8 +10,15 @@ requires-python = ">=3.10"
 dependencies = []
 license = {text = "MIT"}
 
+[project.optional-dependencies]
+geo = ["geoip2>=4.8,<6"]
+mysql = ["PyMySQL>=1.1,<2"]
+full = ["geoip2>=4.8,<6", "PyMySQL>=1.1,<2"]
+
 [project.scripts]
 fmn-filters = "fmn_filters.__main__:main"
+orbymon-enrich = "fmn_filters.enrich_stream:main"
+orbymon-mysql-sink = "fmn_filters.mysql_sink:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

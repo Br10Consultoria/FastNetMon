@@ -9,8 +9,13 @@ from .models import Event
 
 MATCH_KEYS = {'src_cidrs', 'dst_cidrs', 'exclude_src_cidrs', 'exclude_dst_cidrs',
               'src_ports', 'dst_ports', 'protocols', 'tcp_flags_all', 'tcp_flags_any',
-              'path_suffix', 'methods', 'statuses', 'all_of', 'any_of'}
-GROUP_KEYS = {'src_ip', 'dst_ip', 'src_port', 'dst_port', 'protocol'}
+              'path_suffix', 'methods', 'statuses', 'all_of', 'any_of',
+              'src_asns', 'dst_asns', 'src_countries', 'dst_countries', 'input_interfaces', 'output_interfaces',
+              'not', 'tcp_flags_none', 'ttl_min', 'ttl_max', 'bytes_min', 'bytes_max',
+              'packets_min', 'packets_max', 'duration_ms_min', 'duration_ms_max',
+              'icmp_types', 'icmp_codes', 'src_nat_ips', 'dst_nat_ips',
+              'src_nat_ports', 'dst_nat_ports', 'next_hops', 'bgp_next_hops'}
+GROUP_KEYS = {'src_ip', 'dst_ip', 'src_port', 'dst_port', 'protocol', 'src_asn', 'dst_asn', 'src_country', 'dst_country', 'input_if', 'output_if'}
 THRESHOLDS = {'min_pps', 'min_mbps', 'min_flows_per_sec', 'min_unique_sources', 'min_rps'}
 
 
@@ -26,19 +31,30 @@ def validate_match(match: dict):
                 raise ValueError(f'{key} deve ser lista não vazia')
             for cidr in match[key]:
                 ip_network(cidr, strict=False)
-    for key in ('src_ports', 'dst_ports'):
+    for key in ('src_ports', 'dst_ports', 'src_asns', 'dst_asns', 'input_interfaces', 'output_interfaces', 'icmp_types', 'icmp_codes', 'src_nat_ports', 'dst_nat_ports'):
         if key in match:
             if not isinstance(match[key], list) or not match[key]:
                 raise ValueError(f'{key} deve ser lista não vazia')
             for p in match[key]:
-                if not isinstance(p, int) or isinstance(p, bool) or p < 0 or p > 65535:
+                if not isinstance(p, int) or isinstance(p, bool) or p < 0 or p > (65535 if key in ('src_ports', 'dst_ports') else 4294967295):
                     raise ValueError(f'{key} com porta inválida')
-    for key in ('protocols', 'methods', 'statuses'):
+    for key in ('protocols', 'methods', 'statuses', 'src_countries', 'dst_countries'):
         if key in match and (not isinstance(match[key], list) or not match[key]):
             raise ValueError(f'{key} deve ser lista não vazia')
-    for key in ('tcp_flags_all', 'tcp_flags_any', 'path_suffix'):
+    for key in ('tcp_flags_all', 'tcp_flags_any', 'tcp_flags_none', 'path_suffix'):
         if key in match and (not isinstance(match[key], str) or not match[key]):
             raise ValueError(f'{key} deve ser string não vazia')
+    for key in ('ttl_min', 'ttl_max', 'bytes_min', 'bytes_max', 'packets_min', 'packets_max', 'duration_ms_min', 'duration_ms_max'):
+        if key in match and (not isinstance(match[key], (int,float)) or isinstance(match[key], bool) or not math.isfinite(match[key]) or match[key] < 0):
+            raise ValueError(f'{key} deve ser numérico, não negativo e finito')
+    for key in ('src_nat_ips', 'dst_nat_ips', 'next_hops', 'bgp_next_hops'):
+        if key in match:
+            if not isinstance(match[key], list) or not match[key]:
+                raise ValueError(f'{key} precisa de lista de IPs')
+            for ip in match[key]:
+                ip_address(ip)
+    if 'not' in match:
+        validate_match(match['not'])
     for key in ('all_of', 'any_of'):
         if key in match:
             if not isinstance(match[key], list) or not match[key]:
@@ -55,15 +71,43 @@ def matches(event: Event, match: dict) -> bool:
         if key in match and any(ip_address(getattr(event, field_name)) in ip_network(v, strict=False) for v in match[key]):
             return False
     for key, field_name in (('src_ports', 'src_port'), ('dst_ports', 'dst_port'),
+                            ('src_asns', 'src_asn'), ('dst_asns', 'dst_asn'),
+                            ('src_countries', 'src_country'), ('dst_countries', 'dst_country'),
+                            ('input_interfaces', 'input_if'), ('output_interfaces', 'output_if'),
+                            ('icmp_types','icmp_type'), ('icmp_codes','icmp_code'),
+                            ('src_nat_ports','src_nat_port'), ('dst_nat_ports','dst_nat_port'),
                             ('protocols', 'protocol'), ('methods', 'method'), ('statuses', 'status')):
         if key in match:
             allowed = match[key]
             if key == 'protocols':
                 allowed = [str(v).lower() for v in allowed]
+            if key in ('src_countries', 'dst_countries'):
+                allowed = [str(v).upper() for v in allowed]
             if key == 'methods':
                 allowed = [str(v).upper() for v in allowed]
             if getattr(event, field_name) not in allowed:
                 return False
+    for key,attr in (('src_nat_ips','src_nat_ip'),('dst_nat_ips','dst_nat_ip'),
+                     ('next_hops','next_hop'),('bgp_next_hops','bgp_next_hop')):
+        if key in match and getattr(event, attr) not in match[key]:
+            return False
+    for prefix, value in (('ttl',event.ttl),('bytes',event.bytes),('packets',event.packets),
+                          ('duration_ms',(event.end-event.start)*1000)):
+        if f'{prefix}_min' in match and value < match[f'{prefix}_min']:
+            return False
+        if f'{prefix}_max' in match and value > match[f'{prefix}_max']:
+            return False
+    if 'tcp_flags_none' in match and any(c in event.tcp_flags for c in match['tcp_flags_none'].upper()):
+        return False
+    if 'not' in match:
+        # Unknown enrichment cannot prove country/ASN exclusion.
+        negated = match['not']
+        for k, value in (('src_countries', event.src_country), ('dst_countries', event.dst_country),
+                         ('src_asns', event.src_asn), ('dst_asns', event.dst_asn)):
+            if k in negated and (value == '' or value == 0):
+                return False
+        if matches(event, negated):
+            return False
     if 'tcp_flags_all' in match and not all(c in event.tcp_flags for c in match['tcp_flags_all'].upper()):
         return False
     if 'tcp_flags_any' in match and not any(c in event.tcp_flags for c in match['tcp_flags_any'].upper()):
@@ -219,7 +263,21 @@ class Detector:
             if last is not None and watermark - last < rule.cooldown_seconds:
                 continue
             self.last_alert[key] = watermark
-            results.append({'rule': rule.name, 'kind': rule.kind, 'severity': rule.severity,
+            # Attribution is only safe if grouping includes the dimension (multi-source
+            # destination alerts MUST NOT claim a single ASN or source IP).
+            context = {name: getattr(event, name) for name in
+                       ('src_asn', 'src_asn_name', 'src_country', 'src_latitude', 'src_longitude',
+                        'dst_asn', 'dst_asn_name', 'dst_country')
+                       if (name.startswith('src_') and ('src_asn' in rule.group_by or 'src_ip' in rule.group_by)
+                           or name.startswith('dst_') and ('dst_asn' in rule.group_by or 'dst_ip' in rule.group_by))}
+            if 'src_ip' not in rule.group_by:
+                context.pop('src_latitude', None)
+                context.pop('src_longitude', None)
+            # Even grouped-by-ASN data may span countries: country attribution
+            # requires explicit src_country grouping or single source IP.
+            if 'src_country' not in rule.group_by and 'src_ip' not in rule.group_by:
+                context.pop('src_country', None)
+            results.append({'context': context, 'rule': rule.name, 'kind': rule.kind, 'severity': rule.severity,
                             'group': group, 'time_unix': event.end, 'window_seconds': rule.window_seconds,
                             'metrics_estimated': metrics, 'sample_sources': sorted(source_ips)[:10],
                             'action': 'alert_only'})

@@ -11,6 +11,7 @@ from pathlib import Path
 from .engine import Rule, Detector
 from .parsers import parse_record, stream_records
 from .watcher import scan
+from .enrichment import Enricher
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -27,6 +28,8 @@ def main(argv: list[str] | None = None) -> int:
     cli.add_argument('--poll-seconds', type=int, default=5)
     cli.add_argument('--max-age-minutes', type=int, default=15)
     cli.add_argument('--once', action='store_true', help='escanear apenas uma vez')
+    cli.add_argument('--asn-mmdb', help='caminho GeoLite2-ASN.mmdb (opcional)')
+    cli.add_argument('--city-mmdb', help='caminho GeoLite2-City.mmdb (opcional)')
     args = cli.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s', stream=sys.stderr)
     try:
@@ -38,6 +41,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.validate:
             print(f'{len(rules)} regras válidas')
             return 0
+        enricher = Enricher(args.asn_mmdb, args.city_mmdb) if (args.asn_mmdb or args.city_mmdb) else None
         if args.watch_dir:
             if args.poll_seconds < 1 or args.max_age_minutes < 1:
                 raise ValueError('poll-seconds e max-age-minutes devem ser positivos')
@@ -45,7 +49,8 @@ def main(argv: list[str] | None = None) -> int:
             with sqlite3.connect(args.state_db) as db:
                 while True:
                     scan(Path(args.watch_dir), db, detector, args.nfdump_bin,
-                         args.max_age_minutes, emit=lambda item: print(json.dumps(item, ensure_ascii=False), flush=True))
+                         args.max_age_minutes, emit=lambda item: print(json.dumps(item, ensure_ascii=False), flush=True),
+                         enricher=enricher)
                     if args.once:
                         return 0
                     time.sleep(args.poll_seconds)
@@ -55,7 +60,7 @@ def main(argv: list[str] | None = None) -> int:
                 source = sys.stdin if filename == '-' else stack.enter_context(open(filename, encoding='utf-8'))
                 for raw in stream_records(source, args.format):
                     try:
-                        event = parse_record(raw, assume_utc=args.assume_utc)
+                        event = parse_record(enricher.enrich(raw) if enricher else raw, assume_utc=args.assume_utc)
                         if event is None:
                             continue
                         for alert in detector.process(event):

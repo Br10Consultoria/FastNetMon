@@ -1,0 +1,11 @@
+apiVersion: 1
+providers:
+  - name: OrbyMon
+    orgId: 1
+    folder: OrbyMon
+    type: file
+    disableDeletion: false
+    allowUiUpdates: true
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards/orbymon
