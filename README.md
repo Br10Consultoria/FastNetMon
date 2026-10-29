@@ -39,6 +39,8 @@ sudo bash scripts/inspect-pilot.sh huawei
 
 A inspeção mostra volume normal, top IPs, portas e protocolos, sem depender de alerta. Os coletores são independentes e persistem após reinício, com diretórios separados.
 
+> **Fase 2 (piloto):** [Ingestao idempotente Huawei → MariaDB → Grafana](docs/TRAFFIC_PIPELINE.md). O timer e opcional e nao e iniciado pelo bootstrap.
+
 ## Componentes e estágio real
 
 | Componente | Estado |

@@ -9,7 +9,7 @@ esac
 root="/var/lib/orbymon/flows/$source_name"
 if [[ ! -d "$root" ]]; then echo "Diretorio ausente: $root" >&2; exit 1; fi
 if ! command -v nfdump >/dev/null 2>&1; then echo 'nfdump nao instalado' >&2; exit 1; fi
-last="$(find "$root" -maxdepth 1 -type f -name 'nfcapd.[0-9]*' -printf '%f\n' | sort | tail -n 1)"
+last="$(find "$root" -maxdepth 1 -type f -name 'nfcapd.20*' -printf '%T@ %f\n' | sort -nr | head -n 1 | cut -d' ' -f2-)"
 if [[ -z "$last" ]]; then
   echo "Ainda sem arquivos rotacionados para $source_name. Aguarde 30-90 segundos, confira firewall e exportacao." >&2
   exit 1

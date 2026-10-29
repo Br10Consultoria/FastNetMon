@@ -1,0 +1,17 @@
+[Unit]
+Description=OrbyMon Huawei flow ingestion (read-only source, MariaDB sink)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=orbymon
+Group=orbymon
+WorkingDirectory=/opt/orbymon
+EnvironmentFile=/etc/orbymon/pipeline.env
+ExecStart=/opt/orbymon/.venv/bin/python -m fmn_filters.ingest_nfcapd --source huawei
+TimeoutStartSec=240
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true

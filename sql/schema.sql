@@ -47,3 +47,16 @@ CREATE TABLE IF NOT EXISTS orby_traffic_minute (
     INDEX ix_traffic_country_time (src_country, bucket_utc),
     INDEX ix_traffic_port_time (dst_port, bucket_utc)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- Checkpoint atomico por arquivo; nao apagar sem planejamento de reconciliacao.
+CREATE TABLE IF NOT EXISTS orby_ingested_files (
+    source VARCHAR(32) NOT NULL,
+    file_name VARCHAR(255) NOT NULL,
+    file_size BIGINT UNSIGNED NOT NULL,
+    file_mtime_ns BIGINT UNSIGNED NOT NULL,
+    flow_count BIGINT UNSIGNED NOT NULL,
+    ingested_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (source, file_name),
+    INDEX ix_ingested_at (ingested_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
