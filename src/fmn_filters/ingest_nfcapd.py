@@ -85,6 +85,7 @@ def run(source="huawei", *, dry_run=False, max_files=20,
         return 0
     db = None if dry_run else connection_from_env()
     imported = 0
+    failures = 0
     try:
         for path in files:
             try:
@@ -95,13 +96,19 @@ def run(source="huawei", *, dry_run=False, max_files=20,
                     fresh = save_file(db, source, path, st, records, count)
                     print(f"{'IMPORTADO' if fresh else 'JA_IMPORTADO'} {path.name}: {count} fluxos", flush=True)
                     imported += int(fresh)
-            except Exception:
+            except Exception as exc:
                 if db is not None:
                     db.rollback()
-                raise
+                # Um arquivo legado com relogio incorreto nao deve impedir
+                # a ingestao dos demais arquivos novos.
+                print(f"IGNORADO {path.name}: {exc}", file=sys.stderr, flush=True)
+                failures += 1
+                continue
     finally:
         if db is not None:
             db.close()
+    if failures:
+        raise RuntimeError(f"{failures} arquivo(s) nao importado(s); verifique logs")
     return imported
 
 
