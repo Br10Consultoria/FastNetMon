@@ -76,17 +76,54 @@ def save_file(db, source, path, stat, records, count):
     return True
 
 
+def pending_files(db, source, files):
+    """Seleciona somente arquivos ainda nao importados, antes de limitar o lote.
+
+    Caso contrario, os 20 arquivos antigos monopolizam todas as execucoes
+    e o Grafana para de receber trafego novo.
+    """
+    if not files:
+        return []
+    saved = {}
+    with db.cursor() as cur:
+        for start in range(0, len(files), 200):
+            batch = files[start:start + 200]
+            placeholders = ",".join(["%s"] * len(batch))
+            cur.execute(
+                "SELECT file_name,file_size,file_mtime_ns FROM orby_ingested_files "
+                "WHERE source=%s AND file_name IN (" + placeholders + ")",
+                (source,) + tuple(p.name for p in batch),
+            )
+            for name, size, mtime_ns in cur.fetchall():
+                saved[name] = (int(size), int(mtime_ns))
+    pending = []
+    for path in files:
+        previous = saved.get(path.name)
+        if previous is None:
+            pending.append(path)
+        else:
+            stat = path.stat()
+            if previous != (stat.st_size, stat.st_mtime_ns):
+                raise ValueError("Arquivo ja importado mudou: " + path.name)
+    return pending
+
+
 def run(source="huawei", *, dry_run=False, max_files=20,
         max_age_hours=1, min_age=45, directory=None):
     folder = directory if directory is not None else ROOT / source
-    files = candidates(folder, time.time(), min_age, max_age_hours * 3600)[:max_files]
-    print(f"fonte={source} arquivos_elegiveis={len(files)} dry_run={dry_run}", flush=True)
-    if not files:
+    eligible = candidates(folder, time.time(), min_age, max_age_hours * 3600)
+    if not eligible:
+        print(f"fonte={source} arquivos_elegiveis=0 dry_run={dry_run}", flush=True)
         return 0
     db = None if dry_run else connection_from_env()
     imported = 0
     failures = 0
     try:
+        pending = eligible if dry_run else pending_files(db, source, eligible)
+        files = pending[:max_files]
+        print(f"fonte={source} arquivos_elegiveis={len(eligible)} "
+              f"arquivos_pendentes={len(pending)} lote={len(files)} dry_run={dry_run}",
+              flush=True)
         for path in files:
             try:
                 st, records, count = decode_file(path, time.time())

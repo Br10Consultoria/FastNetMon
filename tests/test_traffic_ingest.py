@@ -7,7 +7,7 @@ import time
 import unittest
 from unittest.mock import patch
 
-from fmn_filters.ingest_nfcapd import candidates, decode_file, save_file
+from fmn_filters.ingest_nfcapd import candidates, decode_file, save_file, pending_files, run
 
 
 class FakeCursor:
@@ -25,8 +25,16 @@ class FakeCursor:
                 self.db.pending = (args[0], args[1], args[2], args[3])
         elif "SELECT file_size" in sql:
             self.db.selected = self.db.saved.get(tuple(args))
+        elif "SELECT file_name,file_size,file_mtime_ns" in sql:
+            self.db.selected_many = [
+                (name, size, mtime)
+                for (source, name), (size, mtime) in self.db.saved.items()
+                if source == args[0] and name in args[1:]
+            ]
     def fetchone(self):
         return self.db.selected
+    def fetchall(self):
+        return self.db.selected_many
     def executemany(self, sql, args):
         self.db.pending_rows.extend(args)
 
@@ -38,6 +46,7 @@ class FakeDB:
         self.selected = None
         self.pending_rows = []
         self.rows = []
+        self.selected_many = []
     def cursor(self):
         return FakeCursor(self)
     def commit(self):
@@ -84,6 +93,29 @@ class PipelineTests(unittest.TestCase):
             self.assertFalse(save_file(db, "huawei", path, st, records, count))
             self.assertEqual(len(db.rows), 1)
             self.assertEqual(db.rows[0][8:10], (2048, 143360))
+
+    def test_skips_processed_files_before_batch_limit(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            now = time.time()
+            paths = []
+            for number in range(25):
+                path = folder / ("nfcapd.2026102916%04d" % number)
+                path.write_text(str(number))
+                os.utime(path, (now - 200 + number, now - 200 + number))
+                paths.append(path)
+            db = FakeDB()
+            for path in paths[:20]:
+                st = path.stat()
+                db.saved[("huawei", path.name)] = (st.st_size, st.st_mtime_ns)
+            remaining = pending_files(db, "huawei", paths)
+            self.assertEqual(remaining, paths[20:])
+            self.assertEqual(len(remaining[:20]), 5)
+            # A primeira rodada importou 20; a proxima deve processar novos arquivos.
+            st = paths[19].stat()
+            paths[19].write_text("alterado")
+            with self.assertRaisesRegex(ValueError, "mudou"):
+                pending_files(db, "huawei", paths)
 
     def test_reject_future(self):
         now = datetime(2026, 10, 29, 19, 7, tzinfo=timezone.utc).timestamp()
