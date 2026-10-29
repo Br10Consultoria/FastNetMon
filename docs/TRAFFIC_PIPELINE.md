@@ -7,7 +7,8 @@ Os contadores NetFlow v9 ja foram expandidos pelo nfdump com sampler 1:2048:
 para evitar deslocamento de 3h no Ubuntu com America/Bahia.
 
 - Lê somente arquivos nfcapd.20* com pelo menos 45s de idade e ate 1h.
-- Processa ate 20 arquivos em cada rodada; rollback integral em falha.
+- Consulta o ledger antes de escolher o lote: arquivos ja processados nao ocupam as 20 vagas, permitindo avancar no backlog apos cada execucao.
+- Processa ate 20 arquivos pendentes em cada rodada; rollback integral em falha.
 - Ledger orby_ingested_files e rollup orby_traffic_minute compartilham a
   mesma transacao, impedindo reimportacao e duplo somatorio.
 - Rejeita registros mais de 5min no futuro ou 4h no passado.
