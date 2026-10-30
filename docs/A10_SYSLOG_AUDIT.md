@@ -39,3 +39,39 @@ variadas; nao declarar 304 eventos perdidos sem evidencia.
 
 A rotacao dos arquivos A10 nao possui exclusao automatica;
 monitorar espaco, controle de acesso e retencao adequada para dados NAT.
+
+## Diagnostico adicional: limite 8 KiB e diferenca de relogio
+
+O rsyslog possui limite global default maxMessageSize de 8 KiB quando
+nao configurado; mensagens acima disso podem ser truncadas. Uma
+concentracao de rawmsg_bytes_p50/p95 perto de 8192 e muitos fragmentos
+sugerem investigar tamanho/framing, MAS nao provam sozinho truncamento.
+A auditoria agora mostra quantidades perto de 4096 e 8192 bytes.
+
+A diferenca delta_coletor_menos_a10_segundos_p50/p95 compara o horario
+timegenerated (received_at do receptor) com o timestamp do header do A10,
+com offsets timezone respeitados. Pode ter atraso/buffering alem de
+desvio de relogio; por isso revisar NTP em ambos os servidores antes
+de atribuir o offset inteiramente a hora incorreta.
+
+No flow:
+
+    timedatectl status
+    date -Ins
+
+No A10 (somente leitura, sintaxe varia por ACOS):
+
+    show clock
+    show cgnv6 logging statistics
+
+Para avaliar taxa REAL de crescimento do log ATIVO:
+
+    antes=$(stat -c %s /var/log/orbymon/a10/a10-current.ndjson)
+    sleep 30
+    depois=$(stat -c %s /var/log/orbymon/a10/a10-current.ndjson)
+    echo "Bytes em 30 segundos: $((depois-antes))"
+
+A contagem de bytes sera invalida se logrotate girar o arquivo entre
+as duas medicoes (valor negativo ou proximo de zero); acompanhe
+`du -sh /var/log/orbymon/a10` tambem. Nao habilitar limpeza
+automatica de logs CGNAT sem politica legal e capacidade de arquivo.
