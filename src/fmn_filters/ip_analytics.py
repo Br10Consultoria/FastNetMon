@@ -69,13 +69,20 @@ def aggregate(records: list, source: str, enricher: Enricher):
     groups = {}
     count = 0
     for raw in records:
+        if str(raw.get("type", "")).upper() == "EVENT" and "kind" not in raw:
+            continue
+        src_raw = next((raw[k] for k in ("src_ip","src4_addr","src6_addr","srcip")
+                        if raw.get(k)), None)
+        dst_raw = next((raw[k] for k in ("dst_ip","dst4_addr","dst6_addr","dstip")
+                        if raw.get(k)), None)
+        try:
+            src = ip_address(str(src_raw)).compressed
+            dst = ip_address(str(dst_raw)).compressed
+        except ValueError:
+            # Nao deixar um registro sem IP parar a ingestao dos demais.
+            continue
         event = parse_record(raw, assume_utc=True)
         if event is None or event.kind != "flow":
-            continue
-        try:
-            src = ip_address(event.src_ip).compressed
-            dst = ip_address(event.dst_ip).compressed
-        except ValueError:
             continue
         bucket = datetime.fromtimestamp(event.end, timezone.utc).replace(
             second=0, microsecond=0, tzinfo=None)
