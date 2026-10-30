@@ -1,0 +1,429 @@
+{
+  "id": null,
+  "uid": "orbymon-huawei-live",
+  "title": "OrbyMon | Huawei - Trafego em tempo real",
+  "timezone": "browser",
+  "schemaVersion": 40,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-3h",
+    "to": "now"
+  },
+  "tags": [
+    "orbymon",
+    "huawei"
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Banda estimada em Mbps por protocolo",
+      "type": "timeseries",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'), protocol AS metric, ROUND(SUM(total_bytes)*8/60000000,2) AS value FROM orby_traffic_minute WHERE $__timeFilter(bucket_utc) GROUP BY 1,2 ORDER BY 1",
+          "format": "time_series",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "PPS estimados por protocolo",
+      "type": "timeseries",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 16,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'), protocol AS metric, ROUND(SUM(total_packets)/60,0) AS value FROM orby_traffic_minute WHERE $__timeFilter(bucket_utc) GROUP BY 1,2 ORDER BY 1",
+          "format": "time_series",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Top 20 ASN origem",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 8,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT src_asn AS ASN, ROUND(SUM(total_bytes)/1000000,2) AS MB FROM orby_traffic_minute WHERE $__timeFilter(bucket_utc) AND src_asn > 0 GROUP BY src_asn ORDER BY SUM(total_bytes) DESC LIMIT 20",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 4,
+      "title": "Top portas TCP/UDP",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 9,
+        "w": 8,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT protocol, dst_port, ROUND(SUM(total_bytes)/1000000,2) AS MB FROM orby_traffic_minute WHERE $__timeFilter(bucket_utc) AND dst_port>0 AND protocol IN ('tcp','udp') GROUP BY protocol,dst_port ORDER BY SUM(total_bytes) DESC LIMIT 20",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 5,
+      "title": "Volume estimado no período (GB)",
+      "type": "stat",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT ROUND(COALESCE(SUM(total_bytes),0)/1000000000,3) AS value FROM orby_traffic_minute WHERE $__timeFilter(bucket_utc)",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 6,
+      "title": "PPS estimado últimos 5 min",
+      "type": "stat",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 18,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT ROUND(COALESCE(SUM(total_packets),0)/300,0) AS value FROM orby_traffic_minute WHERE bucket_utc >= UTC_TIMESTAMP() - INTERVAL 5 MINUTE AND bucket_utc <= UTC_TIMESTAMP()",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 7,
+      "title": "Mbps estimados últimos 5 min",
+      "type": "stat",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 18,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT ROUND(COALESCE(SUM(total_bytes),0)*8/300000000,2) AS value FROM orby_traffic_minute WHERE bucket_utc >= UTC_TIMESTAMP() - INTERVAL 5 MINUTE AND bucket_utc <= UTC_TIMESTAMP()",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 8,
+      "title": "Total de arquivos importados",
+      "type": "stat",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 18,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT COUNT(*) AS value FROM orby_ingested_files",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 9,
+      "title": "Fluxos por minuto",
+      "type": "timeseries",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'), protocol AS metric, SUM(flow_records) AS value FROM orby_traffic_minute WHERE $__timeFilter(bucket_utc) GROUP BY 1,2 ORDER BY 1",
+          "format": "time_series",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "title": "Últimos registros processados",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 30,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT bucket_utc AS minuto_utc, protocol, ROUND(SUM(total_bytes)*8/60000000,2) AS mbps, ROUND(SUM(total_packets)/60,0) AS pps FROM orby_traffic_minute WHERE $__timeFilter(bucket_utc) GROUP BY bucket_utc,protocol ORDER BY bucket_utc DESC LIMIT 60",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    }
+  ],
+  "templating": {
+    "list": []
+  }
+}
