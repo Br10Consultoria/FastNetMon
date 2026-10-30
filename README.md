@@ -54,6 +54,8 @@ O instalador configura HTTPS autofirmado na porta 3000, datasource somente leitu
 
 **Fase 2 IPs e interfaces:** [instalacao automatica com dashboard](docs/IP_ANALYTICS.md): `sudo bash scripts/setup-ip-analytics.sh`.
 
+**GeoLite2 (ASN/operadora/país e mapa):** [configuracao com MaxMind e atualização diária](docs/GEOIP_SETUP.md): `sudo bash scripts/setup-geoip.sh` após cadastrar a licença GeoLite2. As bases não vêm incluídas no repositório e o estado do servidor deve ser verificado.
+
 **Fase 3 DDoS passiva:** [regras AND/OR/NOT para as redes protegidas, PPS/Mbps e dashboard](docs/DDOS_PASSIVE.md). Instalar com `sudo bash scripts/setup-ddos-passive.sh` apos validar a Fase 2.
 
 **Fase 4 CGNAT:** [diagnostico read-only, IP publico como origem/destino, perfis de pool e baseline p95](docs/CGNAT_BASELINE.md): `sudo bash scripts/setup-cgnat-baseline.sh`.
