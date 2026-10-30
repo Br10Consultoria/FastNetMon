@@ -71,3 +71,43 @@ GeoLite2 mostra localizacao aproximada do bloco, nao do assinante.
 Referencias:
 https://dev.maxmind.com/geoip/updating-databases/
 https://github.com/maxmind/geoipupdate/blob/main/doc/GeoIP.conf.md
+
+## Corrigir import de geoip2.database pelo usuario orbymon
+
+Se o instalador concluiu, baixou os MMDBs e o Python root conseguiu instalar
+geoip2, mas um teste como orbymon retorna
+`ModuleNotFoundError: No module named 'geoip2.database'`, primeiro
+verifique que o modulo esteja no mesmo venv. O instalador historico usou
+umask 027 durante o `pip install`, o que pode criar bibliotecas root:root
+sem permissoes para o usuario orbymon. A causa especifica deve ser
+confirmada com diagnostico de pacotes/paths quando a reparacao falhar.
+
+    cd /opt/orbymon
+    git pull --ff-only origin main
+    sudo bash scripts/repair-geoip-python.sh
+
+O comando reinstala as dependencias GeoIP e o projeto no mesmo ambiente
+virtual usando umask 022, sem tocar nas bases, no MariaDB ou no A10,
+e testa os imports pelo usuario real orbymon sem PYTHONPATH. Os bancos
+GeoLite2 permanecem root:orbymon 0640, a chave MaxMind root 0600.
+
+Teste real da base, sem mostrar segredos:
+
+    cd /opt/orbymon
+    sudo -u orbymon /opt/orbymon/.venv/bin/python - <<'PY'
+from fmn_filters.enrichment import Enricher
+with_reader=Enricher("/var/lib/orbymon/geoip/GeoLite2-ASN.mmdb",
+                     "/var/lib/orbymon/geoip/GeoLite2-City.mmdb")
+try:
+    print(with_reader.lookup("8.8.8.8"))
+finally:
+    with_reader.close()
+PY
+
+Por fim, o timer existente ja executa o proximo batch Huawei com os
+caminhos definidos em /etc/orbymon/ip-analytics.env. Confirmar:
+
+    sudo systemctl start orbymon-ip-huawei.service
+    sudo journalctl -u orbymon-ip-huawei.service -n 30 --no-pager
+
+Nao reimporte arquivos ja contabilizados para nao duplicar bytes/fluxos.

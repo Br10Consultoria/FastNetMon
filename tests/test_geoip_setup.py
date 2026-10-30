@@ -9,7 +9,7 @@ class GeoIPSetupTests(unittest.TestCase):
     def test_bash_syntax(self):
         if not shutil.which("bash"):
             self.skipTest("bash ausente")
-        for path in ("scripts/setup-geoip.sh","scripts/update-geoip.sh"):
+        for path in ("scripts/setup-geoip.sh","scripts/update-geoip.sh","scripts/repair-geoip-python.sh"):
             p=subprocess.run(["bash","-n",str(ROOT/path)],capture_output=True,text=True)
             self.assertEqual(p.returncode,0,p.stderr)
 

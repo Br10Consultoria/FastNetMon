@@ -26,8 +26,17 @@ chown root:root /etc/GeoIP.conf
 chmod 0600 /etc/GeoIP.conf
 install -d -m 0750 -o root -g orbymon "$GEOIP_DIR"
 bash "$BASE/scripts/update-geoip.sh"
-"$BASE/.venv/bin/python" -m pip install -e "$BASE[geo]"
-"$BASE/.venv/bin/python" -c 'import geoip2.database'
+# Pacotes do venv precisam ser importaveis pelo usuario orbymon.
+# O umask 027 usado para configs sigilosas nao deve ser usado para pip:
+# isso pode criar bibliotecas root:root inacessiveis ao usuario do servico.
+(
+  umask 022
+  "$BASE/.venv/bin/python" -m pip install -e "$BASE[geo]"
+)
+if ! runuser -u orbymon -- "$BASE/.venv/bin/python" -c 'import geoip2.database; import fmn_filters.enrichment'; then
+  echo "Python nao importavel como orbymon; execute sudo bash scripts/repair-geoip-python.sh" >&2
+  exit 1
+fi
 install -d -m 0750 -o root -g orbymon /etc/orbymon
 TMP="$(mktemp /etc/orbymon/.geoip-XXXXXXXX)"
 trap 'rm -f "$TMP"' EXIT
