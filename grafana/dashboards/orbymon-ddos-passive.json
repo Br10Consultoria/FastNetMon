@@ -1,0 +1,330 @@
+{
+  "id": null,
+  "uid": "orbymon-ddos-passive",
+  "title": "OrbyMon | Fase 3 - Sinais DDoS passivos",
+  "description": "Deteccao passiva de possiveis anomalias (NetFlow amostrado 1:2048). Sem bloqueio, alertas nao sao provas de DDoS.",
+  "timezone": "browser",
+  "schemaVersion": 40,
+  "version": 1,
+  "refresh": "1m",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "tags": [
+    "orbymon",
+    "ddos",
+    "passivo"
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Sinais passivos no periodo",
+      "type": "stat",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT COUNT(*) AS value FROM orby_alerts WHERE rule_name LIKE 'OrbyMon F3:%' AND $__timeFilter(event_time)",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Destinos distintos com sinais",
+      "type": "stat",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT COUNT(DISTINCT dst_ip) AS value FROM orby_alerts WHERE rule_name LIKE 'OrbyMon F3:%' AND $__timeFilter(event_time)",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Saude do detector (UTC)",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT source AS Exportador,last_checked_at AS 'Ultima verificacao UTC',latest_bucket_utc AS 'Janela avaliada UTC',status AS Estado,signals AS Sinais,alerts AS 'Alertas novos' FROM orby_ddos_checks WHERE source='huawei'",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 4,
+      "title": "Sinais por minuto e severidade",
+      "type": "timeseries",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 16,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT $__timeGroupAlias(event_time,'1m'),severity AS metric,COUNT(*) AS value FROM orby_alerts WHERE rule_name LIKE 'OrbyMon F3:%' AND $__timeFilter(event_time) GROUP BY 1,2 ORDER BY 1",
+          "format": "time_series",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Destinos com mais sinais",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 4,
+        "w": 8,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT dst_ip AS 'Destino',COUNT(*) AS 'Sinais',ROUND(MAX(mbps),2) AS 'Pico Mbps',ROUND(MAX(pps),0) AS 'Pico PPS' FROM orby_alerts WHERE rule_name LIKE 'OrbyMon F3:%' AND $__timeFilter(event_time) GROUP BY dst_ip ORDER BY COUNT(*) DESC LIMIT 20",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 6,
+      "title": "Lista de sinais recentes",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 13,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT event_time AS 'UTC',rule_name AS 'Regra',severity AS 'Severidade',dst_ip AS 'Destino',protocol AS 'Protocolo',dst_port AS 'Porta',ROUND(pps,0) AS 'PPS estimado',ROUND(mbps,2) AS 'Mbps estimado',unique_sources AS 'Origens observadas' FROM orby_alerts WHERE rule_name LIKE 'OrbyMon F3:%' AND $__timeFilter(event_time) ORDER BY event_time DESC LIMIT 100",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 7,
+      "title": "Regras com disparos",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 23,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT rule_name AS 'Regra',severity AS 'Severidade',COUNT(*) AS 'Sinais' FROM orby_alerts WHERE rule_name LIKE 'OrbyMon F3:%' AND $__timeFilter(event_time) GROUP BY rule_name,severity ORDER BY COUNT(*) DESC",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 8,
+      "title": "Protocolos com disparos",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 23,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT protocol AS 'Protocolo',dst_port AS 'Porta',COUNT(*) AS 'Sinais',ROUND(MAX(mbps),2) AS 'Pico Mbps' FROM orby_alerts WHERE rule_name LIKE 'OrbyMon F3:%' AND $__timeFilter(event_time) GROUP BY protocol,dst_port ORDER BY COUNT(*) DESC",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    }
+  ]
+}
