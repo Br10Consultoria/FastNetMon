@@ -10,6 +10,9 @@ mariadb orbymon < "$BASE/sql/interface_names.sql"
 D=/var/lib/grafana/dashboards/orbymon
 if [[ -d "$D" ]] && id grafana >/dev/null 2>&1; then
   for dash in orbymon-ip-analytics.json orbymon-cgnat.json orbymon-overview.json; do
+    if [[ -f "$D/$dash" ]] && ! cmp -s "$BASE/grafana/dashboards/$dash" "$D/$dash"; then
+      cp -a "$D/$dash" "$D/$dash.bak.$(date -u +%Y%m%dT%H%M%SZ)"
+    fi
     install -o grafana -g grafana -m 0644 "$BASE/grafana/dashboards/$dash" "$D/$dash"
   done
   echo "[OK] Dashboards provisionados em $D (mesmos UID, sem duplicatas)"
