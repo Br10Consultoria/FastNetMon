@@ -4,7 +4,7 @@
 
 ![OrbyMon](assets/orbymon-logo.svg)
 
-> **Pode instalar num Ubuntu 24.04 LTS ou Debian e receber NetFlow/IPFIX do Huawei e MikroTik.** Isso coleta tráfego normal, mesmo sem qualquer ataque. A consulta inicial funciona com `nfdump`; **o Grafana de tráfego contínuo ainda não está ligado automaticamente ao coletor e não deve ser considerado pronto para produção.** Sem mitigação automática.
+> **Pode instalar num Ubuntu 24.04 LTS ou Debian e receber NetFlow/IPFIX do Huawei e MikroTik.** Isso coleta tráfego normal, mesmo sem qualquer ataque. A consulta inicial funciona com `nfdump`; **a ingestao MariaDB e o provisionamento automatico de dashboards Grafana estao disponiveis em piloto, ainda nao homologados para producao.** Sem mitigação automática.
 
 ## Instalar servidor do zero — começar somente pelo Huawei
 
@@ -41,7 +41,16 @@ A inspeção mostra volume normal, top IPs, portas e protocolos, sem depender de
 
 > **Fase 2 (piloto):** [Ingestao idempotente Huawei → MariaDB → Grafana](docs/TRAFFIC_PIPELINE.md). O timer e opcional e nao e iniciado pelo bootstrap.
 
-**Grafana em um comando:** [configuracao automatica e dashboard](docs/GRAFANA_AUTO.md) com `sudo bash scripts/setup-grafana.sh`.
+## Instalar Grafana e importar TODOS os dashboards automaticamente
+
+No Ubuntu com MariaDB OrbyMon instalado:
+
+```bash
+cd /opt/orbymon
+sudo bash scripts/setup-grafana.sh --public-host 187.87.201.198
+```
+
+O instalador configura HTTPS autofirmado na porta 3000, datasource somente leitura e importa todos dashboards da pasta grafana/dashboards. Veja [procedimento e seguranca](docs/GRAFANA_AUTO.md).
 
 ## Componentes e estágio real
 
@@ -51,7 +60,7 @@ A inspeção mostra volume normal, top IPs, portas e protocolos, sem depender de
 | Inspeção de tráfego normal (nfdump) | Disponível |
 | Filtros AND/OR/NOT, IP, porta, protocolo, ASN, geolocalização e métricas | Protótipo funcional; regras de exemplo usam IPs de documentação |
 | Incidentes SQLite, API local autenticada e replay idempotente | v0.3 laboratório |
-| Grafana e MariaDB (SQL, dashboards JSON, GeoLite2 offline) | Arquivos presentes; **pipeline contínuo/sem duplicidade ainda pendente** |
+| Grafana e MariaDB (SQL, dashboards JSON, GeoLite2 offline) | Pipeline idempotente MariaDB e instalador automatico Grafana disponiveis (piloto) |
 | Verificação em links reais 10/40/100G e sampling | Não homologado |
 | BGP FlowSpec, RTBH, comandos em roteadores | **Não implementados**; nenhuma ação automática |
 | Multiempresa com autorização robusta | Ainda não homologado para produção |
