@@ -7,6 +7,9 @@ class CapacityTests(unittest.TestCase):
         self.assertTrue(result["valido"])
         self.assertAlmostEqual(result["projecao_gib_por_dia"],31.37,delta=.10)
         self.assertEqual(result["alerta_capacidade"],"critico")
+        self.assertAlmostEqual(result["projecao_gib_7_dias"],219.55,delta=1)
+        self.assertAlmostEqual(result["projecao_gib_30_dias"],940.9,delta=4)
+        self.assertGreater(result["projecao_gib_365_dias"],11000)
         self.assertGreater(result["dias_livres_estimados_sem_compressao"],2.4)
 
     def test_rotation_never_fakes_growth(self):

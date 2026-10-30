@@ -44,6 +44,9 @@ def estimate(before, after, seconds, free_bytes):
         "bytes_gravados": delta,
         "taxa_kib_por_segundo": round(bytes_sec / 1024, 2),
         "projecao_gib_por_dia": round(bytes_day / GIB, 2),
+        "projecao_gib_7_dias": round(bytes_day * 7 / GIB, 2),
+        "projecao_gib_30_dias": round(bytes_day * 30 / GIB, 2),
+        "projecao_gib_365_dias": round(bytes_day * 365 / GIB, 2),
         "dias_livres_estimados_sem_compressao": (
             round(available_days, 2) if available_days is not None else None
         ),
