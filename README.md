@@ -56,6 +56,8 @@ O instalador configura HTTPS autofirmado na porta 3000, datasource somente leitu
 
 **Fase 3 DDoS passiva:** [regras AND/OR/NOT para as redes protegidas, PPS/Mbps e dashboard](docs/DDOS_PASSIVE.md). Instalar com `sudo bash scripts/setup-ddos-passive.sh` apos validar a Fase 2.
 
+**Fase 4 CGNAT:** [diagnostico read-only, IP publico como origem/destino, perfis de pool e baseline p95](docs/CGNAT_BASELINE.md): `sudo bash scripts/setup-cgnat-baseline.sh`.
+
 ## Componentes e estágio real
 
 | Componente | Estado |
