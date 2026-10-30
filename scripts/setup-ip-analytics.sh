@@ -11,6 +11,7 @@ done
 mariadb orbymon -e "SELECT 1" >/dev/null
 echo "=== Criando tabelas IP sem alterar schema existente ==="
 mariadb orbymon < "$BASE/sql/ip_analytics.sql"
+mariadb orbymon < "$BASE/sql/interface_names.sql"
 echo "=== Validacao de leitura de arquivos reais ==="
 runuser -u orbymon -- "$BASE/.venv/bin/python" -m fmn_filters.ip_analytics \
   --source huawei --dry-run --max-files 2
