@@ -86,6 +86,10 @@ if ! systemctl restart rsyslog.service; then
 fi
 # Rsyslog's fileCreateMode does not grant access to the orbymon group
 # on files that already exist. Correct ownership without truncating data.
+if [[ -L /var/log/orbymon/a10/a10-current.ndjson ]]; then
+  echo "Caminho de log nao pode ser link simbolico" >&2
+  exit 1
+fi
 if [[ -f /var/log/orbymon/a10/a10-current.ndjson ]]; then
   chown syslog:orbymon /var/log/orbymon/a10/a10-current.ndjson
   chmod 0640 /var/log/orbymon/a10/a10-current.ndjson
