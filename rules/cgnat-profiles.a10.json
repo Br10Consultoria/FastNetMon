@@ -1,0 +1,39 @@
+{
+  "protected_cidrs": [
+    "45.238.170.0/23",
+    "187.87.201.0/24"
+  ],
+  "cgnat_pools": [
+    "45.238.170.64/26",
+    "45.238.171.64/26",
+    "45.238.170.128/26",
+    "45.238.171.128/26"
+  ],
+  "dedicated_public_cidrs": [],
+  "infrastructure_public_cidrs": [],
+  "lookback_hours": 1,
+  "settle_minutes": 5,
+  "min_samples": 10,
+  "max_rows": 80000,
+  "inside_private_cidrs": [
+    "100.64.64.0/19"
+  ],
+  "cgnat_pool_metadata": {
+    "45.238.170.64/26": {
+      "name": "NAT-POOL-08",
+      "max_users_per_ip": 32
+    },
+    "45.238.171.64/26": {
+      "name": "NAT-POOL-09",
+      "max_users_per_ip": 32
+    },
+    "45.238.170.128/26": {
+      "name": "NAT-POOL-10",
+      "max_users_per_ip": 32
+    },
+    "45.238.171.128/26": {
+      "name": "NAT-POOL-11",
+      "max_users_per_ip": 32
+    }
+  }
+}
