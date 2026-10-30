@@ -27,7 +27,7 @@ class GeoIPSetupTests(unittest.TestCase):
         self.assertIn('chown root:orbymon "$path"',s)
         self.assertIn('chmod 0640 "$path"',s)
         t=(ROOT/"deploy/systemd/orbymon-geoip-update.timer").read_text()
-        self.assertIn("OnCalendar=Mon,Thu",t)
+        self.assertIn("OnCalendar=*-*-*",t)
 
 if __name__=="__main__":
     unittest.main()
