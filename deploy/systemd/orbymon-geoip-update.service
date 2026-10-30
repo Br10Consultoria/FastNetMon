@@ -1,0 +1,16 @@
+[Unit]
+Description=OrbyMon - atualizar bases ASN e City da MaxMind
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/bin/bash /opt/orbymon/scripts/update-geoip.sh
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/orbymon/geoip
+TimeoutStartSec=10min
