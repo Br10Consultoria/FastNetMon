@@ -12,7 +12,7 @@
   ],
   "timezone": "browser",
   "schemaVersion": 40,
-  "version": 2,
+  "version": 3,
   "refresh": "30s",
   "editable": true,
   "graphTooltip": 1,
@@ -141,7 +141,7 @@
     },
     {
       "id": 4,
-      "title": "Volume estimado agregado (MB; rollup legado)",
+      "title": "Volume estimado Huawei (MB)",
       "type": "stat",
       "datasource": {
         "type": "mysql",
@@ -160,7 +160,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT ROUND(SUM(total_bytes)/1000000,2) AS value FROM orby_traffic_minute WHERE $__timeFilter(bucket_utc)",
+          "rawSql": "SELECT ROUND(COALESCE(SUM(total_bytes),0)/1000000,2) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc)",
           "format": "table",
           "editorMode": "code"
         }
@@ -186,7 +186,7 @@
     },
     {
       "id": 5,
-      "title": "Volume por protocolo — Mbps (média por minuto)",
+      "title": "Mbps estimados por protocolo — Huawei",
       "type": "timeseries",
       "datasource": {
         "type": "mysql",
@@ -205,7 +205,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'), protocol AS metric, ROUND(SUM(total_bytes)*8/60000000,2) AS value FROM orby_traffic_minute WHERE $__timeFilter(bucket_utc) GROUP BY 1,protocol ORDER BY 1",
+          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),protocol AS metric,ROUND(SUM(total_bytes)*8/60000000,3) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) GROUP BY 1,protocol ORDER BY 1",
           "format": "time_series",
           "editorMode": "code"
         }
@@ -274,7 +274,7 @@
     },
     {
       "id": 7,
-      "title": "Origem aproximada dos alertas por IP",
+      "title": "Mapa de alertas DDoS — apenas quando houver alertas",
       "type": "geomap",
       "datasource": {
         "type": "mysql",
@@ -282,8 +282,8 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 12,
-        "w": 15,
+        "y": 47,
+        "w": 12,
         "h": 11
       },
       "targets": [
@@ -339,7 +339,8 @@
           }
         },
         "overrides": []
-      }
+      },
+      "description": "Este painel mostra apenas incidentes com IP de origem geolocalizado. Ficar vazio quando não existem alertas é esperado."
     },
     {
       "id": 8,
@@ -456,7 +457,7 @@
     },
     {
       "id": 10,
-      "title": "Top portas de destino (MB estimados)",
+      "title": "Top portas de destino Huawei (MB estimados)",
       "type": "barchart",
       "datasource": {
         "type": "mysql",
@@ -475,7 +476,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT CAST(dst_port AS CHAR) AS 'Porta', ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_traffic_minute WHERE $__timeFilter(bucket_utc) GROUP BY dst_port ORDER BY SUM(total_bytes) DESC LIMIT 15",
+          "rawSql": "SELECT CAST(dst_port AS CHAR) AS 'Porta',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) GROUP BY dst_port ORDER BY SUM(total_bytes) DESC LIMIT 15",
           "format": "table",
           "editorMode": "code"
         }
@@ -660,6 +661,136 @@
         "colorMode": "value",
         "graphMode": "none",
         "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 21,
+      "title": "Mapa de origens do tráfego Huawei — GeoLite2",
+      "type": "geomap",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 15,
+        "h": 11
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT src_latitude AS latitude,src_longitude AS longitude,MAX(src_country) AS country,src_asn AS asn,MAX(NULLIF(src_asn_name,'')) AS operator_name,COUNT(DISTINCT src_ip) AS source_ips,ROUND(SUM(total_bytes)/1000000,2) AS volume_mb FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND src_latitude IS NOT NULL AND src_longitude IS NOT NULL GROUP BY src_latitude,src_longitude,src_asn ORDER BY SUM(total_bytes) DESC LIMIT 300",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "options": {
+        "view": {
+          "id": "coords",
+          "lat": 0,
+          "lon": 0,
+          "zoom": 1
+        },
+        "basemap": {
+          "type": "default",
+          "name": "Open Street Map"
+        },
+        "layers": [
+          {
+            "type": "markers",
+            "name": "Tráfego Huawei (localização GeoIP aproximada)",
+            "location": {
+              "mode": "coords",
+              "latitude": "latitude",
+              "longitude": "longitude"
+            },
+            "tooltip": true,
+            "config": {
+              "style": {
+                "size": {
+                  "fixed": 9
+                },
+                "color": {
+                  "fixed": "#FF891A"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "description": "Origens públicas observadas no NetFlow Huawei, localizadas aproximadamente pela GeoLite2. Não são alertas nem locais exatos. A atualização depende da importação nfcapd → MariaDB."
+    },
+    {
+      "id": 22,
+      "title": "PPS estimados por protocolo — Huawei",
+      "type": "timeseries",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 47,
+        "w": 12,
+        "h": 11
+      },
+      "description": "Taxa estimada em bucket de um minuto, não medição instantânea.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),protocol AS metric,ROUND(SUM(total_packets)/60,1) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) GROUP BY 1,protocol ORDER BY 1",
+          "format": "time_series",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "pps",
+          "decimals": 2,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       }
     }
   ],
