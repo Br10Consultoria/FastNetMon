@@ -39,6 +39,9 @@ mariadb --batch -N -e "SELECT 1" >/dev/null
 FOUND="$(mariadb --batch -N -e "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME='orbymon'")"
 [[ "$FOUND" == "1" ]] || { echo "Banco orbymon ausente; instale MariaDB e crie o banco antes" >&2; exit 1; }
 [[ -d /etc/orbymon ]] || install -d -m 0750 -o root -g orbymon /etc/orbymon
+# Grafana precisa atravessar /etc/orbymon para ler certificado root:grafana.
+# O x para outros nao revela pipeline.env ou grafana.env (arquivos 0640).
+chmod o+x /etc/orbymon
 install -d -m 0750 -o root -g grafana /etc/orbymon/grafana-tls
 ENV_FILE=/etc/orbymon/grafana.env
 ADMIN_FIRST=0
