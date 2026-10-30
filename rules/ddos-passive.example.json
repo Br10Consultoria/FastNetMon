@@ -1,0 +1,94 @@
+{
+  "enabled": true,
+  "source": "huawei",
+  "protected_cidrs": [
+    "45.238.170.0/23",
+    "187.87.201.0/24"
+  ],
+  "excluded_destinations": [],
+  "settle_minutes": 4,
+  "consecutive_minutes": 2,
+  "cooldown_minutes": 20,
+  "max_query_rows": 20000,
+  "rules": [
+    {
+      "name": "UDP volumetrico",
+      "enabled": true,
+      "severity": "high",
+      "match": {
+        "protocols": [
+          "udp"
+        ]
+      },
+      "group_by_port": false,
+      "min_pps": 50000,
+      "min_mbps": 400,
+      "min_sources": 8,
+      "input_interfaces": []
+    },
+    {
+      "name": "DNS e NTP combinados",
+      "enabled": true,
+      "severity": "warning",
+      "match": {
+        "all_of": [
+          {
+            "protocols": [
+              "udp"
+            ]
+          },
+          {
+            "any_of": [
+              {
+                "dst_ports": [
+                  53
+                ]
+              },
+              {
+                "dst_ports": [
+                  123
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "group_by_port": true,
+      "min_pps": 25000,
+      "min_mbps": 150,
+      "min_sources": 8,
+      "input_interfaces": []
+    },
+    {
+      "name": "TCP volumetrico",
+      "enabled": true,
+      "severity": "high",
+      "match": {
+        "protocols": [
+          "tcp"
+        ]
+      },
+      "group_by_port": false,
+      "min_pps": 80000,
+      "min_mbps": 600,
+      "min_sources": 8,
+      "input_interfaces": []
+    },
+    {
+      "name": "ICMP anomalo",
+      "enabled": true,
+      "severity": "warning",
+      "match": {
+        "protocols": [
+          "icmp",
+          "icmpv6"
+        ]
+      },
+      "group_by_port": false,
+      "min_pps": 15000,
+      "min_mbps": 80,
+      "min_sources": 5,
+      "input_interfaces": []
+    }
+  ]
+}
