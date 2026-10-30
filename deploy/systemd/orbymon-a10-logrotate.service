@@ -1,0 +1,6 @@
+[Unit]
+Description=OrbyMon rotate raw A10 syslog (no retention deletion)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/logrotate -s /var/lib/orbymon/state/a10-logrotate.state /etc/logrotate.d/orbymon-a10

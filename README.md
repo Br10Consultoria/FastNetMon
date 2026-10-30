@@ -58,6 +58,8 @@ O instalador configura HTTPS autofirmado na porta 3000, datasource somente leitu
 
 **Fase 4 CGNAT:** [diagnostico read-only, IP publico como origem/destino, perfis de pool e baseline p95](docs/CGNAT_BASELINE.md): `sudo bash scripts/setup-cgnat-baseline.sh`.
 
+**A10 CGNAT Syslog:** [recepcao TCP/5514 exclusiva, spool bruto e inspecao sem correlacao prematura](docs/A10_SYSLOG.md). Instalar com sudo bash scripts/setup-a10-syslog.sh --a10-source-ip IP_REAL_DO_A10.
+
 ## Componentes e estágio real
 
 | Componente | Estado |
