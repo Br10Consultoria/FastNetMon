@@ -13,7 +13,7 @@ def record(minute=0,src="8.8.8.8",dst="45.238.170.10",proto="udp",
            port=53,pps=100000,mbps=700,interface=86,out=16,asn=15169):
     return dict(bucket_utc=datetime(2026,10,30,10,0)+timedelta(minutes=minute),
         src_ip=src,dst_ip=dst,protocol=proto,dst_port=port,input_if=interface,
-        output_if=out,src_asn=asn,dst_asn=0,src_country="US",dst_country="",
+        output_if=out,netflow_direction=0,src_asn=asn,dst_asn=0,src_country="US",dst_country="",
         total_packets=pps*60,total_bytes=mbps*60e6/8,flow_records=1)
 
 
@@ -56,6 +56,13 @@ class PassiveTests(unittest.TestCase):
         rows=[record(minute=m,src="8.8.8.%d"%(n+1),pps=6000,mbps=40,
                      interface=86 if n%2 else 87)
               for m in range(2) for n in range(10)]
+        self.assertEqual(evaluate(rows,self.rule,self.config,self.start),[])
+
+    def test_netflow_direction_not_combined(self):
+        rows=[record(minute=m,src="8.8.8.%d"%(n+1),pps=6000,mbps=40)
+              for m in range(2) for n in range(10)]
+        for i,row in enumerate(rows):
+            row["netflow_direction"]=i%2
         self.assertEqual(evaluate(rows,self.rule,self.config,self.start),[])
 
     def test_few_sources_or_excluded_destination(self):
