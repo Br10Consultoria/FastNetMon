@@ -1,0 +1,46 @@
+-- Fase 2 - tabelas independentes da Fase 1.
+CREATE TABLE IF NOT EXISTS orby_ip_pairs_minute (
+ source VARCHAR(32) NOT NULL,
+ bucket_utc DATETIME NOT NULL,
+ src_ip VARCHAR(45) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+ dst_ip VARCHAR(45) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+ protocol VARCHAR(20) NOT NULL,
+ dst_port SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+ input_if INT UNSIGNED NOT NULL DEFAULT 0,
+ output_if INT UNSIGNED NOT NULL DEFAULT 0,
+ netflow_direction SMALLINT NOT NULL DEFAULT -1,
+ src_prefix VARCHAR(50) NOT NULL DEFAULT '',
+ dst_prefix VARCHAR(50) NOT NULL DEFAULT '',
+ src_asn BIGINT UNSIGNED NOT NULL DEFAULT 0,
+ dst_asn BIGINT UNSIGNED NOT NULL DEFAULT 0,
+ src_asn_name VARCHAR(255) NOT NULL DEFAULT '',
+ dst_asn_name VARCHAR(255) NOT NULL DEFAULT '',
+ src_country CHAR(2) NOT NULL DEFAULT '',
+ dst_country CHAR(2) NOT NULL DEFAULT '',
+ src_latitude DECIMAL(9,6) NULL,
+ src_longitude DECIMAL(9,6) NULL,
+ dst_latitude DECIMAL(9,6) NULL,
+ dst_longitude DECIMAL(9,6) NULL,
+ total_packets DOUBLE NOT NULL DEFAULT 0,
+ total_bytes DOUBLE NOT NULL DEFAULT 0,
+ flow_records BIGINT UNSIGNED NOT NULL DEFAULT 0,
+ PRIMARY KEY(source,bucket_utc,src_ip,dst_ip,protocol,dst_port,input_if,output_if,netflow_direction),
+ INDEX ix_pairs_src_time(src_ip,bucket_utc),
+ INDEX ix_pairs_dst_time(dst_ip,bucket_utc),
+ INDEX ix_pairs_bucket_src(bucket_utc,src_ip),
+ INDEX ix_pairs_bucket_dst(bucket_utc,dst_ip),
+ INDEX ix_pairs_src_prefix(src_prefix,bucket_utc),
+ INDEX ix_pairs_dst_prefix(dst_prefix,bucket_utc),
+ INDEX ix_pairs_interface(input_if,output_if,bucket_utc)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS orby_ip_ingested_files (
+ source VARCHAR(32) NOT NULL,
+ file_name VARCHAR(255) NOT NULL,
+ file_size BIGINT UNSIGNED NOT NULL,
+ file_mtime_ns BIGINT UNSIGNED NOT NULL,
+ flow_count BIGINT UNSIGNED NOT NULL,
+ ingested_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ PRIMARY KEY(source,file_name),
+ INDEX ix_ip_ingested_at(ingested_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

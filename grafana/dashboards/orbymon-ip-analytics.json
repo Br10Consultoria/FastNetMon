@@ -1,0 +1,589 @@
+{
+  "id": null,
+  "uid": "orbymon-ip-analytics",
+  "title": "OrbyMon | Huawei - IPs, Redes e Interfaces",
+  "description": "Pares IP amostrados do Huawei. Tráfego estimado, ifIndex bruto e GeoLite2 quando disponível; não é tráfego único de clientes.",
+  "timezone": "browser",
+  "schemaVersion": 40,
+  "version": 1,
+  "refresh": "1m",
+  "time": {
+    "from": "now-3h",
+    "to": "now"
+  },
+  "tags": [
+    "orbymon",
+    "huawei",
+    "ip",
+    "netflow",
+    "asn"
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Ranking de IPs de origem",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT src_ip AS 'IP origem',MAX(NULLIF(src_prefix,'')) AS 'Prefixo',MAX(src_asn) AS ASN,MAX(NULLIF(src_asn_name,'')) AS 'Organizacao',MAX(NULLIF(src_country,'')) AS 'Pais',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc) GROUP BY src_ip ORDER BY SUM(total_bytes) DESC LIMIT 30",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 2,
+      "title": "Ranking de IPs de destino",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT dst_ip AS 'IP destino',MAX(NULLIF(dst_prefix,'')) AS 'Prefixo',MAX(dst_asn) AS ASN,MAX(NULLIF(dst_country,'')) AS 'Pais',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc) GROUP BY dst_ip ORDER BY SUM(total_bytes) DESC LIMIT 30",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 3,
+      "title": "Pares origem e destino / principais portas",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 15,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT src_ip AS 'Origem',dst_ip AS 'Destino',protocol AS 'Protocolo',dst_port AS 'Porta',input_if AS 'Entrada ifIndex',output_if AS 'Saida ifIndex',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc) GROUP BY src_ip,dst_ip,protocol,dst_port,input_if,output_if ORDER BY SUM(total_bytes) DESC LIMIT 40",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 4,
+      "title": "Interfaces Huawei (ifIndex e direcao bruta)",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 15,
+        "y": 9,
+        "w": 9,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT input_if AS 'Entrada ifIndex',output_if AS 'Saida ifIndex',netflow_direction AS 'Direcao raw',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados',SUM(flow_records) AS 'Registros' FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc) GROUP BY input_if,output_if,netflow_direction ORDER BY SUM(total_bytes) DESC LIMIT 30",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 5,
+      "title": "Prefixos de origem exportados",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT src_prefix AS 'Rede',COUNT(DISTINCT src_ip) AS 'IPs observados',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc) AND src_prefix!='' GROUP BY src_prefix ORDER BY SUM(total_bytes) DESC LIMIT 30",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 6,
+      "title": "Prefixos de destino exportados",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 18,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT dst_prefix AS 'Rede',COUNT(DISTINCT dst_ip) AS 'IPs observados',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc) AND dst_prefix!='' GROUP BY dst_prefix ORDER BY SUM(total_bytes) DESC LIMIT 30",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 7,
+      "title": "Top ASNs de origem",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 26,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT src_asn AS ASN,MAX(NULLIF(src_asn_name,'')) AS 'Organizacao',src_country AS 'Pais',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc) AND src_asn>0 GROUP BY src_asn,src_country ORDER BY SUM(total_bytes) DESC LIMIT 30",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 8,
+      "title": "Banda estimada por entrada ifIndex (Mbps)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 26,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),CAST(input_if AS CHAR) AS metric,ROUND(SUM(total_bytes)*8/60000000,2) AS value FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc) GROUP BY 1,input_if ORDER BY 1",
+          "format": "time_series",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "title": "IPs distintos de origem",
+      "type": "stat",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 34,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT COUNT(DISTINCT src_ip) AS value FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc)",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 10,
+      "title": "IPs distintos de destino",
+      "type": "stat",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 34,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT COUNT(DISTINCT dst_ip) AS value FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc)",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 11,
+      "title": "Pares de IP distintos",
+      "type": "stat",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 34,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT COUNT(*) AS value FROM (SELECT src_ip,dst_ip FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc) GROUP BY src_ip,dst_ip) t",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 12,
+      "title": "Ultimo fluxo registrado (UTC)",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 34,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT MAX(bucket_utc) AS 'Ultimo fluxo UTC' FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc)",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 13,
+      "title": "Localização aproximada das origens (GeoLite2)",
+      "type": "geomap",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 38,
+        "w": 16,
+        "h": 12
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT src_latitude AS latitude,src_longitude AS longitude,src_country AS country,src_asn AS asn,ROUND(SUM(total_bytes)/1000000,2) AS volume_mb FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc) AND src_latitude IS NOT NULL AND src_longitude IS NOT NULL GROUP BY src_latitude,src_longitude,src_country,src_asn ORDER BY SUM(total_bytes) DESC LIMIT 300",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "options": {
+        "view": {
+          "id": "coords",
+          "lat": 0,
+          "lon": 0,
+          "zoom": 1
+        },
+        "basemap": {
+          "type": "default",
+          "name": "Open Street Map"
+        },
+        "layers": [
+          {
+            "type": "markers",
+            "name": "Origens observadas (localização aproximada)",
+            "location": {
+              "mode": "coords",
+              "latitude": "latitude",
+              "longitude": "longitude"
+            },
+            "tooltip": true,
+            "config": {
+              "style": {
+                "size": {
+                  "fixed": 7
+                },
+                "color": {
+                  "fixed": "#FF891A"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 14,
+      "title": "Paises de origem (se houver GeoLite2)",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 38,
+        "w": 8,
+        "h": 12
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT src_country AS Pais,COUNT(DISTINCT src_ip) AS 'IPs distintos',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc) AND src_country!='' GROUP BY src_country ORDER BY SUM(total_bytes) DESC LIMIT 30",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    }
+  ]
+}

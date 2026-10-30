@@ -1,0 +1,11 @@
+[Unit]
+Description=OrbyMon Fase 2 - importar IPs e interfaces Huawei periodicamente
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=1min
+AccuracySec=5s
+Unit=orbymon-ip-huawei.service
+
+[Install]
+WantedBy=timers.target

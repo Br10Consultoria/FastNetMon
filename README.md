@@ -52,6 +52,8 @@ sudo bash scripts/setup-grafana.sh --public-host 187.87.201.198
 
 O instalador configura HTTPS autofirmado na porta 3000, datasource somente leitura e importa todos dashboards da pasta grafana/dashboards. Veja [procedimento e seguranca](docs/GRAFANA_AUTO.md).
 
+**Fase 2 IPs e interfaces:** [instalacao automatica com dashboard](docs/IP_ANALYTICS.md): `sudo bash scripts/setup-ip-analytics.sh`.
+
 ## Componentes e estágio real
 
 | Componente | Estado |
