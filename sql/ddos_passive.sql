@@ -7,8 +7,9 @@ CREATE TABLE IF NOT EXISTS orby_ddos_rule_state (
  dst_port SMALLINT UNSIGNED NOT NULL DEFAULT 0,
  input_if INT UNSIGNED NOT NULL DEFAULT 0,
  output_if INT UNSIGNED NOT NULL DEFAULT 0,
+ netflow_direction SMALLINT NOT NULL DEFAULT -1,
  last_alert_utc DATETIME NULL,
- PRIMARY KEY(source,rule_name,dst_ip,protocol,dst_port,input_if,output_if)
+ PRIMARY KEY(source,rule_name,dst_ip,protocol,dst_port,input_if,output_if,netflow_direction)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE IF NOT EXISTS orby_ddos_checks (
  source VARCHAR(32) NOT NULL PRIMARY KEY,
