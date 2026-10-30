@@ -34,8 +34,7 @@ O instalador valida a existencia do arquivo de credenciais sem imprimir
 segredos, cria /var/lib/orbymon/geoip root:orbymon, baixa MMDBs,
 instala geoip2 no .venv, configura ORBYMON_ASN_MMDB e
 ORBYMON_CITY_MMDB em /etc/orbymon/ip-analytics.env, faz backup do
-env anterior e ativa o timer de atualizacao da base nas segundas e
-quintas. Nao altera as tabelas de trafego e NAO reimporta arquivos
+env anterior e ativa o timer de atualizacao da base diariamente. Nao altera as tabelas de trafego e NAO reimporta arquivos
 ja contabilizados.
 
 ## Confirmar
