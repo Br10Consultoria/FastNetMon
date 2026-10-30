@@ -8,10 +8,26 @@ GEOIP_DIR=/var/lib/orbymon/geoip
 ENV_FILE=/etc/orbymon/ip-analytics.env
 [[ -x "$BASE/.venv/bin/python" ]] || { echo "Venv .venv ausente" >&2; exit 1; }
 id orbymon >/dev/null || { echo "Usuario orbymon ausente" >&2; exit 1; }
-if ! command -v geoipupdate >/dev/null; then
+# Optional offline/manual import (already extracted MMDBs; no MaxMind key).
+# GeoLite2 terms require prompt updates; this mode does not schedule a timer.
+LOCAL_DIR=""
+case "${1:-}" in
+  "") ;;
+  --local-mmdb-dir)
+    [[ $# -eq 2 && -d "$2" ]] || {
+      echo "Uso: sudo bash scripts/setup-geoip.sh --local-mmdb-dir DIRETORIO_COM_MMDB" >&2
+      exit 2
+    }
+    LOCAL_DIR="$(cd "$2" && pwd -P)"
+    ;;
+  *) echo "Opcao desconhecida. Use --local-mmdb-dir DIRETORIO_COM_MMDB." >&2; exit 2 ;;
+esac
+if [[ -z "$LOCAL_DIR" ]] && ! command -v geoipupdate >/dev/null; then
   apt-get update
   DEBIAN_FRONTEND=noninteractive apt-get install -y geoipupdate
 fi
+if [[ -z "$LOCAL_DIR" ]]; then
+  # Automatic mode requires MaxMind credentials, which never go to GitHub.
 if [[ ! -s /etc/GeoIP.conf ]] ||
    ! grep -Eq '^[[:space:]]*AccountID[[:space:]]+[0-9]+' /etc/GeoIP.conf ||
    ! grep -Eq '^[[:space:]]*LicenseKey[[:space:]]+[^[:space:]#]+' /etc/GeoIP.conf ||
@@ -22,12 +38,41 @@ if [[ ! -s /etc/GeoIP.conf ]] ||
   echo "Nao compartilhe chave nem coloque-a no GitHub/chat." >&2
   exit 2
 fi
-chown root:root /etc/GeoIP.conf
-chmod 0600 /etc/GeoIP.conf
+  chown root:root /etc/GeoIP.conf
+  chmod 0600 /etc/GeoIP.conf
+fi
 install -d -m 0750 -o root -g orbymon "$GEOIP_DIR"
-bash "$BASE/scripts/update-geoip.sh"
 "$BASE/.venv/bin/python" -m pip install -e "$BASE[geo]"
 "$BASE/.venv/bin/python" -c 'import geoip2.database'
+if [[ -n "$LOCAL_DIR" ]]; then
+  for name in GeoLite2-ASN.mmdb GeoLite2-City.mmdb; do
+    original="$LOCAL_DIR/$name"
+    [[ -f "$original" && -s "$original" && ! -L "$original" ]] || {
+      echo "Arquivo ausente ou inseguro: $original" >&2; exit 2;
+    }
+  done
+  # Validate the binary MMDB format before changing installed databases.
+  "$BASE/.venv/bin/python" - "$LOCAL_DIR" <<'PY'
+import sys
+from pathlib import Path
+import geoip2.database
+source = Path(sys.argv[1])
+for name in ("GeoLite2-ASN.mmdb", "GeoLite2-City.mmdb"):
+    with geoip2.database.Reader(str(source/name)) as reader:
+        metadata = reader.metadata()
+        expected = "GeoLite2-ASN" if "ASN" in name else "GeoLite2-City"
+        if metadata.database_type != expected:
+            raise ValueError(f"Tipo MMDB incorreto no arquivo {name}: {metadata.database_type}")
+print("MMDB ASN/City verificados: formato e tipo corretos.")
+PY
+  for name in GeoLite2-ASN.mmdb GeoLite2-City.mmdb; do
+    tmp="$(mktemp "$GEOIP_DIR/.mmdb.XXXXXXXX")"
+    install -m 0640 -o root -g orbymon "$LOCAL_DIR/$name" "$tmp"
+    mv -f "$tmp" "$GEOIP_DIR/$name"
+  done
+else
+  bash "$BASE/scripts/update-geoip.sh"
+fi
 install -d -m 0750 -o root -g orbymon /etc/orbymon
 TMP="$(mktemp /etc/orbymon/.geoip-XXXXXXXX)"
 trap 'rm -f "$TMP"' EXIT
@@ -38,10 +83,16 @@ fi
 printf 'ORBYMON_ASN_MMDB=%s/GeoLite2-ASN.mmdb\n' "$GEOIP_DIR" >> "$TMP"
 printf 'ORBYMON_CITY_MMDB=%s/GeoLite2-City.mmdb\n' "$GEOIP_DIR" >> "$TMP"
 install -m 0640 -o root -g orbymon "$TMP" "$ENV_FILE"
-install -m 0644 "$BASE/deploy/systemd/orbymon-geoip-update.service" /etc/systemd/system/
-install -m 0644 "$BASE/deploy/systemd/orbymon-geoip-update.timer" /etc/systemd/system/
-systemctl daemon-reload
-systemctl enable --now orbymon-geoip-update.timer
+if [[ -z "$LOCAL_DIR" ]]; then
+  install -m 0644 "$BASE/deploy/systemd/orbymon-geoip-update.service" /etc/systemd/system/
+  install -m 0644 "$BASE/deploy/systemd/orbymon-geoip-update.timer" /etc/systemd/system/
+  systemctl daemon-reload
+  systemctl enable --now orbymon-geoip-update.timer
+  echo "Atualizacao automatica GeoLite2 agendada."
+else
+  echo "Modo manual: nao foi criado timer de atualizacao (sem credenciais MaxMind)."
+  echo "Atualize os arquivos manualmente a cada nova versao, respeitando a licenca GeoLite2."
+fi
 echo "GeoLite2 configurada; apenas novos flows elegiveis receberao ASN/geo."
 echo "Nao reimporte arquivos previamente contabilizados."
 ls -lh "$GEOIP_DIR"/GeoLite2-{ASN,City}.mmdb
