@@ -1,0 +1,10 @@
+[Unit]
+Description=OrbyMon hourly syslog rotation A10
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+Unit=orbymon-a10-logrotate.service
+
+[Install]
+WantedBy=timers.target
