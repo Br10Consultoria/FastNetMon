@@ -36,7 +36,7 @@ def parse_record(raw: dict, assume_utc: bool = False) -> Event | None:
     start = timestamp(_first(raw, 'start', 'first', 'timestamp', 'time'), assume_utc)
     end = timestamp(_first(raw, 'end', 'last', 'timestamp', 'time', default=start), assume_utc)
     proto_raw = _first(raw, 'protocol', 'proto', default='tcp' if kind == 'http' else '')
-    proto_aliases = {'6': 'tcp', '17': 'udp', '1': 'icmp', '58': 'icmpv6'}
+    proto_aliases = {'6': 'tcp', '17': 'udp', '1': 'icmp', '58': 'icmpv6', '50': 'esp'}
     proto = proto_aliases.get(str(proto_raw).lower(), str(proto_raw).lower())
     if kind == 'http' and proto != 'tcp':
         raise ValueError('evento HTTP deve ser TCP')
@@ -61,8 +61,8 @@ def parse_record(raw: dict, assume_utc: bool = False) -> Event | None:
         src_longitude=float(raw['src_longitude']) if raw.get('src_longitude') is not None else None,
         dst_latitude=float(raw['dst_latitude']) if raw.get('dst_latitude') is not None else None,
         dst_longitude=float(raw['dst_longitude']) if raw.get('dst_longitude') is not None else None,
-        input_if=int(_first(raw, 'input_if', 'in_if', default=0)),
-        output_if=int(_first(raw, 'output_if', 'out_if', default=0)),
+        input_if=int(_first(raw, 'input_if', 'in_if', 'input_snmp', default=0)),
+        output_if=int(_first(raw, 'output_if', 'out_if', 'output_snmp', default=0)),
         ttl=int(_first(raw, 'ttl', default=-1)),
         icmp_type=int(_first(raw, 'icmp_type', default=-1)),
         icmp_code=int(_first(raw, 'icmp_code', default=-1)),
