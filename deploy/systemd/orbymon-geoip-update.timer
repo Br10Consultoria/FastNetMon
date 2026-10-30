@@ -1,7 +1,7 @@
 [Unit]
-Description=OrbyMon - atualizacao GeoLite2 duas vezes por semana
+Description=OrbyMon - atualizacao GeoLite2 diariamente
 [Timer]
-OnCalendar=Mon,Thu *-*-* 05:20:00
+OnCalendar=*-*-* 05:20:00
 RandomizedDelaySec=20min
 Persistent=true
 Unit=orbymon-geoip-update.service
