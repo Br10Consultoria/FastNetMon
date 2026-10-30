@@ -13,17 +13,23 @@ import sys
 
 LOG = Path("/var/log/orbymon/a10/a10-current.ndjson")
 IP = re.compile(r"(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?![\w.])")
+# A10 real syslog uses PortAllocated / PortFreed. Older templates may use
+# PortAllocation. A single rsyslog rawmsg may contain multiple markers.
 KINDS = (
-    ("port_allocation",re.compile(r"LSN:PortAllocation",re.I)),
-    ("port_freed",re.compile(r"LSN:PortFreed",re.I)),
+    ("port_allocation",re.compile(r"LSN:Port(?:Allocated|Allocation):(?:TCP|UDP)",re.I)),
+    ("port_freed",re.compile(r"LSN:PortFreed:(?:TCP|UDP)",re.I)),
     ("session_created",re.compile(r"SessionCreated",re.I)),
     ("session_deleted",re.compile(r"SessionDeleted",re.I)),
     ("port_batch",re.compile(r"Port[- ]?Batch|PortBlock",re.I)),
 )
 MAPPING = re.compile(
-    r"LSN:Port(?:Allocation|Freed):(TCP|UDP)\s+\["
-    r"((?:\d{1,3}\.){3}\d{1,3})\s+(\d{1,5})\s+"
-    r"((?:\d{1,3}\.){3}\d{1,3})\s+(\d{1,5})\s+-\s+-\]")
+    r"LSN:Port(?P<event>Allocated|Allocation|Freed):(?P<protocol>TCP|UDP)\s*"
+    r"\[\s*(?P<inside>(?:\d{1,3}\.){3}\d{1,3})\s+"
+    r"(?P<inside_port>\d{1,5})\s+"
+    r"(?P<public>(?:\d{1,3}\.){3}\d{1,3})\s+"
+    r"(?P<public_port>\d{1,5})(?:\s+-\s+-)?\s*\]",
+    re.I,
+)
 INSIDE = ipaddress.ip_network("100.64.64.0/19")
 POOLS = tuple(map(ipaddress.ip_network, (
     "45.238.170.64/26", "45.238.170.128/26",
@@ -34,25 +40,33 @@ def classify(text):
     return next((name for name,pattern in KINDS if pattern.search(text)), "unrecognized")
 
 
+def candidate_mappings(text):
+    """Identify only candidate single-port event shapes; no DB correlation.
+
+    Validate every matched address and port. One raw syslog record may contain
+    multiple concatenated A10 messages. Do not rely on line count as event count.
+    """
+    for m in MAPPING.finditer(text):
+        try:
+            inside=ipaddress.ip_address(m.group("inside"))
+            public=ipaddress.ip_address(m.group("public"))
+            inside_port=int(m.group("inside_port"))
+            public_port=int(m.group("public_port"))
+        except ValueError:
+            continue
+        if (inside not in INSIDE or not any(public in pool for pool in POOLS)
+                or not (1<=inside_port<=65535 and 1<=public_port<=65535)):
+            continue
+        yield {"protocol":m.group("protocol").lower(),
+               "event":"allocated" if m.group("event").lower() in ("allocated","allocation") else "freed",
+               "inside_ip":str(inside),"inside_port":inside_port,
+               "public_ip":str(public),"public_port":public_port,
+               "status":"unverified_candidate"}
+
+
 def candidate_mapping(text):
-    """Only a sample published A10 single-port format. Not a verified log."""
-    m=MAPPING.search(text)
-    if not m:
-        return None
-    proto, inside, inside_port, public, public_port=m.groups()
-    try:
-        inside=ipaddress.ip_address(inside)
-        public=ipaddress.ip_address(public)
-        inside_port=int(inside_port)
-        public_port=int(public_port)
-    except ValueError:
-        return None
-    if not (inside in INSIDE and any(public in pool for pool in POOLS)
-            and 1<=inside_port<=65535 and 1<=public_port<=65535):
-        return None
-    return {"protocol":proto.lower(),"inside_ip":str(inside),
-            "inside_port":inside_port,"public_ip":str(public),
-            "public_port":public_port,"status":"unverified_candidate"}
+    """Backward-compatible first candidate, not a verified NAT mapping."""
+    return next(candidate_mappings(text),None)
 
 
 def tail_bytes(path, max_bytes):
@@ -74,7 +88,8 @@ def inspect(path=LOG, last=200, max_bytes=8000000, examples=3):
     if not path.exists():
         return {"status":"sem_mensagens","arquivo":str(path),"categorias":{}}
     records=deque(tail_bytes(path,max_bytes),maxlen=last)
-    categories=Counter()
+    categories=Counter()             # first matched marker per received record
+    event_markers=Counter()          # every marker found in concatenated rawmsg
     source_ips=Counter()
     raw_examples=[]
     malformed=0
@@ -94,14 +109,19 @@ def inspect(path=LOG, last=200, max_bytes=8000000, examples=3):
             continue
         source_ips[source]+=1
         categories[classify(raw)]+=1
-        candidates+=int(candidate_mapping(raw) is not None)
+        for category, pattern in KINDS:
+            event_markers[category]+=len(pattern.findall(raw))
+        candidates+=sum(1 for _ in candidate_mappings(raw))
         if len(raw_examples)<examples:
             raw_examples.append(IP.sub("[IP]",raw)[:240])
     return {"status":"ok","linhas_consideradas":len(records),
-            "tipos_identificados":dict(categories),"origens_recebidas":dict(source_ips),
+            "tipos_identificados":dict(categories),
+            "marcadores_por_evento":{k:v for k,v in event_markers.items() if v},
+            "total_marcadores":sum(event_markers.values()),
+            "origens_recebidas":dict(source_ips),
             "candidatos_mapeamento_formato_publicado":candidates,
             "linhas_invalidas":malformed,"exemplos_com_ips_ocultos":raw_examples,
-            "observacao":"Candidatos nao sao mapeamentos homologados, nem associacoes PPPoE."}
+            "observacao":"Linhas Syslog podem conter varios eventos; candidatos sao apenas formatos encontrados, nao traducoes homologadas nem assinantes."}
 
 
 def main(argv=None):

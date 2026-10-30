@@ -111,3 +111,21 @@ e armazenamento de longo prazo ainda nao esta implementada.
 - Destino Syslog e o IP do servidor flow alcancavel pelo A10: o IP publico usado para Grafana/NetFlow foi 187.87.201.198, mas confirmar rota e filtros antes de configurar; preferir endereco privado real do flow caso exista.
 
 Nao use 10.100.10.9 como destino do log sem encaminhamento explicito configurado na borda: e o endereco do roteador, nao o servidor flow. A confirmacao de ping/rota entre A10 e flow precede a configuracao definitiva no ACOS.
+
+
+## Logs reais recebidos em 30/10/2026
+
+A origem `10.100.10.10` do A10 ja foi confirmada pelo receptor.
+O equipamento esta enviando `LSN:PortAllocated` e `LSN:PortFreed`
+(TCP/UDP). A interface Huawei `10.100.10.9` e apenas gateway;
+**nao** deve ser configurada como destino do Syslog.
+
+O inspetor agora conta marcadores separados, mesmo quando varias
+mensagens aparecem dentro do mesmo `rawmsg`. Os campos novos
+`marcadores_por_evento` e `total_marcadores` ajudam a verificar
+se ocorrem eventos de alocacao e liberacao. O campo
+`candidatos_mapeamento_formato_publicado` e exploratorio; ainda
+nao confirma timestamps/portas de traducoes e nao grava NAT no banco.
+Eventuais eventos incompletos devem ser examinados quanto a framing
+TCP (terminador LF ou octet-counting), sem alterar configuracao A10
+ou rsyslog enquanto nao houver evidencia de perda ou erro real.
