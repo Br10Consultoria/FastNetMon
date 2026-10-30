@@ -56,7 +56,7 @@ class AuditTests(unittest.TestCase):
                 "source_ip":"10.100.10.10",
                 "received_at":"2026-10-30T09:11:10-03:00",
                 "raw":frame
-            })+"\\n",encoding="utf-8")
+            })+"\n",encoding="utf-8")
             result=audit(p)
             self.assertEqual(result["amostras_com_horarios_comparaveis"],1)
             self.assertEqual(result["delta_coletor_menos_a10_segundos_p50"],7200)
@@ -69,7 +69,7 @@ class AuditTests(unittest.TestCase):
             missing=Path(d)/"missing"
             self.assertEqual(audit(missing)["status"],"sem_mensagens")
             p=Path(d)/"bad.ndjson"
-            p.write_text("BAD\\n")
+            p.write_text("BAD\n")
             self.assertEqual(audit(p)["linhas_invalidas"],1)
 
     def test_no_timestamp_not_auto_correlated(self):
