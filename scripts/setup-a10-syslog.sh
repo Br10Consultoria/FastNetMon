@@ -63,7 +63,9 @@ ruleset(name="OrbyA10Input") {
   if ($fromhost-ip == "__SOURCE__" or $fromhost-ip == "127.0.0.1") then {
     action(type="omfile"
       file="/var/log/orbymon/a10/a10-current.ndjson"
-      template="OrbyA10JSON" fileCreateMode="0640" dirCreateMode="0750")
+      template="OrbyA10JSON" fileCreateMode="0640"
+      fileOwner="syslog" fileGroup="orbymon"
+      dirCreateMode="0750" dirOwner="syslog" dirGroup="orbymon")
     stop
   }
   stop
@@ -81,6 +83,12 @@ if ! systemctl restart rsyslog.service; then
   systemctl restart rsyslog.service || true
   echo "Nao foi possivel iniciar rsyslog; configuracao restaurada." >&2
   exit 1
+fi
+# Rsyslog's fileCreateMode does not grant access to the orbymon group
+# on files that already exist. Correct ownership without truncating data.
+if [[ -f /var/log/orbymon/a10/a10-current.ndjson ]]; then
+  chown syslog:orbymon /var/log/orbymon/a10/a10-current.ndjson
+  chmod 0640 /var/log/orbymon/a10/a10-current.ndjson
 fi
 # Do not delete CGNAT evidence without a separately defined retention policy.
 cat > /etc/logrotate.d/orbymon-a10 <<'ROTATE'
