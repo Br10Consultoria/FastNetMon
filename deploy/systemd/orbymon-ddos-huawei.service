@@ -1,0 +1,17 @@
+[Unit]
+Description=OrbyMon fase 3 - deteccao passiva de DDoS Huawei
+After=network-online.target mariadb.service
+Wants=network-online.target mariadb.service
+
+[Service]
+Type=oneshot
+User=orbymon
+Group=orbymon
+WorkingDirectory=/opt/orbymon
+EnvironmentFile=/etc/orbymon/pipeline.env
+ExecStart=/opt/orbymon/.venv/bin/python -m fmn_filters.ddos_passive --config /etc/orbymon/ddos-rules.json
+TimeoutStartSec=120
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true

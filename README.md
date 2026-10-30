@@ -54,6 +54,8 @@ O instalador configura HTTPS autofirmado na porta 3000, datasource somente leitu
 
 **Fase 2 IPs e interfaces:** [instalacao automatica com dashboard](docs/IP_ANALYTICS.md): `sudo bash scripts/setup-ip-analytics.sh`.
 
+**Fase 3 DDoS passiva:** [regras AND/OR/NOT para as redes protegidas, PPS/Mbps e dashboard](docs/DDOS_PASSIVE.md). Instalar com `sudo bash scripts/setup-ddos-passive.sh` apos validar a Fase 2.
+
 ## Componentes e estágio real
 
 | Componente | Estado |
