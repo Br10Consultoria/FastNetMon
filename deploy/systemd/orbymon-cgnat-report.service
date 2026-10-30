@@ -1,0 +1,17 @@
+[Unit]
+Description=OrbyMon fase 4 - relatorio read-only CGNAT e p95 do Huawei
+After=network-online.target mariadb.service
+Wants=network-online.target mariadb.service
+
+[Service]
+Type=oneshot
+User=orbymon
+Group=orbymon
+WorkingDirectory=/opt/orbymon
+EnvironmentFile=/etc/orbymon/pipeline.env
+ExecStart=/opt/orbymon/.venv/bin/python -m fmn_filters.cgnat_baseline --config /etc/orbymon/cgnat-profiles.json
+TimeoutStartSec=120
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
