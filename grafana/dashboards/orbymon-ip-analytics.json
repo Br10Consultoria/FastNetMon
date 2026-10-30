@@ -5,8 +5,8 @@
   "description": "Pares IP amostrados do Huawei. Tráfego estimado, ifIndex bruto e GeoLite2 quando disponível; não é tráfego único de clientes.",
   "timezone": "browser",
   "schemaVersion": 40,
-  "version": 2,
-  "refresh": "1m",
+  "version": 3,
+  "refresh": "30s",
   "time": {
     "from": "now-3h",
     "to": "now"
