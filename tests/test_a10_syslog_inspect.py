@@ -10,7 +10,7 @@ from fmn_filters.a10_syslog_inspect import (
 
 class A10SyslogInspectTests(unittest.TestCase):
     def test_vendor_sample_candidate_only(self):
-        s="LSN:PortAllocation:TCP [100.64.64.12 12345 45.238.170.70 30001 - -]"
+        s="LSN:PortAllocated:TCP [100.64.64.12 12345 45.238.170.70 30001]"
         self.assertEqual(classify(s),"port_allocation")
         mapped=candidate_mapping(s)
         self.assertEqual(mapped["inside_ip"],"100.64.64.12")
@@ -66,6 +66,36 @@ class A10SyslogInspectTests(unittest.TestCase):
         self.assertIn('chmod 0640 /var/log/orbymon/a10/a10-current.ndjson', script)
         self.assertIn('if [[ -L /var/log/orbymon/a10/a10-current.ndjson ]]', script)
         self.assertIn('create 0640 syslog orbymon', script)
+
+    def test_real_a10_port_freed_and_multiple_events_one_rawmsg(self):
+        combined=(
+            "<135>1 2026-10-30T07:11:48-03:00 A10 CGNAT_ENTER - "
+            "LSN:PortFreed:UDP [100.64.64.12 34055 45.238.170.70 34055]"
+            "<135>1 2026-10-30T07:11:49-03:00 A10 CGNAT_ENTER - "
+            "LSN:PortAllocated:TCP [100.64.64.13 38742 45.238.171.70 38742]"
+        )
+        from fmn_filters.a10_syslog_inspect import candidate_mappings
+        matches=list(candidate_mappings(combined))
+        self.assertEqual(len(matches),2)
+        self.assertEqual([m["event"] for m in matches],["freed","allocated"])
+        with TemporaryDirectory() as temp:
+            path=Path(temp)/"joined.ndjson"
+            path.write_text(json.dumps({"source_ip":"10.100.10.10",
+                                         "raw":combined})+"\n",encoding="utf-8")
+            result=inspect(path,last=10,examples=1)
+            self.assertEqual(result["linhas_consideradas"],1)
+            self.assertEqual(result["marcadores_por_evento"],
+                             {"port_allocation":1,"port_freed":1})
+            self.assertEqual(result["total_marcadores"],2)
+            self.assertEqual(result["candidatos_mapeamento_formato_publicado"],2)
+            self.assertNotIn("100.64.64.12",json.dumps(result["exemplos_com_ips_ocultos"]))
+            self.assertNotIn("45.238.171.70",json.dumps(result["exemplos_com_ips_ocultos"]))
+
+    def test_dont_count_invalid_ip_or_port_as_mapping(self):
+        from fmn_filters.a10_syslog_inspect import candidate_mappings
+        s=("LSN:PortAllocated:TCP [999.999.999.999 1234 45.238.170.70 2222]"
+           "LSN:PortFreed:UDP [100.64.64.12 0 45.238.170.70 2222]")
+        self.assertEqual(list(candidate_mappings(s)),[])
 
 
 if __name__ == "__main__":
