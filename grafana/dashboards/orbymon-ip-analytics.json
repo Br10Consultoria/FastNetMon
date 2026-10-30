@@ -5,7 +5,7 @@
   "description": "Pares IP amostrados do Huawei. Tráfego estimado, ifIndex bruto e GeoLite2 quando disponível; não é tráfego único de clientes.",
   "timezone": "browser",
   "schemaVersion": 40,
-  "version": 1,
+  "version": 2,
   "refresh": "1m",
   "time": {
     "from": "now-3h",
@@ -40,7 +40,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT src_ip AS 'IP origem',MAX(NULLIF(src_prefix,'')) AS 'Prefixo',MAX(src_asn) AS ASN,MAX(NULLIF(src_asn_name,'')) AS 'Organizacao',MAX(NULLIF(src_country,'')) AS 'Pais',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc) GROUP BY src_ip ORDER BY SUM(total_bytes) DESC LIMIT 30",
+          "rawSql": "SELECT src_ip AS 'IP origem',MAX(NULLIF(src_prefix,'')) AS 'Prefixo',MAX(src_asn) AS ASN,COALESCE(MAX(NULLIF(src_asn_name,'')),'Não identificado') AS 'Organizacao',MAX(NULLIF(src_country,'')) AS 'Pais',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc) GROUP BY src_ip ORDER BY SUM(total_bytes) DESC LIMIT 30",
           "format": "table",
           "editorMode": "code"
         }
@@ -51,7 +51,24 @@
             "mode": "palette-classic"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "MB estimados"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "suffix: MB"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          }
+        ]
       },
       "options": {}
     },
@@ -76,7 +93,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT dst_ip AS 'IP destino',MAX(NULLIF(dst_prefix,'')) AS 'Prefixo',MAX(dst_asn) AS ASN,MAX(NULLIF(dst_country,'')) AS 'Pais',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc) GROUP BY dst_ip ORDER BY SUM(total_bytes) DESC LIMIT 30",
+          "rawSql": "SELECT dst_ip AS 'IP destino',MAX(NULLIF(dst_prefix,'')) AS 'Prefixo',MAX(dst_asn) AS ASN,COALESCE(MAX(NULLIF(dst_asn_name,'')),'Não identificado') AS 'Organizacao',MAX(NULLIF(dst_country,'')) AS 'Pais',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc) GROUP BY dst_ip ORDER BY SUM(total_bytes) DESC LIMIT 30",
           "format": "table",
           "editorMode": "code"
         }
@@ -87,7 +104,24 @@
             "mode": "palette-classic"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "MB estimados"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "suffix: MB"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          }
+        ]
       },
       "options": {}
     },
@@ -112,7 +146,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT src_ip AS 'Origem',dst_ip AS 'Destino',protocol AS 'Protocolo',dst_port AS 'Porta',input_if AS 'Entrada ifIndex',output_if AS 'Saida ifIndex',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc) GROUP BY src_ip,dst_ip,protocol,dst_port,input_if,output_if ORDER BY SUM(total_bytes) DESC LIMIT 40",
+          "rawSql": "SELECT src_ip AS 'Origem',dst_ip AS 'Destino',protocol AS 'Protocolo',dst_port AS 'Porta',CASE WHEN input_if=0 THEN 'Não informado' ELSE COALESCE(im_in.if_name,CONCAT('ifIndex ',input_if)) END AS 'Entrada Huawei',CASE WHEN output_if=0 THEN 'Não informado' ELSE COALESCE(im_out.if_name,CONCAT('ifIndex ',output_if)) END AS 'Saída Huawei',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=input_if LEFT JOIN orby_interface_names AS im_out ON im_out.source='huawei' AND im_out.if_index=output_if WHERE $__timeFilter(bucket_utc) GROUP BY src_ip,dst_ip,protocol,dst_port,input_if,output_if ORDER BY SUM(total_bytes) DESC LIMIT 40",
           "format": "table",
           "editorMode": "code"
         }
@@ -123,13 +157,30 @@
             "mode": "palette-classic"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "MB estimados"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "suffix: MB"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          }
+        ]
       },
       "options": {}
     },
     {
       "id": 4,
-      "title": "Interfaces Huawei (ifIndex e direcao bruta)",
+      "title": "Interfaces Huawei (ifName confirmado ou ifIndex)",
       "type": "table",
       "datasource": {
         "type": "mysql",
@@ -148,7 +199,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT input_if AS 'Entrada ifIndex',output_if AS 'Saida ifIndex',netflow_direction AS 'Direcao raw',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados',SUM(flow_records) AS 'Registros' FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc) GROUP BY input_if,output_if,netflow_direction ORDER BY SUM(total_bytes) DESC LIMIT 30",
+          "rawSql": "SELECT CASE WHEN input_if=0 THEN 'Não informado' ELSE COALESCE(im_in.if_name,CONCAT('ifIndex ',input_if)) END AS 'Entrada Huawei',CASE WHEN output_if=0 THEN 'Não informado' ELSE COALESCE(im_out.if_name,CONCAT('ifIndex ',output_if)) END AS 'Saída Huawei',netflow_direction AS 'Direcao raw',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados',SUM(flow_records) AS 'Registros' FROM orby_ip_pairs_minute LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=input_if LEFT JOIN orby_interface_names AS im_out ON im_out.source='huawei' AND im_out.if_index=output_if WHERE $__timeFilter(bucket_utc) GROUP BY input_if,output_if,netflow_direction ORDER BY SUM(total_bytes) DESC LIMIT 30",
           "format": "table",
           "editorMode": "code"
         }
@@ -159,7 +210,24 @@
             "mode": "palette-classic"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "MB estimados"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "suffix: MB"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          }
+        ]
       },
       "options": {}
     },
@@ -195,7 +263,24 @@
             "mode": "palette-classic"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "MB estimados"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "suffix: MB"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          }
+        ]
       },
       "options": {}
     },
@@ -231,7 +316,24 @@
             "mode": "palette-classic"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "MB estimados"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "suffix: MB"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          }
+        ]
       },
       "options": {}
     },
@@ -267,13 +369,31 @@
             "mode": "palette-classic"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "MB estimados"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "suffix: MB"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          }
+        ]
       },
-      "options": {}
+      "options": {},
+      "description": "ASN/pais GeoLite2 somente quando conhecido, sem dados inventados."
     },
     {
       "id": 8,
-      "title": "Banda estimada por entrada ifIndex (Mbps)",
+      "title": "Mbps estimados por interface de entrada Huawei",
       "type": "timeseries",
       "datasource": {
         "type": "mysql",
@@ -292,7 +412,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),CAST(input_if AS CHAR) AS metric,ROUND(SUM(total_bytes)*8/60000000,2) AS value FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc) GROUP BY 1,input_if ORDER BY 1",
+          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),CASE WHEN input_if=0 THEN 'Não informado' ELSE COALESCE(CONCAT(im_in.if_name,' (',input_if,')'),CONCAT('ifIndex ',input_if)) END AS metric,ROUND(SUM(total_bytes)*8/60000000,2) AS value FROM orby_ip_pairs_minute LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=input_if WHERE $__timeFilter(bucket_utc) GROUP BY 1,input_if,im_in.if_name ORDER BY 1",
           "format": "time_series",
           "editorMode": "code"
         }
@@ -446,7 +566,7 @@
     },
     {
       "id": 12,
-      "title": "Ultimo fluxo registrado (UTC)",
+      "title": "Último fluxo Huawei UTC (independente do filtro)",
       "type": "table",
       "datasource": {
         "type": "mysql",
@@ -465,7 +585,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT MAX(bucket_utc) AS 'Ultimo fluxo UTC' FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc)",
+          "rawSql": "SELECT MAX(bucket_utc) AS 'Último fluxo Huawei (UTC)' FROM orby_ip_pairs_minute WHERE source='huawei'",
           "format": "table",
           "editorMode": "code"
         }
@@ -581,9 +701,95 @@
             "mode": "palette-classic"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "MB estimados"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "suffix: MB"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          }
+        ]
       },
       "options": {}
+    },
+    {
+      "id": 20,
+      "title": "Atraso da última coleta Huawei (min; agora)",
+      "type": "stat",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 51,
+        "w": 12,
+        "h": 4
+      },
+      "description": "Independente do período selecionado; negativo indica horário do fluxo no futuro. Ajuda a entender painéis vazios em 15/30 minutos.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT ROUND(TIMESTAMPDIFF(SECOND,MAX(bucket_utc),UTC_TIMESTAMP())/60,1) AS value FROM orby_ip_pairs_minute WHERE source='huawei'",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix: min",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 5
+              },
+              {
+                "color": "red",
+                "value": 15
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
     }
   ]
 }
