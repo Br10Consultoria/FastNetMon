@@ -7,7 +7,10 @@ BASE="$(cd "$(dirname "$0")/.." && pwd)"
 [[ -s /etc/orbymon/pipeline.env ]] || { echo "pipeline.env ausente" >&2; exit 1; }
 mariadb orbymon -NBe "SHOW TABLES LIKE 'orby_ip_pairs_minute'" |
  grep -qx orby_ip_pairs_minute || { echo "Fase 2 deve estar instalada" >&2; exit 1; }
-install -d -o root -g orbymon -m 0750 /etc/orbymon
+# Nao alterar permissoes de /etc/orbymon: o Grafana usa TLS nele.
+if [[ ! -d /etc/orbymon ]]; then
+  install -d -o root -g orbymon -m 0750 /etc/orbymon
+fi
 if [[ ! -e /etc/orbymon/cgnat-profiles.json ]]; then
   install -o root -g orbymon -m 0640 \
     "$BASE/rules/cgnat-profiles.example.json" /etc/orbymon/cgnat-profiles.json
