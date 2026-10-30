@@ -40,7 +40,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT src_ip AS 'IP origem',MAX(NULLIF(src_prefix,'')) AS 'Prefixo',MAX(src_asn) AS ASN,COALESCE(MAX(NULLIF(src_asn_name,'')),'Não identificado') AS 'Organizacao',COALESCE(MAX(NULLIF(src_country,'')),'Não identificado') AS 'Pais',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc) GROUP BY src_ip ORDER BY SUM(total_bytes) DESC LIMIT 30",
+          "rawSql": "SELECT src_ip AS 'IP origem',MAX(NULLIF(src_prefix,'')) AS 'Prefixo',MAX(src_asn) AS ASN,COALESCE(MAX(NULLIF(src_asn_name,'')),'Não identificado') AS 'Organizacao',COALESCE(MAX(NULLIF(src_country,'')),'Não identificado') AS 'Pais',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) GROUP BY src_ip ORDER BY SUM(total_bytes) DESC LIMIT 30",
           "format": "table",
           "editorMode": "code"
         }
@@ -93,7 +93,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT dst_ip AS 'IP destino',MAX(NULLIF(dst_prefix,'')) AS 'Prefixo',MAX(dst_asn) AS ASN,COALESCE(MAX(NULLIF(dst_asn_name,'')),'Não identificado') AS 'Organizacao',COALESCE(MAX(NULLIF(dst_country,'')),'Não identificado') AS 'Pais',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc) GROUP BY dst_ip ORDER BY SUM(total_bytes) DESC LIMIT 30",
+          "rawSql": "SELECT dst_ip AS 'IP destino',MAX(NULLIF(dst_prefix,'')) AS 'Prefixo',MAX(dst_asn) AS ASN,COALESCE(MAX(NULLIF(dst_asn_name,'')),'Não identificado') AS 'Organizacao',COALESCE(MAX(NULLIF(dst_country,'')),'Não identificado') AS 'Pais',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) GROUP BY dst_ip ORDER BY SUM(total_bytes) DESC LIMIT 30",
           "format": "table",
           "editorMode": "code"
         }
@@ -146,7 +146,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT src_ip AS 'Origem',dst_ip AS 'Destino',protocol AS 'Protocolo',dst_port AS 'Porta',CASE WHEN input_if=0 THEN 'Não informado' ELSE COALESCE(MAX(im_in.if_name),CONCAT('ifIndex ',input_if)) END AS 'Entrada Huawei',CASE WHEN output_if=0 THEN 'Não informado' ELSE COALESCE(MAX(im_out.if_name),CONCAT('ifIndex ',output_if)) END AS 'Saída Huawei',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=input_if LEFT JOIN orby_interface_names AS im_out ON im_out.source='huawei' AND im_out.if_index=output_if WHERE $__timeFilter(bucket_utc) GROUP BY src_ip,dst_ip,protocol,dst_port,input_if,output_if ORDER BY SUM(total_bytes) DESC LIMIT 40",
+          "rawSql": "SELECT src_ip AS 'Origem',dst_ip AS 'Destino',protocol AS 'Protocolo',dst_port AS 'Porta',CASE WHEN input_if=0 THEN 'Não informado' ELSE COALESCE(MAX(im_in.if_name),CONCAT('ifIndex ',input_if)) END AS 'Entrada Huawei',CASE WHEN output_if=0 THEN 'Não informado' ELSE COALESCE(MAX(im_out.if_name),CONCAT('ifIndex ',output_if)) END AS 'Saída Huawei',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=input_if LEFT JOIN orby_interface_names AS im_out ON im_out.source='huawei' AND im_out.if_index=output_if WHERE orby_ip_pairs_minute.source='huawei' AND $__timeFilter(bucket_utc) GROUP BY src_ip,dst_ip,protocol,dst_port,input_if,output_if ORDER BY SUM(total_bytes) DESC LIMIT 40",
           "format": "table",
           "editorMode": "code"
         }
@@ -199,7 +199,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT CASE WHEN input_if=0 THEN 'Não informado' ELSE COALESCE(MAX(im_in.if_name),CONCAT('ifIndex ',input_if)) END AS 'Entrada Huawei',CASE WHEN output_if=0 THEN 'Não informado' ELSE COALESCE(MAX(im_out.if_name),CONCAT('ifIndex ',output_if)) END AS 'Saída Huawei',netflow_direction AS 'Direcao raw',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados',SUM(flow_records) AS 'Registros' FROM orby_ip_pairs_minute LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=input_if LEFT JOIN orby_interface_names AS im_out ON im_out.source='huawei' AND im_out.if_index=output_if WHERE $__timeFilter(bucket_utc) GROUP BY input_if,output_if,netflow_direction ORDER BY SUM(total_bytes) DESC LIMIT 30",
+          "rawSql": "SELECT CASE WHEN input_if=0 THEN 'Não informado' ELSE COALESCE(MAX(im_in.if_name),CONCAT('ifIndex ',input_if)) END AS 'Entrada Huawei',CASE WHEN output_if=0 THEN 'Não informado' ELSE COALESCE(MAX(im_out.if_name),CONCAT('ifIndex ',output_if)) END AS 'Saída Huawei',netflow_direction AS 'Direcao raw',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados',SUM(flow_records) AS 'Registros' FROM orby_ip_pairs_minute LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=input_if LEFT JOIN orby_interface_names AS im_out ON im_out.source='huawei' AND im_out.if_index=output_if WHERE orby_ip_pairs_minute.source='huawei' AND $__timeFilter(bucket_utc) GROUP BY input_if,output_if,netflow_direction ORDER BY SUM(total_bytes) DESC LIMIT 30",
           "format": "table",
           "editorMode": "code"
         }
@@ -252,7 +252,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT src_prefix AS 'Rede',COUNT(DISTINCT src_ip) AS 'IPs observados',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc) AND src_prefix!='' GROUP BY src_prefix ORDER BY SUM(total_bytes) DESC LIMIT 30",
+          "rawSql": "SELECT src_prefix AS 'Rede',COUNT(DISTINCT src_ip) AS 'IPs observados',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND src_prefix!='' GROUP BY src_prefix ORDER BY SUM(total_bytes) DESC LIMIT 30",
           "format": "table",
           "editorMode": "code"
         }
@@ -305,7 +305,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT dst_prefix AS 'Rede',COUNT(DISTINCT dst_ip) AS 'IPs observados',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc) AND dst_prefix!='' GROUP BY dst_prefix ORDER BY SUM(total_bytes) DESC LIMIT 30",
+          "rawSql": "SELECT dst_prefix AS 'Rede',COUNT(DISTINCT dst_ip) AS 'IPs observados',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND dst_prefix!='' GROUP BY dst_prefix ORDER BY SUM(total_bytes) DESC LIMIT 30",
           "format": "table",
           "editorMode": "code"
         }
@@ -358,7 +358,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT src_asn AS ASN,MAX(NULLIF(src_asn_name,'')) AS 'Organizacao',src_country AS 'Pais',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc) AND src_asn>0 GROUP BY src_asn,src_country ORDER BY SUM(total_bytes) DESC LIMIT 30",
+          "rawSql": "SELECT src_asn AS ASN,MAX(NULLIF(src_asn_name,'')) AS 'Organizacao',src_country AS 'Pais',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND src_asn>0 GROUP BY src_asn,src_country ORDER BY SUM(total_bytes) DESC LIMIT 30",
           "format": "table",
           "editorMode": "code"
         }
@@ -412,7 +412,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),CASE WHEN input_if=0 THEN 'Não informado' ELSE COALESCE(CONCAT(im_in.if_name,' (',input_if,')'),CONCAT('ifIndex ',input_if)) END AS metric,ROUND(SUM(total_bytes)*8/60000000,2) AS value FROM orby_ip_pairs_minute LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=input_if WHERE $__timeFilter(bucket_utc) GROUP BY 1,input_if,im_in.if_name ORDER BY 1",
+          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),CASE WHEN input_if=0 THEN 'Não informado' ELSE COALESCE(CONCAT(im_in.if_name,' (',input_if,')'),CONCAT('ifIndex ',input_if)) END AS metric,ROUND(SUM(total_bytes)*8/60000000,2) AS value FROM orby_ip_pairs_minute LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=input_if WHERE orby_ip_pairs_minute.source='huawei' AND $__timeFilter(bucket_utc) GROUP BY 1,input_if,im_in.if_name ORDER BY 1",
           "format": "time_series",
           "editorMode": "code"
         }
@@ -453,7 +453,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT COUNT(DISTINCT src_ip) AS value FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc)",
+          "rawSql": "SELECT COUNT(DISTINCT src_ip) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc)",
           "format": "table",
           "editorMode": "code"
         }
@@ -497,7 +497,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT COUNT(DISTINCT dst_ip) AS value FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc)",
+          "rawSql": "SELECT COUNT(DISTINCT dst_ip) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc)",
           "format": "table",
           "editorMode": "code"
         }
@@ -541,7 +541,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT COUNT(*) AS value FROM (SELECT src_ip,dst_ip FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc) GROUP BY src_ip,dst_ip) t",
+          "rawSql": "SELECT COUNT(*) AS value FROM (SELECT src_ip,dst_ip FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) GROUP BY src_ip,dst_ip) t",
           "format": "table",
           "editorMode": "code"
         }
@@ -621,7 +621,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT src_latitude AS latitude,src_longitude AS longitude,src_country AS country,src_asn AS asn,ROUND(SUM(total_bytes)/1000000,2) AS volume_mb FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc) AND src_latitude IS NOT NULL AND src_longitude IS NOT NULL GROUP BY src_latitude,src_longitude,src_country,src_asn ORDER BY SUM(total_bytes) DESC LIMIT 300",
+          "rawSql": "SELECT src_latitude AS latitude,src_longitude AS longitude,src_country AS country,src_asn AS asn,ROUND(SUM(total_bytes)/1000000,2) AS volume_mb FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND src_latitude IS NOT NULL AND src_longitude IS NOT NULL GROUP BY src_latitude,src_longitude,src_country,src_asn ORDER BY SUM(total_bytes) DESC LIMIT 300",
           "format": "table",
           "editorMode": "code"
         }
@@ -690,7 +690,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT src_country AS Pais,COUNT(DISTINCT src_ip) AS 'IPs distintos',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc) AND src_country!='' GROUP BY src_country ORDER BY SUM(total_bytes) DESC LIMIT 30",
+          "rawSql": "SELECT src_country AS Pais,COUNT(DISTINCT src_ip) AS 'IPs distintos',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND src_country!='' GROUP BY src_country ORDER BY SUM(total_bytes) DESC LIMIT 30",
           "format": "table",
           "editorMode": "code"
         }
