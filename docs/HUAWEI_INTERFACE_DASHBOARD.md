@@ -95,3 +95,39 @@ Huawei/A10. Em seguida dê Refresh no Grafana e teste 15, 30, 60min.
   gráficos legados (volume/protocolos); rankings GeoIP usam
   `orby_ip_pairs_minute` enriquecida.
 - NetFlow não equivale ao log CGNAT nem identifica assinantes.
+
+
+## Sincronizar automaticamente via SNMP de leitura
+
+Se o IP SNMP do Huawei NE8000 for alcançável pelo flow, o comando novo
+faz a consulta da IF-MIB e importa os nomes reais para o MariaDB,
+sem alterar nenhuma interface, configuração de SNMP ou CGNAT:
+
+    cd /opt/orbymon
+    git pull --ff-only origin main
+    sudo apt-get install -y snmp
+    sudo install -d -m 700 /root/.snmp
+    sudo nano /root/.snmp/snmp.conf
+
+Adicione somente a comunidade de LEITURA já autorizada no Huawei:
+
+    defCommunity SUA_COMUNIDADE_SNMP_DE_LEITURA
+
+Depois:
+
+    sudo chmod 600 /root/.snmp/snmp.conf
+    sudo bash scripts/sync-huawei-ifnames-snmp.sh IP_SNMP_DO_HUAWEI --dry-run
+    sudo bash scripts/sync-huawei-ifnames-snmp.sh IP_SNMP_DO_HUAWEI
+    sudo mariadb orbymon -e "SELECT if_index,if_name FROM orby_interface_names WHERE source='huawei' AND if_index IN (16,86,334);"
+
+O script nao envia comunidade nos argumentos do processo nem imprime
+as credenciais, consulta apenas a OID 1.3.6.1.2.1.31.1.1.1.1,
+valida as respostas e usa a conexao local existente via pipeline.env.
+Os ifIndex 16/86/334 sao exemplos reais observados no dashboard,
+mas os nomes somente sao preenchidos quando vierem do SNMP.
+O ifIndex 0 permanece "Nao informado" — ele nao e uma porta real.
+
+Caso o SNMP nao responda, verificar ACL de UDP/161, IP de gerenciamento
+alcancavel, versao SNMP e MIB view no proprio Huawei. Nao abra SNMP
+publicamente; limite a leitura ao IP do flow. Para SNMPv3 ou sem
+acesso SNMP, use o importador CSV/SNMP walk descrito acima.

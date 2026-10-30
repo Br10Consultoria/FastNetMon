@@ -25,7 +25,8 @@ def validated(index, name):
     if idx < 1 or idx > 4294967295:
         raise ValueError(f'ifIndex deve ser de 1 ate 4294967295: {idx}')
     val = str(name).strip().strip('"').strip()
-    if not val or len(val) > 128 or any(ord(c) < 32 for c in val):
+    if (not val or len(val) > 128 or any(ord(c) < 32 for c in val)
+        or val.casefold().startswith(('no such instance', 'no such object', 'end of mib','timeout:', 'error:'))):
         raise ValueError(f'ifName invalido para ifIndex {idx}')
     return idx, val
 
