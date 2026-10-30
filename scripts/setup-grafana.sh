@@ -36,6 +36,9 @@ if ! command -v grafana-server >/dev/null; then
 fi
 id grafana >/dev/null || { echo "Usuario grafana nao encontrado" >&2; exit 1; }
 mariadb --batch -N -e "SELECT 1" >/dev/null
+# Dashboards Huawei/CGNAT referenciam tabela opcional de ifName confirmado.
+# Criar tabela vazia idempotente evita erros SQL antes de importar nomes reais.
+mariadb orbymon < "$PROJECT_DIR/sql/interface_names.sql"
 FOUND="$(mariadb --batch -N -e "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME='orbymon'")"
 [[ "$FOUND" == "1" ]] || { echo "Banco orbymon ausente; instale MariaDB e crie o banco antes" >&2; exit 1; }
 [[ -d /etc/orbymon ]] || install -d -m 0750 -o root -g orbymon /etc/orbymon
