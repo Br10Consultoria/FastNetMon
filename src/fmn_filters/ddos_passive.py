@@ -152,7 +152,7 @@ def match_rollup(row, match):
 
 
 SQL_ROWS = """SELECT bucket_utc,src_ip,dst_ip,protocol,dst_port,input_if,output_if,
-src_asn,dst_asn,src_country,dst_country,total_packets,total_bytes,flow_records
+netflow_direction,src_asn,dst_asn,src_country,dst_country,total_packets,total_bytes,flow_records
 FROM orby_ip_pairs_minute
 WHERE source=%s AND bucket_utc >= %s AND bucket_utc < %s
 ORDER BY bucket_utc LIMIT %s"""
@@ -167,7 +167,7 @@ def fetch_rows(cur, source, start, end, limit):
     for values in raw:
         result.append(dict(zip((
             "bucket_utc","src_ip","dst_ip","protocol","dst_port","input_if",
-            "output_if","src_asn","dst_asn","src_country","dst_country",
+            "output_if","netflow_direction","src_asn","dst_asn","src_country","dst_country",
             "total_packets","total_bytes","flow_records"
         ),values)))
     return result
@@ -189,7 +189,7 @@ def evaluate(rows, rule, config, start):
             continue
         port=int(row["dst_port"]) if rule["group_by_port"] else 0
         # Nunca misturar ifIndex de entrada/saida ou direcoes para mascarar duplicacao.
-        key=(row["dst_ip"],row["protocol"],port,row["input_if"],row["output_if"])
+        key=(row["dst_ip"],row["protocol"],port,row["input_if"],row["output_if"],row["netflow_direction"])
         bucket=row["bucket_utc"]
         if not start<=bucket<start+timedelta(minutes=minutes):
             continue
@@ -211,7 +211,7 @@ def evaluate(rows, rule, config, start):
             continue
         results.append({
             "dst_ip":key[0],"protocol":key[1],"dst_port":key[2],
-            "input_if":key[3],"output_if":key[4],
+            "input_if":key[3],"output_if":key[4],"netflow_direction":key[5],
             "pps":round(max(v[0] for v in rates),2),
             "mbps":round(max(v[1] for v in rates),4),
             "unique_sources":min(v[2] for v in rates),
@@ -223,13 +223,13 @@ def evaluate(rows, rule, config, start):
 
 def insert_alert(cur, source, rule, event, cooldown):
     key=(source,rule["name"],event["dst_ip"],event["protocol"],
-         event["dst_port"],event["input_if"],event["output_if"])
+         event["dst_port"],event["input_if"],event["output_if"],event["netflow_direction"])
     cur.execute("""INSERT IGNORE INTO orby_ddos_rule_state
-(source,rule_name,dst_ip,protocol,dst_port,input_if,output_if)
-VALUES (%s,%s,%s,%s,%s,%s,%s)""",key)
+(source,rule_name,dst_ip,protocol,dst_port,input_if,output_if,netflow_direction)
+VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",key)
     cur.execute("""SELECT last_alert_utc FROM orby_ddos_rule_state
 WHERE source=%s AND rule_name=%s AND dst_ip=%s AND protocol=%s AND
-dst_port=%s AND input_if=%s AND output_if=%s FOR UPDATE""",key)
+dst_port=%s AND input_if=%s AND output_if=%s AND netflow_direction=%s FOR UPDATE""",key)
     old=cur.fetchone()
     if old is None:
         raise RuntimeError("nao foi possivel consultar cooldown da regra")
@@ -238,7 +238,7 @@ dst_port=%s AND input_if=%s AND output_if=%s FOR UPDATE""",key)
     group={
         "dst_ip":event["dst_ip"],"protocol":event["protocol"],
         "dst_port":event["dst_port"],"input_if":event["input_if"],
-        "output_if":event["output_if"],"exporter":source,
+        "output_if":event["output_if"],"netflow_direction":event["netflow_direction"],"exporter":source,
     }
     alert={
         "action":"alert_only",
@@ -256,7 +256,7 @@ dst_port=%s AND input_if=%s AND output_if=%s FOR UPDATE""",key)
     cur.execute(ALERT_SQL,alert_to_row(alert))
     cur.execute("""UPDATE orby_ddos_rule_state SET last_alert_utc=%s
 WHERE source=%s AND rule_name=%s AND dst_ip=%s AND protocol=%s AND
-dst_port=%s AND input_if=%s AND output_if=%s""",(event["bucket"],)+key)
+dst_port=%s AND input_if=%s AND output_if=%s AND netflow_direction=%s""",(event["bucket"],)+key)
     return True
 
 
