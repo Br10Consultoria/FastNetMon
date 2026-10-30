@@ -58,6 +58,15 @@ class A10SyslogInspectTests(unittest.TestCase):
             f.write_text("a"*70000+"\n")
             self.assertEqual(inspect(f)["linhas_invalidas"],1)
 
+    def test_installer_maintains_group_access_for_future_files(self):
+        installer = Path(__file__).resolve().parent.parent / "scripts/setup-a10-syslog.sh"
+        script = installer.read_text(encoding="utf-8")
+        self.assertIn('fileOwner="syslog" fileGroup="orbymon"', script)
+        self.assertIn('chown syslog:orbymon /var/log/orbymon/a10/a10-current.ndjson', script)
+        self.assertIn('chmod 0640 /var/log/orbymon/a10/a10-current.ndjson', script)
+        self.assertIn('if [[ -L /var/log/orbymon/a10/a10-current.ndjson ]]', script)
+        self.assertIn('create 0640 syslog orbymon', script)
+
 
 if __name__ == "__main__":
     unittest.main()

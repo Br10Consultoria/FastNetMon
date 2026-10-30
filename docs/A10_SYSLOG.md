@@ -37,6 +37,14 @@ substitua por TLS ou transporte cifrado.
     sudo -u orbymon env PYTHONPATH=/opt/orbymon/src python3 -m fmn_filters.a10_syslog_inspect
 
 A mensagem collector-healthcheck aparecera como 'unrecognized': esperado.
+
+Se a instalacao anterior retornar Permission denied ao inspecionar
+'a10-current.ndjson', atualize o repositorio e execute novamente o
+instalador com o mesmo --a10-source-ip. A rotina preserva o conteudo do
+arquivo existente, corrige owner/group para syslog:orbymon (0640), e
+configura novos arquivos com fileOwner=syslog e fileGroup=orbymon.
+O logrotate ja usava 'create 0640 syslog orbymon'. Nao use chmod 777
+nem exponha registros brutos de CGNAT.
 Verifique recebimento do A10 com:
 
     sudo tcpdump -ni any 'tcp port 5514' -c 15
@@ -95,3 +103,11 @@ nao apaga registros e faz compactacao. Monitore disco e defina
 retenção legal, backups, controles de acesso e capacidade antes
 de liberar producao ou logs de volume elevado. A fase de compliance
 e armazenamento de longo prazo ainda nao esta implementada.
+
+## Enderecamento fisico confirmado
+
+- A10 Thunder no enlace de CGNAT: **10.100.10.10** (origem Syslog, salvo source-interface diferente).
+- Huawei borda no enlace com A10: **10.100.10.9** (proximo salto do A10, NAO endereco do coletor).
+- Destino Syslog e o IP do servidor flow alcancavel pelo A10: o IP publico usado para Grafana/NetFlow foi 187.87.201.198, mas confirmar rota e filtros antes de configurar; preferir endereco privado real do flow caso exista.
+
+Nao use 10.100.10.9 como destino do log sem encaminhamento explicito configurado na borda: e o endereco do roteador, nao o servidor flow. A confirmacao de ping/rota entre A10 e flow precede a configuracao definitiva no ACOS.
