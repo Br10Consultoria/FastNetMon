@@ -1,68 +1,72 @@
-# OrbyMon - Fase 4: diagnostico CGNAT e baseline observada
+# OrbyMon - CGNAT A10: pools publicos reais e rede interna
 
-Os blocos protegidos sao 45.238.170.0/23 e 187.87.201.0/24.
-Nao sabemos ainda quais enderecos desses blocos sao compartilhados
-pelo equipamento de CGNAT; o instalador NAO classifica nenhum como
-CGNAT ate receber a informacao real de pools.
+## Topologia informada
 
-## Instalar (somente leitura)
+Router Huawei NE8000: quatro rotas estaticas para next-hop 10.100.10.10,
+que terminam no equipamento A10 (configuracao cgnv6/LSN). O A10 usa
+class-list CL_CGN1 -> 100.64.64.0/19 lsn-lid 1, pool-group NAT-Group.
+
+| A10 pool | CIDR publico | max-users-per-ip |
+|---|---|---|
+| NAT-POOL-08 | 45.238.170.64/26 | 32 |
+| NAT-POOL-09 | 45.238.171.64/26 | 32 |
+| NAT-POOL-10 | 45.238.170.128/26 | 32 |
+| NAT-POOL-11 | 45.238.171.128/26 | 32 |
+
+Total: quatro /26, 256 enderecos do pool, 8192 atribuicoes *teoricas*
+(256 x 32), nao usuarios atualmente conectados. O /19 interno tem
+8192 enderecos, tambem nao equivale ao numero de assinantes ativos.
+
+Esses pools sao SUBFAIXAS da rede publica protegida 45.238.170.0/23.
+O bloco 187.87.201.0/24 continua protegido no detector passivo da F3,
+mas NAO e automaticamente classificado como CGNAT.
+
+## Atualizar classificacao local sem perder personalizacoes
 
     cd /opt/orbymon
     git pull --ff-only origin main
     PYTHONPATH=src python3 -m unittest discover -s tests -q
     sudo bash scripts/setup-cgnat-baseline.sh
 
-Instala e importa automaticamente o dashboard
-"OrbyMon | CGNAT - Redes Publicas e Baseline" na pasta OrbyMon.
-Nao cria novas tabelas, nao muda alertas, thresholds, exportacao, CGNAT,
-Huawei, Mikrotik, firewall ou SSH.
+O instalador faz backup do perfil JSON existente (se alterar), preenche
+somente os 4 pools conhecidos, rede interna /19 e metadados do A10.
+Preserva classificacoes existentes dedicado/infraestrutura e parametros
+de lookback/limites de linhas. Se encontrar pools preexistentes
+divergentes ou conflito com dedicado/infra, ERRA com mensagem de
+revisao manual e NAO sobrescreve perfis.
+Para ver arquivo configurado:
 
-Relatorio em JSON no journal:
+    sudo python3 -m json.tool /etc/orbymon/cgnat-profiles.json
+
+## Resultado
+
+O relatorio read-only inclui:
+- Baseline P95 e pico por IP publico, protocolo, lado (src/dst), ifIndex e
+  direcao da exportacao (ja existia).
+- Novo baseline P95 e pico por POOL (NAT-POOL-08..11), mantendo
+  separacao de direcoes e interfaces. Nao soma o mesmo pacote visto duas vezes.
+- Capacidade teorica por pool, sem fingir saber uso real.
+- Declaracao de 100.64.64.0/19 como rede interna do A10.
+- Dashboard OrbyMon CGNAT atualizado: visoes por POOL e observacoes de rede
+  privada quando houver exportacao desses fluxos no Huawei.
 
     sudo systemctl start orbymon-cgnat-report.service
-    sudo journalctl -u orbymon-cgnat-report.service -n 120 --no-pager
+    sudo journalctl -u orbymon-cgnat-report.service -n 180 --no-pager
 
-## Cadastrar os pools REAIS quando disponiveis
+A consulta analisa os ultimos 60 minutos por padrao; contadores
+do NetFlow amostrado 1:2048 sao estimados e agrupados no minuto final.
+Ausencia de fluxos para 100.64.64.0/19 nao prova que o NAT esteja
+desativado: o Huawei pode observar a posicao pos-NAT do fluxo.
 
-Edite /etc/orbymon/cgnat-profiles.json. Campos:
-- protected_cidrs: blocos publicos protegidos.
-- cgnat_pools: faixas publicas REALMENTE compartilhadas (vazio por padrao).
-- dedicated_public_cidrs: IPs/faixas dedicados a clientes.
-- infrastructure_public_cidrs: IPs/faixas de infraestrutura.
-- lookback_hours: janela 1-72h; inicie 1h para evitar sobrecarga.
-- settle_minutes: aguardar consolidação de NetFlow.
-- min_samples: minimo de minutos observados para considerar p95 utilizavel.
-- max_rows: aborta sem apresentar amostra parcial quando excedido.
+## Limitacoes de identificacao dos assinantes
 
-Pools devem ser CIDR valido totalmente contido nos blocos protegidos;
-subfaixas com papeis diferentes nao podem se sobrepor.
-Nao presumir qual bloco/host e CGNAT com base na contagem de conexoes.
+Um IP publico pode corresponder a ate 32 usuarios conforme configurado,
+mas NAO ha correlacao por assinante no rollup do OrbyMon.
+Precisaremos de eventos/logs de mapeamento do A10 contendo
+IP privado:porta -> IP publico:porta, protocolo e horarios, alem da
+ligacao PPPoE/RADIUS com o assinante. A Fase 2 NAO registra portas de
+origem, de modo que nao pode reconstruir traducoes com precisao.
+Nao ativar consultas ou alteracoes no A10 sem validacao de riscos.
 
-O sistema separa os IPs publicos **vistos como origem** dos **vistos
-como destino**. Isso NAO significa upload/download nem indica se o
-observador esta antes ou depois do CGNAT.
-Os indices input_if,output_if,direction sao preservados como emitidos.
-
-O relatorio entrega p95 e pico de Mbps/PPS por IP publico, interface,
-direcao e protocolo, com numero de minutos observados. Se houver poucas
-observacoes, baseline_confiavel=false; p95 nao sera adequado a calibracao.
-A agregacao usa apenas minutos que tiveram fluxos: minutos sem amostra
-NAO devem ser considerados trafego zero.
-
-## Consideracoes sobre assinantes / NAT
-
-Um unico IP publico compartilhado representa varios assinantes.
-NetFlow pos-NAT nao identifica automaticamente IP privado, portas
-traduzidas nem cliente PPPoE. Para correlacao real, sera preciso um
-export de logs de NAT contendo IP/porta privado, IP/porta publico,
-protocolo e timestamps confiaveis (e modelo de atribuicao de clientes).
-Nao adivinhar assinante a partir do IP publico ou ASN.
-
-A tabela da fase 2 agrega portas de destino, nao guarda portas de origem;
-portanto nao pode reconstruir mapeamentos NAT historicos. Em alguns
-cenarios NAT logging tambem nao informa destino; seu formato deve ser
-inspecionado e a retencao/privacidade revisada antes da integracao.
-
-A fase 3 continua PASSIVA com seus limites atuais. A F4 apenas fornece
-referencias para calibração posterior, sem alterar automaticamente
-limiares nem confirmar DDoS.
+A fase 3 continua PASSIVA e NAO muda automaticamente thresholds ou
+regras em funcao deste perfil.

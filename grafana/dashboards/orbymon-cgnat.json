@@ -2,10 +2,10 @@
   "id": null,
   "uid": "orbymon-cgnat-observability",
   "title": "OrbyMon | CGNAT - Redes Publicas e Baseline",
-  "description": "Análise passiva dos blocos 45.238.170.0/23 e 187.87.201.0/24. Mostra papel do IP observado como origem/destino, nao garante sentido NAT, identidade do assinante nem ataque confirmado.",
+  "description": "CGNAT A10: pools publicos NAT-POOL-08/09/10/11 e rede interna 100.64.64.0/19. Lado src/dst e ifIndex sao brutos do NetFlow; sem inferencia de NAT, assinante ou ataque.",
   "timezone": "browser",
   "schemaVersion": 40,
-  "version": 1,
+  "version": 2,
   "refresh": "1m",
   "time": {
     "from": "now-3h",
@@ -354,6 +354,191 @@
             "uid": "orbymon-mysql"
           },
           "rawSql": "SELECT input_if AS 'ifIndex entrada',output_if AS 'ifIndex saida',netflow_direction AS 'Direcao raw',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc) AND ((src_ip LIKE '45.238.170.%' OR src_ip LIKE '45.238.171.%' OR src_ip LIKE '187.87.201.%') OR (dst_ip LIKE '45.238.170.%' OR dst_ip LIKE '45.238.171.%' OR dst_ip LIKE '187.87.201.%')) GROUP BY input_if,output_if,netflow_direction ORDER BY SUM(total_bytes) DESC LIMIT 30",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 10,
+      "title": "A10 CGNAT - Pool publico na ORIGEM (top protocolos/ifIndex)",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 35,
+        "w": 12,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT pool_name AS Pool, protocol AS Protocolo,input_if AS 'ifIndex entrada',netflow_direction AS 'Direcao raw', COUNT(DISTINCT ip_publico) AS 'IPs publicos observados',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM (SELECT bucket_utc,protocol,input_if,output_if,netflow_direction,src_ip AS ip_publico,total_bytes,total_packets,CASE WHEN INET_ATON(src_ip) BETWEEN INET_ATON('45.238.170.64') AND INET_ATON('45.238.170.127') THEN 'NAT-POOL-08' WHEN INET_ATON(src_ip) BETWEEN INET_ATON('45.238.171.64') AND INET_ATON('45.238.171.127') THEN 'NAT-POOL-09' WHEN INET_ATON(src_ip) BETWEEN INET_ATON('45.238.170.128') AND INET_ATON('45.238.170.191') THEN 'NAT-POOL-10' WHEN INET_ATON(src_ip) BETWEEN INET_ATON('45.238.171.128') AND INET_ATON('45.238.171.191') THEN 'NAT-POOL-11' ELSE NULL END AS pool_name FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc)) a WHERE pool_name IS NOT NULL GROUP BY pool_name,protocol,input_if,netflow_direction ORDER BY SUM(total_bytes) DESC LIMIT 40",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 11,
+      "title": "A10 CGNAT - Pool publico no DESTINO (top protocolos/ifIndex)",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 35,
+        "w": 12,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT pool_name AS Pool,protocol AS Protocolo,input_if AS 'ifIndex entrada',netflow_direction AS 'Direcao raw',COUNT(DISTINCT ip_publico) AS 'IPs publicos observados',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM (SELECT bucket_utc,protocol,input_if,output_if,netflow_direction,dst_ip AS ip_publico,total_bytes,total_packets,CASE WHEN INET_ATON(dst_ip) BETWEEN INET_ATON('45.238.170.64') AND INET_ATON('45.238.170.127') THEN 'NAT-POOL-08' WHEN INET_ATON(dst_ip) BETWEEN INET_ATON('45.238.171.64') AND INET_ATON('45.238.171.127') THEN 'NAT-POOL-09' WHEN INET_ATON(dst_ip) BETWEEN INET_ATON('45.238.170.128') AND INET_ATON('45.238.170.191') THEN 'NAT-POOL-10' WHEN INET_ATON(dst_ip) BETWEEN INET_ATON('45.238.171.128') AND INET_ATON('45.238.171.191') THEN 'NAT-POOL-11' ELSE NULL END AS pool_name FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc)) a WHERE pool_name IS NOT NULL GROUP BY pool_name,protocol,input_if,netflow_direction ORDER BY SUM(total_bytes) DESC LIMIT 40",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 12,
+      "title": "A10 - Mbps estimados por pool/ifIndex/direcao (IP na origem)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 45,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),CONCAT(pool_name,' if',input_if,' dir',netflow_direction) AS metric,ROUND(SUM(total_bytes)*8/60000000,2) AS value FROM (SELECT bucket_utc,protocol,input_if,output_if,netflow_direction,src_ip AS ip_publico,total_bytes,total_packets,CASE WHEN INET_ATON(src_ip) BETWEEN INET_ATON('45.238.170.64') AND INET_ATON('45.238.170.127') THEN 'NAT-POOL-08' WHEN INET_ATON(src_ip) BETWEEN INET_ATON('45.238.171.64') AND INET_ATON('45.238.171.127') THEN 'NAT-POOL-09' WHEN INET_ATON(src_ip) BETWEEN INET_ATON('45.238.170.128') AND INET_ATON('45.238.170.191') THEN 'NAT-POOL-10' WHEN INET_ATON(src_ip) BETWEEN INET_ATON('45.238.171.128') AND INET_ATON('45.238.171.191') THEN 'NAT-POOL-11' ELSE NULL END AS pool_name FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc)) a WHERE pool_name IS NOT NULL GROUP BY 1,2 ORDER BY 1",
+          "format": "time_series",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 13,
+      "title": "A10 - Rede interna 100.64.64.0/19 observada na ORIGEM (pre-NAT possivel)",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 55,
+        "w": 12,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT src_ip AS 'IP interno observado',protocol AS Protocolo,input_if AS 'ifIndex entrada',output_if AS 'ifIndex saida',netflow_direction AS 'Direcao raw',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND INET_ATON(src_ip) BETWEEN INET_ATON('100.64.64.0') AND INET_ATON('100.64.95.255') GROUP BY src_ip,protocol,input_if,output_if,netflow_direction ORDER BY SUM(total_bytes) DESC LIMIT 30",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 14,
+      "title": "A10 - Rede interna 100.64.64.0/19 observada no DESTINO (pre-NAT possivel)",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 55,
+        "w": 12,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT dst_ip AS 'IP interno observado',protocol AS Protocolo,input_if AS 'ifIndex entrada',output_if AS 'ifIndex saida',netflow_direction AS 'Direcao raw',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND INET_ATON(dst_ip) BETWEEN INET_ATON('100.64.64.0') AND INET_ATON('100.64.95.255') GROUP BY dst_ip,protocol,input_if,output_if,netflow_direction ORDER BY SUM(total_bytes) DESC LIMIT 30",
           "format": "table",
           "editorMode": "code"
         }

@@ -11,10 +11,10 @@ mariadb orbymon -NBe "SHOW TABLES LIKE 'orby_ip_pairs_minute'" |
 if [[ ! -d /etc/orbymon ]]; then
   install -d -o root -g orbymon -m 0750 /etc/orbymon
 fi
-if [[ ! -e /etc/orbymon/cgnat-profiles.json ]]; then
-  install -o root -g orbymon -m 0640 \
-    "$BASE/rules/cgnat-profiles.example.json" /etc/orbymon/cgnat-profiles.json
-fi
+echo "=== Configurando pools A10 conhecidos (preservando dados locais) ==="
+"$BASE/.venv/bin/python" -m fmn_filters.configure_a10 \
+  --file /etc/orbymon/cgnat-profiles.json \
+  --a10-template "$BASE/rules/cgnat-profiles.a10.json"
 "$BASE/.venv/bin/python" -m fmn_filters.cgnat_baseline \
  --config /etc/orbymon/cgnat-profiles.json --validate
 install -m 0644 "$BASE/deploy/systemd/orbymon-cgnat-report.service" \
