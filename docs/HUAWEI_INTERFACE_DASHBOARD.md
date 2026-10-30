@@ -20,7 +20,7 @@ Verificar o relógio do banco e o dado realmente gravado com:
     sudo mariadb orbymon -e "
     SELECT UTC_TIMESTAMP() agora_utc,
       (SELECT MAX(bucket_utc) FROM orby_ip_pairs_minute WHERE source='huawei') ultimo_ip,
-      (SELECT MAX(bucket_utc) FROM orby_traffic_minute WHERE source='huawei') ultimo_trafego;
+      (SELECT MAX(bucket_utc) FROM orby_traffic_minute) ultimo_trafego;
     SELECT source,
       SUM(bucket_utc>=UTC_TIMESTAMP()-INTERVAL 15 MINUTE) ult15,
       SUM(bucket_utc>=UTC_TIMESTAMP()-INTERVAL 30 MINUTE) ult30,
