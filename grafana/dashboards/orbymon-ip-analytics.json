@@ -479,6 +479,111 @@
         "overrides": []
       },
       "options": {}
+    },
+    {
+      "id": 13,
+      "title": "Localização aproximada das origens (GeoLite2)",
+      "type": "geomap",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 38,
+        "w": 16,
+        "h": 12
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT src_latitude AS latitude,src_longitude AS longitude,src_country AS country,src_asn AS asn,ROUND(SUM(total_bytes)/1000000,2) AS volume_mb FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc) AND src_latitude IS NOT NULL AND src_longitude IS NOT NULL GROUP BY src_latitude,src_longitude,src_country,src_asn ORDER BY SUM(total_bytes) DESC LIMIT 300",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "options": {
+        "view": {
+          "id": "coords",
+          "lat": 0,
+          "lon": 0,
+          "zoom": 1
+        },
+        "basemap": {
+          "type": "default",
+          "name": "Open Street Map"
+        },
+        "layers": [
+          {
+            "type": "markers",
+            "name": "Origens observadas (localização aproximada)",
+            "location": {
+              "mode": "coords",
+              "latitude": "latitude",
+              "longitude": "longitude"
+            },
+            "tooltip": true,
+            "config": {
+              "style": {
+                "size": {
+                  "fixed": 7
+                },
+                "color": {
+                  "fixed": "#FF891A"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 14,
+      "title": "Paises de origem (se houver GeoLite2)",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 38,
+        "w": 8,
+        "h": 12
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT src_country AS Pais,COUNT(DISTINCT src_ip) AS 'IPs distintos',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc) AND src_country!='' GROUP BY src_country ORDER BY SUM(total_bytes) DESC LIMIT 30",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
     }
   ]
 }
