@@ -41,6 +41,8 @@ A inspeção mostra volume normal, top IPs, portas e protocolos, sem depender de
 
 > **Fase 2 (piloto):** [Ingestao idempotente Huawei → MariaDB → Grafana](docs/TRAFFIC_PIPELINE.md). O timer e opcional e nao e iniciado pelo bootstrap.
 
+**Grafana em um comando:** [configuracao automatica e dashboard](docs/GRAFANA_AUTO.md) com `sudo bash scripts/setup-grafana.sh`.
+
 ## Componentes e estágio real
 
 | Componente | Estado |
