@@ -5,7 +5,7 @@ Nao registra NAT no MariaDB; nao imprime IP ou porta de assinante.
 from __future__ import annotations
 import argparse
 from collections import Counter, deque
-from datetime import datetime
+from datetime import datetime, timezone
 import ipaddress
 import json
 from pathlib import Path
@@ -32,6 +32,8 @@ def audit(path=LOG,*,last=1000,max_bytes=16000000):
     event_counts=Counter()
     first=None
     newest=None
+    sizes=[]
+    clock_deltas=[]
     for line in lines:
         if line is None:
             stats["linhas_maiores_64KiB"]+=1
@@ -46,6 +48,14 @@ def audit(path=LOG,*,last=1000,max_bytes=16000000):
             continue
         raw=rec["raw"]
         stats["linhas_validas"]+=1
+        sizes.append(len(raw.encode("utf-8",errors="replace")))
+        try:
+            collector_time=datetime.fromisoformat(
+                str(rec["received_at"]).replace("Z","+00:00"))
+            if collector_time.tzinfo is None:
+                collector_time=None
+        except (KeyError,TypeError,ValueError):
+            collector_time=None
         starts=list(HEADER.finditer(raw))
         stats["cabecalhos_rfc5424"]+=len(starts)
         stats["marcadores_nat"]+=sum(len(rx.findall(raw)) for _,rx in NAT)
@@ -81,15 +91,33 @@ def audit(path=LOG,*,last=1000,max_bytes=16000000):
                 continue
             if first is None or ts<first: first=ts
             if newest is None or ts>newest: newest=ts
+            if collector_time is not None:
+                clock_deltas.append(
+                    (collector_time.astimezone(timezone.utc)
+                     - ts.astimezone(timezone.utc)).total_seconds())
             event_counts[mappings[0]["event"]]+=1
     confirmed=sum(event_counts.values())
     total=stats["marcadores_nat"]
+    sizes.sort()
+    clock_deltas.sort()
+    def nearest(values,pct):
+        if not values: return None
+        import math
+        return values[max(0,math.ceil(len(values)*pct)-1)]
     return {
       "status":"ok","linhas_consideradas":len(lines),
       "linhas_validas":stats["linhas_validas"],
       "linhas_invalidas":stats["linhas_invalidas"],
       "linhas_maiores_64KiB":stats["linhas_maiores_64KiB"],
       "marcadores_nat":total,
+      "rawmsg_bytes_p50":nearest(sizes,.50),
+      "rawmsg_bytes_p95":nearest(sizes,.95),
+      "rawmsg_bytes_max":sizes[-1] if sizes else None,
+      "rawmsg_entre_8000_8192_bytes":sum(8000<=n<=8192 for n in sizes),
+      "rawmsg_entre_4000_4096_bytes":sum(4000<=n<=4096 for n in sizes),
+      "delta_coletor_menos_a10_segundos_p50":nearest(clock_deltas,.50),
+      "delta_coletor_menos_a10_segundos_p95":nearest(clock_deltas,.95),
+      "amostras_com_horarios_comparaveis":len(clock_deltas),
       "cabecalhos_rfc5424":stats["cabecalhos_rfc5424"],
       "linhas_com_varios_cabecalhos":stats["linhas_com_varios_cabecalhos"],
       "linhas_sem_cabecalho":stats["linhas_sem_cabecalho"],

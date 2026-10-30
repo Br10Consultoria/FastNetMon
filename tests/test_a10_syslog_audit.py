@@ -48,12 +48,28 @@ class AuditTests(unittest.TestCase):
             self.assertEqual(out["eventos_sem_mapeamento_completo"],1)
             self.assertEqual(out["eventos_com_timestamp_e_mapeamento_candidato"],0)
 
+    def test_size_distribution_and_timestamp_skew_without_sensitive_output(self):
+        with TemporaryDirectory() as d:
+            p=Path(d)/"clock.ndjson"
+            frame=message("Allocated","10")
+            p.write_text(json.dumps({
+                "source_ip":"10.100.10.10",
+                "received_at":"2026-10-30T09:11:10-03:00",
+                "raw":frame
+            })+"\n",encoding="utf-8")
+            result=audit(p)
+            self.assertEqual(result["amostras_com_horarios_comparaveis"],1)
+            self.assertEqual(result["delta_coletor_menos_a10_segundos_p50"],7200)
+            self.assertEqual(result["rawmsg_bytes_max"],len(frame.encode()))
+            self.assertEqual(result["rawmsg_bytes_p95"],len(frame.encode()))
+            self.assertNotIn("100.64.64.12",json.dumps(result))
+
     def test_invalid_and_absent_file(self):
         with TemporaryDirectory() as d:
             missing=Path(d)/"missing"
             self.assertEqual(audit(missing)["status"],"sem_mensagens")
             p=Path(d)/"bad.ndjson"
-            p.write_text("BAD\\n")
+            p.write_text("BAD\n")
             self.assertEqual(audit(p)["linhas_invalidas"],1)
 
     def test_no_timestamp_not_auto_correlated(self):
