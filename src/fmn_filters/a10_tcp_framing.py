@@ -159,7 +159,7 @@ def inspect_span(data: bytes, stats: Counter, *, audit_nat_candidates=False):
         from .a10_nat_candidate_audit import inspect_candidate_stream
         nat_counts = inspect_candidate_stream(data)
         for key, value in nat_counts.items():
-            stats["nat_" + key] += value
+            stats["candidate_" + key] += value
     headers = list(HEADER.finditer(data))
     stats["cabecalhos_rfc5424"] += len(headers)
     if not headers:
