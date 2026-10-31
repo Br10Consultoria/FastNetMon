@@ -9,7 +9,6 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-import shutil
 import subprocess
 import sys
 import time
@@ -176,11 +175,11 @@ def _rotation_age(props: dict[str, str] | None) -> float | None:
     raw = props.get("ExecMainExitTimestampMonotonic")
     if not raw or not raw.isdigit() or int(raw) == 0:
         return None
-    # systemd uses microseconds since boot; CLOCK_BOOTTIME includes suspend
-    # and aligns with systemd's monotonic unit timestamps on Linux.
-    if not hasattr(time, "CLOCK_BOOTTIME"):
+    # systemd ExecMainExitTimestampMonotonic is microseconds from the
+    # system's CLOCK_MONOTONIC epoch (not wall-clock time).
+    if not hasattr(time, "CLOCK_MONOTONIC"):
         return None
-    return max(0.0, time.clock_gettime(time.CLOCK_BOOTTIME) -
+    return max(0.0, time.clock_gettime(time.CLOCK_MONOTONIC) -
                int(raw) / 1_000_000)
 
 
