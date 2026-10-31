@@ -58,8 +58,8 @@ class A10NatCandidateAuditTests(unittest.TestCase):
         inspect_span(raw, a, audit_nat_candidates=False)
         inspect_span(raw, b, audit_nat_candidates=True)
         self.assertEqual(a["cabecalhos_rfc5424"], b["cabecalhos_rfc5424"])
-        self.assertEqual(b["nat_nat_sintaticamente_candidato"], 1)
-        self.assertNotIn("nat_nat_sintaticamente_candidato", a)
+        self.assertEqual(b["candidate_nat_sintaticamente_candidato"], 1)
+        self.assertNotIn("candidate_nat_sintaticamente_candidato", a)
         self.assertNotIn("100.64.64.12", json.dumps(dict(b)))
 
 if __name__ == "__main__":
