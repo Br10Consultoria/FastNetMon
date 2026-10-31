@@ -928,3 +928,65 @@ recepção de itens autorizados.
 
 O arquivo de envio contém **somente 15 indicadores numéricos**
 sem IP/portas NAT de assinantes, e não modifica logs brutos.
+
+
+## 31/10/2026 — primeira remessa real rejeitada pelo Zabbix
+
+O operador instalou `zabbix_sender 7.4.16` no flow, confirmou
+conexão a `187.87.201.148:10051` e remeteu 15 métricas
+agregadas. O servidor respondeu:
+
+```text
+response=success
+info=processed: 0; failed: 15; total: 15
+sent: 15; skipped: 0; total: 15
+```
+
+**Falha de aceitação:** `response=success` se refere ao
+processamento da requisição de protocolo e `sent: 15` ao envio
+pelo cliente; `processed: 0; failed: 15` significa que **nenhum
+item foi aceito pelo receptor Zabbix**. Não interpretar como
+integração concluída. O rsyslog/A10 TCP/5514 não foram afetados.
+
+### Diagnóstico de cadastro no Zabbix (frontend, sem restart)
+
+No servidor Zabbix, **Coleta de dados → Hosts**:
+
+1. Verificar se há um host **habilitado** com nome **técnico**
+   exatamente `flow` (não apenas o nome visível).
+2. Abrir **Itens** deste host e verificar que existe e está
+   habilitado `orbymon.a10.health.state`, do tipo **Zabbix
+   trapper**. Se não existir, importar o template
+   `zabbix/templates/orbymon-a10-receiver-7.4.json` e vinculá-lo
+   ao host; confirmar que os 15 itens herdados aparecem.
+3. Em `Allowed hosts` de itens trapper, autorizar **somente**
+   o endereço de origem efetivamente percebido pelo Zabbix,
+   respeitando NAT. Verificar no flow:
+   `ip -4 route get 187.87.201.148`.
+   Se houver NAT intermediário, o IP de origem visto pelo
+   Zabbix pode ser diferente do `src` mostrado no flow.
+4. Confirmar que o host `flow` é monitorado pelo
+   Zabbix Server `187.87.201.148` e **não por Proxy**.
+   Se o host usar Proxy, enviar os itens ao Proxy correto.
+5. Após salvar configurações, permitir até ~60s para o
+   cache do Zabbix carregá-las antes de novo teste.
+
+### Enviar só uma métrica de teste depois da correção
+
+```bash
+zabbix_sender -z 187.87.201.148 -p 10051 \
+ -s flow -k orbymon.a10.health.state -o 0 -v
+```
+
+**Esperado**: `processed: 1; failed: 0`. Só depois,
+regerar o health JSON e o arquivo de 15 métricas e fazer
+um único envio em lote; esperar `processed: 15; failed: 0`
+e conferir `Monitoramento → Dados recentes`.
+
+Não modificar firewall, rsyslog, A10 ou habilitar agendamentos
+como tentativa de solucionar falha de cadastro. Os eventos
+NAT e a correlação PPPoE permanecem inalterados.
+
+Referências oficiais Zabbix 7.4:
+- https://www.zabbix.com/documentation/7.4/pt/manual/config/items/itemtypes/trapper
+- https://www.zabbix.com/documentation/7.4/pt/manpages/zabbix_sender
