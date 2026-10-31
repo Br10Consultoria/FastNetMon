@@ -149,3 +149,53 @@ tratar `unique_sources` como cardinalidade real.
 
 Referencia para comportamento do sampling no nfdump:
 https://github.com/phaag/nfdump#sampling
+
+
+### Leitura de produção — 31/10/2026, aproximadamente 17h51 BRT
+
+O operador executou consultas read-only no `flow`:
+
+```text
+orbymon-ip-huawei.timer = active
+orbymon-ddos-huawei.timer = active
+orby_ip_pairs_minute (huawei, ultimos 10min) = 213 linhas
+ultimo bucket da coleta = 2026-10-31 20:48:00 UTC
+orby_ddos_checks: last_checked_at=2026-10-31 20:51:00 UTC
+latest_bucket_utc=2026-10-31 20:46:00 UTC
+status=passive, signals=0, alerts=0
+```
+
+Conclusao limitada: ingestao e detector agendados, registros recentes,
+nenhuma regra disparou na janela avaliada. O atraso de cinco minutos
+entre verificacao e ultimo minuto avaliado corresponde ao
+`settle_minutes=4` + fronteira de janela. As 213 linhas **nao sao**
+213 pacotes/conexoes; representam pares agregados por minuto.
+`passive` preexistente nao certifica se a janela tinha amostras:
+a correcao deste PR registra `sem_dados` quando vazia. Ainda nao
+ha evidencia suficiente para dizer que os limites estao calibrados.
+
+### Calibracao opcional somente leitura, sem IP de clientes no output
+
+O novo `sql/ddos_baseline_readonly.sql` contem tres consultas
+`SELECT`, trabalhando em 60 minutos encerrados 5 minutos
+antes da execucao. O resultado informa cobertura dos buckets
+e **picos por destino/minuto** separados por protocolo,
+ifIndex e direcao, inclusive DNS/NTP por porta. Os IPs
+sao usados apenas para agrupamento **interno** no SQL;
+a resposta exibe apenas estatisticas e interfaces.
+
+Para executar diretamente da branch do PR #33 no worktree
+**isolado**, sem checkout, merge, alteracao em prod ou
+reinicializacao de qualquer processo:
+
+```bash
+git -C /opt/orbymon-a10-audit fetch origin fix/ddos-passive-reliability-20261031
+set -o pipefail
+git -C /opt/orbymon-a10-audit show FETCH_HEAD:sql/ddos_baseline_readonly.sql | mariadb orbymon
+```
+
+Se o primeiro comando falhar, nao executar a segunda linha.
+As taxas sao estimadas de NetFlow amostrado: picos de PPS,
+Mbps e origens podem vir de minutos ou destinos diferentes.
+O objetivo imediato e observar cobertura e ordem de grandeza,
+**sem alterar automaticamente os limiares atuais**.
