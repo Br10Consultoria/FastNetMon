@@ -98,3 +98,73 @@ Fontes:
 - https://www.rfc-editor.org/rfc/rfc6587
 - https://docs.rsyslog.com/doc/configuration/modules/imtcp.html
 - https://documentation.a10networks.com/ACOS-Docs/axapi/703/cgnv6_template_logging.html
+
+
+## Inventário real do A10 — 31/10/2026, 15:18 (BRT)
+
+Saída somente leitura fornecida pelo operador:
+
+- Hardware: Thunder Series Unified Application Service Gateway **TH1030S**;
+- Versão: **ACOS 5.2.1-P11 build 66**, de 30/07/2024;
+- Relógio A10: `Oct-31-2026 15:18`, aparentemente compatível com horário do flow, ainda sem prova de offset NTP;
+- `cgnv6 server ORBY_SYSLOG 187.87.201.198`;
+- `cgnv6 service-group ORBY_SYSLOG tcp`;
+- `cgnv6 template logging ORBY_LOG_TEMPLATE`;
+- `cgnv6 lsn logging default-template ORBY_LOG_TEMPLATE`;
+- `cgnv6 enable-port-batch-v1` ativo;
+- `cgnv6 ddos-protection disable` e `cgnv6 ddos-protection logging disable`;
+- `show running-config | include` não exibe parâmetros subordinados de template, service-group e server. **Framing e formato interno não estão auditados com essa saída**.
+
+Contadores acumulados mais recentes:
+```text
+TCP Port Allocated           62276450
+TCP Port Freed               62254966
+UDP Port Allocated           95469644
+UDP Port Freed               95446525
+TCP Port Batch Allocated            0
+UDP Port Batch Allocated            0
+Log Packets Sent            336092243
+Log Packets Dropped              2629
+TCP Connection Established         15
+TCP Connection Lost                30
+```
+
+Em comparação com o diagnóstico anteriormente registrado no projeto
+(`Log Packets Dropped=1945` e `TCP Connection Lost=15`), os acumulados
+cresceram +684 drops e +15 perdas de conexão. Não há timestamps
+precisos e comparáveis para transformar isso em taxas. Também não
+significa necessariamente perda de tradução NAT para cada pacote.
+O A10 enviou 336 milhões de pacotes de log acumulados; esta contagem
+não prova entrega/persistência pelo receptor.
+
+### Próxima consulta, ainda sem alterações
+
+No A10 modo `#`:
+```text
+show running-config | section ORBY_LOG_TEMPLATE
+show running-config | section ORBY_SYSLOG
+```
+Se o filtro `section` não fornecer contexto, consultar o
+`show running-config` localmente e copiar só blocos pertinentes;
+**não expor credenciais, segredos, comunidade SNMP, chaves, senhas**.
+Confirmar `format rfc5424`, serviço, opção `log port-mappings`,
+`batched-logging-disable`, e porta do servidor no bloco completo.
+
+A documentação de aXAPI para ACOS 5.2.1-P5 descreve `format`,
+`log.port-mappings`, `batched-logging-disable` e `service-group`,
+mas não comprova opção CLI que adicione delimitadores a Syslog TCP
+neste firmware. No RFC6587, o Syslog sobre TCP precisa de
+octet-counting ou delimitador. Não converter o `batch` de portas
+NAT (`enable-port-batch-v1`) em hipótese de framing de mensagens;
+são mecanismos distintos.
+
+Documentação consultada:
+- https://documentation.a10networks.com/ACOS-Docs/axapi/521p5/cgnv6_template_logging.html
+- https://www.rfc-editor.org/rfc/rfc6587
+- https://documentation.a10networks.com/docs/ACOS/521x/5-2-1-P11/
+
+### Observação de segurança
+
+O login de gerenciamento foi feito por `telnet`, sem cifragem
+em trânsito. Planejar migração de gerenciamento para SSH,
+sem desabilitar Telnet antes de validar acesso alternativo.
