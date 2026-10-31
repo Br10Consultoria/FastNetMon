@@ -22,22 +22,29 @@ HEADER=re.compile(
 NAT=KINDS[:2]
 
 
-def audit(path=LOG,*,last=1000,max_bytes=16000000):
-    if not (1<=last<=10000 and 4096<=max_bytes<=100000000):
+def audit(path=LOG,*,last=1000,max_bytes=64000000,max_line_bytes=262144):
+    if not (1<=last<=10000 and 4096<=max_bytes<=100000000
+            and 65536<=max_line_bytes<=1048576):
         raise ValueError("limites invalidos")
     if not path.exists():
         return {"status":"sem_mensagens","arquivo":str(path)}
-    lines=deque(tail_bytes(path,max_bytes),maxlen=last)
+    lines=deque(tail_bytes(path,max_bytes,max_line_bytes=max_line_bytes),maxlen=last)
     stats=Counter()
     event_counts=Counter()
     first=None
     newest=None
     sizes=[]
+    json_line_bytes=[]
     clock_deltas=[]
     for line in lines:
         if line is None:
+            stats["linhas_descartadas_por_limite_de_leitura"]+=1
             stats["linhas_maiores_64KiB"]+=1
             continue
+        line_size=len(line.encode("utf-8",errors="replace"))
+        json_line_bytes.append(line_size)
+        if line_size>65536:
+            stats["linhas_maiores_64KiB"]+=1
         try:
             rec=json.loads(line)
             if not isinstance(rec,dict) or not isinstance(rec.get("raw"),str):
@@ -109,11 +116,18 @@ def audit(path=LOG,*,last=1000,max_bytes=16000000):
       "linhas_validas":stats["linhas_validas"],
       "linhas_invalidas":stats["linhas_invalidas"],
       "linhas_maiores_64KiB":stats["linhas_maiores_64KiB"],
+      "linhas_descartadas_por_limite_de_leitura":stats["linhas_descartadas_por_limite_de_leitura"],
+      "limite_linha_ndjson_bytes":max_line_bytes,
+      "janela_leitura_bytes":max_bytes,
+      "linha_ndjson_bytes_max":max(json_line_bytes) if json_line_bytes else None,
       "marcadores_nat":total,
+      "rawmsg_bytes_p05":nearest(sizes,.05),
       "rawmsg_bytes_p50":nearest(sizes,.50),
       "rawmsg_bytes_p95":nearest(sizes,.95),
       "rawmsg_bytes_max":sizes[-1] if sizes else None,
       "rawmsg_entre_8000_8192_bytes":sum(8000<=n<=8192 for n in sizes),
+      "rawmsg_entre_64000_66000_bytes":sum(64000<=n<=66000 for n in sizes),
+      "rawmsg_acima_8192_bytes":sum(n>8192 for n in sizes),
       "rawmsg_entre_4000_4096_bytes":sum(4000<=n<=4096 for n in sizes),
       "delta_coletor_menos_a10_segundos_p50":nearest(clock_deltas,.50),
       "delta_coletor_menos_a10_segundos_p95":nearest(clock_deltas,.95),
@@ -138,10 +152,12 @@ def main(argv=None):
     p=argparse.ArgumentParser(description="Diagnostico read-only de Syslog A10")
     p.add_argument("--file",type=Path,default=LOG)
     p.add_argument("--last",type=int,default=1000)
-    p.add_argument("--max-bytes",type=int,default=16000000)
+    p.add_argument("--max-bytes",type=int,default=64000000)
+    p.add_argument("--max-line-bytes",type=int,default=262144)
     a=p.parse_args(argv)
     try:
-        print(json.dumps(audit(a.file,last=a.last,max_bytes=a.max_bytes),
+        print(json.dumps(audit(a.file,last=a.last,max_bytes=a.max_bytes,
+                               max_line_bytes=a.max_line_bytes),
                          indent=2,ensure_ascii=False))
     except (OSError,ValueError) as exc:
         print("Falha A10 auditoria: "+str(exc),file=sys.stderr)
