@@ -141,5 +141,33 @@ class A10TcpFramingTests(unittest.TestCase):
         self.assertNotIn("45.238.170.70", json.dumps(out))
         self.assertNotIn("34055", json.dumps(out))
 
+
+    def test_offline_replay_is_opt_in_and_never_authorizes_correlation(self):
+        records = frames(MESSAGE * 3)
+        base = self.run_pcap(records, audit_nat_candidates=True)
+        replay = self.run_pcap(records, audit_nat_candidates=True,
+                               audit_offline_replay=True)
+        self.assertNotIn("replay_nat_sintaticamente_candidato", base["contadores"])
+        self.assertEqual(replay["contadores"]["replay_nat_sintaticamente_candidato"], 2)
+        self.assertEqual(replay["contadores"]["replay_nat_allocated_tcp"], 2)
+        self.assertEqual(replay["contadores"]["replay_eventos_finais_sem_fronteira_confiavel"], 1)
+        self.assertFalse(replay["correlacao_automatica_permitida"])
+        self.assertNotIn("100.64.64.10", json.dumps(replay))
+
+    def test_offline_replay_never_joins_gap_separated_payloads(self):
+        # One full candidate followed by a missing TCP interval and another
+        # complete candidate. Neither one gets an authenticated boundary
+        # by joining the separate reconstructed spans.
+        start = MESSAGE
+        next_message = MESSAGE
+        records = [(100, b"", 0x02), (101, start, 0x18),
+                   (101 + len(start) + 123, next_message, 0x18)]
+        out = self.run_pcap(records, audit_offline_replay=True)
+        c = out["contadores"]
+        self.assertEqual(c["lacunas_tcp_bytes"], 123)
+        self.assertEqual(c.get("replay_nat_sintaticamente_candidato", 0), 0)
+        self.assertEqual(c["replay_eventos_finais_sem_fronteira_confiavel"], 2)
+        self.assertEqual(c["replay_trechos_fechados"], 2)
+
 if __name__ == "__main__":
     unittest.main()
