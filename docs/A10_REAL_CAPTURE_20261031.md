@@ -333,3 +333,57 @@ não muda rsyslog/A10 e não liga associação de assinantes**.
 
 A execução e interpretação ficam em
 `docs/A10_TCP_PCAP_PROBE.md`.
+
+
+## Replay incremental real homologado como prova de conceito offline
+
+A execução fornecida pelo operador no `flow`, com
+`HEAD=787b3f9` e `--audit-nat-candidates --audit-offline-replay`,
+apresentou equivalência entre os dois algoritmos de
+**contagem estrutural de candidatos**, para a mesma amostra
+de 20 segundos:
+
+| Evento | Auditoria direta | Replay incremental |
+|---|---:|---:|
+| PortAllocated TCP | 12646 | 12646 |
+| PortFreed TCP | 13113 | 13113 |
+| PortAllocated UDP | 19720 | 19720 |
+| PortFreed UDP | 19798 | 19798 |
+| ICMP (apenas marcador) | 3913 | 3913 |
+| **Eventos com fronteira candidata** | **69190** | **69190** |
+
+O replay processou `8385236` bytes e reportou
+`replay_trechos_fechados=6`,
+`replay_eventos_finais_sem_fronteira_confiavel=6`.
+Não houve campo `replay_buffers_acima_do_limite` no relatório,
+portanto o contador de estouros registrado é zero nesta execução.
+
+A análise manteve a lacuna TCP de 123 bytes na conexão #3:
+**nenhum dado ausente foi preenchido, inferido ou persistido**.
+
+**Status desta etapa: prova de conceito de classificação incremental
+offline validada por contagens coincidentes na amostra**. Não é um
+receptor TCP real, não garante enquadramento RFC6587, não valida
+entrega fim a fim nem integridade/retencão dos logs CGNAT.
+Mantenha `correlacao_automatica_permitida=false`.
+
+## Encerramento da fase PCAP e próxima evidência independente
+
+Não solicitar sucessivas reexecuções da mesma captura. Para avançar
+à qualificação operacional sem interromper os clientes:
+
+1. Registrar duas leituras de `show cgnv6 logging statistics`
+   no A10, com intervalo **realmente cronometrado** de ~60s.
+2. Usar `a10_logging_health.py` ou calcular manualmente
+   as diferenças dos contadores `Log Packets Dropped`,
+   `TCP Connection Lost` e `Log Packets Sent`.
+3. Conferir disponibilidade e capacidade do receptor atual,
+   espaço em disco e rotacão dos logs brutos.
+4. Só então desenhar ingestão durável com comprovacão de
+   enquadramento, fila/backpressure, cortes nas reconexões,
+   idempotência, reconciliacão e política legal de retenção.
+
+A etapa seguinte **não** deve mudar `cgnv6`,
+`batched-logging-disable`, `rsyslog` ativo ou porta TCP/5514
+enquanto o receptor alternativo não tiver sido testado de forma
+isolada com failover/rollback definido.
