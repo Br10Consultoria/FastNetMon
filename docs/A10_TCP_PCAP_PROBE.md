@@ -231,3 +231,38 @@ sudo env PYTHONPATH=/opt/orbymon-a10-audit/src \
 
 Não apague o PCAP até terminar a análise aprovada pela política de
 evidências. Não compartilhe o PCAP nem arquivos NDJSON brutos.
+
+
+## Modo de diagnóstico seguro das bordas da lacuna (após 6c2469e)
+
+A captura local de 20 segundos informou **1 lacuna com 123 bytes**
+na **conexão 3**, com 13768 segmentos de payload, 2 trechos TCP
+contíguos e nenhum SYN/FIN/RST capturado nessa conexão.
+
+O auditor offline agora apresenta, dentro de
+`diagnostico_de_lacunas_por_conexao`:
+`contexto_estrutural_das_lacunas`, uma lista limitada de
+indicadores booleanos sobre os bytes **imediatamente adjacentes**
+a cada lacuna. Não mostra o texto dos eventos, endereços ou portas.
+Nada é considerado prova de integridade ou de perda no emissor.
+
+Atualizar exclusivamente o worktree de testes:
+```bash
+git -C /opt/orbymon-a10-audit fetch origin feat/a10-tcp-framing-audit
+git -C /opt/orbymon-a10-audit switch --detach origin/feat/a10-tcp-framing-audit
+sudo env PYTHONPATH=/opt/orbymon-a10-audit/src \
+  python3 -m fmn_filters.a10_tcp_framing \
+  --pcap /root/a10-framing-local.pcap --audit-nat-candidates
+```
+
+Interpretação: se `trecho_anterior_termina_colchete=true` e
+`trecho_seguinte_inicia_cabecalho_rfc5424=true`, a lacuna está
+entre fronteiras **aparentemente** alinhadas, mas pode conter
+um ou vários eventos ausentes. Se forem `false`, a lacuna
+pode ter partido um evento; não reconstruir conteúdo ausente.
+Em ambos os casos, `eventos_adjacentes_nao_homologados=true`
+e `correlacao_automatica_permitida=false`.
+
+Depois deste diagnóstico não é necessário repetir a mesma captura
+para obter novas contagens; prosseguir com verificações independentes
+de emissão/recepção antes de criar histórico CGNAT.
