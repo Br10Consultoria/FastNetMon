@@ -1,9 +1,10 @@
 import json
-from datetime import datetime,timedelta
+from datetime import datetime,timedelta,timezone
+from unittest.mock import patch
 from pathlib import Path
 import unittest
 
-from fmn_filters.ddos_passive import validate_config,match_rollup,evaluate,fetch_rows,SQL_ROWS
+from fmn_filters.ddos_passive import validate_config,match_rollup,evaluate,fetch_rows,SQL_ROWS,run
 
 ROOT=Path(__file__).resolve().parent.parent
 CFG=json.loads((ROOT/"rules/ddos-passive.example.json").read_text())
@@ -81,6 +82,46 @@ class PassiveTests(unittest.TestCase):
         c["rules"][0]["min_pps"]=-1
         with self.assertRaises(ValueError):
             validate_config(c)
+
+    def test_rule_cannot_have_only_negative_scope(self):
+        config=json.loads(json.dumps(CFG))
+        config["rules"][0]["match"]={"not":{"protocols":["udp"]}}
+        with self.assertRaisesRegex(ValueError,"POSITIVO"):
+            validate_config(config)
+
+    def test_rule_cannot_escape_scope_through_unrestricted_or(self):
+        config=json.loads(json.dumps(CFG))
+        config["rules"][0]["match"]={
+            "any_of":[{"protocols":["udp"]},{"src_asns":[15169]}]}
+        with self.assertRaisesRegex(ValueError,"POSITIVO"):
+            validate_config(config)
+        config["rules"][0]["match"]={
+            "all_of":[{"protocols":["udp"]},{"any_of":[
+                {"dst_ports":[53]},{"src_asns":[15169]}]}]}
+        self.assertTrue(validate_config(config))
+
+    def test_empty_ingestion_window_does_not_claim_passive_health(self):
+        class FakeCursor:
+            def __init__(self):
+                self.executed=[]
+            def __enter__(self): return self
+            def __exit__(self,exc_type,exc,tb): return False
+            def execute(self,sql,params): self.executed.append((sql,params))
+        class FakeDB:
+            def __init__(self): self.cur=FakeCursor();self.commits=0
+            def cursor(self): return self.cur
+            def commit(self): self.commits+=1
+            def rollback(self): raise AssertionError("unexpected rollback")
+            def close(self): pass
+        db=FakeDB()
+        with (patch("fmn_filters.ddos_passive.connection_from_env",return_value=db),
+              patch("fmn_filters.ddos_passive.fetch_rows",return_value=[])):
+            written=run(self.config,now=datetime(2026,10,31,18,0,tzinfo=timezone.utc))
+        self.assertEqual(written,0)
+        self.assertEqual(db.commits,1)
+        self.assertEqual(len(db.cur.executed),1)
+        self.assertEqual(db.cur.executed[0][1][3],"sem_dados")
+        self.assertEqual(db.cur.executed[0][1][4:6],(0,0))
 
     def test_no_partial_analysis_when_rows_exceed_cap(self):
         class Cur:
