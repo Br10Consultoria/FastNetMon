@@ -708,3 +708,73 @@ aprovado, **não é feita por este protótipo**.
 
 Referência do formato oficial de template Zabbix 7.4:
 https://www.zabbix.com/documentation/7.4/en/manual/xml_export_import/templates
+
+
+## Pré-requisito identificado no flow: zabbix_sender ausente
+
+O operador executou:
+```text
+command -v zabbix_sender
+zabbix_sender nao instalado
+systemctl is-active zabbix-agent2 zabbix-agent
+inactive
+inactive
+```
+
+Não é necessário instalar ou iniciar um Zabbix Agent para esta
+integração: as métricas numéricas já são geradas pelo
+`a10_receiver_health` e `a10_zabbix_sender`. O executável
+`zabbix_sender` é pacote independente para remeter as métricas
+a **itens Zabbix trapper**. Não executar envio até importar o
+template e identificar servidor/proxy correto, host técnico
+e política de segurança.
+
+### Verificação de pacote no flow (Ubuntu/Debian; somente leitura)
+
+```bash
+. /etc/os-release
+printf 'Sistema: %s %s\n' "$ID" "$VERSION_ID"
+apt-cache policy zabbix-sender
+apt-get -s install --no-install-recommends zabbix-sender
+```
+
+Conferir candidato e origem do pacote. Priorizar a versão do
+**repositório oficial Zabbix 7.4** se presente; não habilitar um
+repositório para distribuição/versão errada, nem instalar Zabbix
+Server, Proxy ou Agents junto. Após verificar a simulação,
+em ambiente Ubuntu/Debian com repositório apropriado:
+
+```bash
+sudo apt-get install --no-install-recommends zabbix-sender
+command -v zabbix_sender
+zabbix_sender -V
+```
+
+A instalação do sender não implica ativar serviço ou agente.
+Checar o plano do APT antes de aprovar instalação: não executar
+atualização de todos os pacotes nem reinicializar serviços
+CGNAT/rsyslog.
+
+### Pré-requisitos de envio após a importação
+
+- Endereço do **Zabbix Server ou Proxy que recebe o host**, porta
+  TCP/10051, e caminho de rede de saída do flow;
+- nome técnico do host cadastrado no Zabbix correspondente ao
+  parâmetro `--host` da conversão (o teste usou `flow`);
+- importar `zabbix/templates/orbymon-a10-receiver-7.4.json`
+  no Zabbix de teste e vincular ao host;
+- nos itens `Zabbix trapper`, limitar `Allowed hosts` ao
+  endereço real de origem do flow que o Zabbix enxergará;
+- somente após validação, autorizar um envio manual:
+  `zabbix_sender -z HOST_ZABBIX -p 10051 -i ARQUIVO_METRICAS`,
+  sem host técnico duplicado quando cada linha já o contém.
+
+Não inferir host/IP/porta reais, não embutir credenciais, não
+habilitar processo periódico nem alegar aceitação/armazenamento
+dos 15 valores antes da resposta positiva do servidor e inspeção
+de `Dados mais recentes` no frontend.
+
+Fontes oficiais:
+- https://www.zabbix.com/documentation/7.4/pt/manual/installation/install_from_packages
+- https://www.zabbix.com/documentation/7.4/pt/manpages/zabbix_sender
+- https://www.zabbix.com/documentation/7.4/pt/manual/config/items/itemtypes/trapper
