@@ -518,3 +518,74 @@ até conferir a execução real e disponibilidade de armazenamento.
 Se o disco se aproximar de seu limite, priorizar adicionar
 armazenamento ou arquivamento com retenção verificada; não apagar
 dados CGNAT por automação improvisada.
+
+
+## 31/10/2026 16:21–16:22 BRT — diagnóstico concluído da rotação e capacidade
+
+O operador realizou nova leitura no flow, com resultados:
+
+- `systemctl list-timers`: última execução às **16:00:02 -03**,
+  próxima às **17:00:00 -03**, timer habilitado e agendado;
+- `systemctl show ...`: **Result=success**, `ExecMainStatus=0`,
+  execução das 16:00:02 às 16:00:55;
+- `journalctl`: rotações das 10h, 11h, 12h, 13h, 14h,
+  15h e 16h terminaram com sucesso. As últimas consomem
+  aproximadamente 45–55 segundos de tempo de CPU;
+- `a10_storage_inventory`: **29 arquivos comprimidos**, total
+  **3,594 GiB**; **2 arquivos rotacionados não comprimidos**,
+  **1,600 GiB**; arquivo ativo **0,514 GiB**;
+  total **5,708 GiB** em 32 arquivos. O diretório está ativo
+  (última alteração ocorreu no momento da coleta);
+- `df`: disco com **95,407 GiB** no total, **74,981 GiB**
+  livres (78,59% livre);
+- `a10_syslog_capacity --seconds 15`:
+  **6.562.300 bytes em 15,001 s**, `valid=true`,
+  taxa bruta projetada **35,2 GiB/dia**, ~**2,13 dias**
+  se o restante de disco recebesse somente logs **sem compressão**.
+
+**Resultado:** não existe evidência de falha atual do timer,
+do rsyslog ou da rotação. O arquivo ativo com mais de
+128 MiB é compatível com a execução **horária**: `maxsize`
+é avaliado somente na execução do logrotate; não é um
+limite contínuo de tamanho.
+
+**Risco pendente:** `rotate -1` mantém os arquivos sem
+remoção, mesmo com `compress` e `delaycompress`.
+A previsão de 2,13 dias é **conservadora e não representa o
+crescimento líquido real com compressão**. Não é correto
+inferir retenção de 30 dias ou taxa de compressão a partir
+das categorias de 32 arquivos em um instante isolado.
+O fluxo de logs é elevado: acompanhar disco e consumo de
+CPU da rotação; não alterar política ou excluir arquivos
+sem definir armazenamento/retencão adequada.
+
+### Medir crescimento líquido efetivo incluindo compressão (somente leitura)
+
+A branch adicionou `a10_storage_trend.py` e timestamps em
+`a10_storage_inventory.py`. Recomendação: duas leituras
+com **pelo menos 1 hora, preferivelmente 2–3 horas**
+de diferença para atravessar rotações, salvo-se o histórico
+de metadados como JSON em diretório administrativo protegido.
+
+```bash
+sudo install -d -m 0700 /root/orbymon-audit
+sudo env PYTHONPATH=/opt/orbymon-a10-audit/src \
+ python3 -m fmn_filters.a10_storage_inventory \
+ > /root/orbymon-audit/antes.json
+# Repetir o comando abaixo após pelo menos 2 horas:
+sudo env PYTHONPATH=/opt/orbymon-a10-audit/src \
+ python3 -m fmn_filters.a10_storage_inventory \
+ > /root/orbymon-audit/depois.json
+sudo env PYTHONPATH=/opt/orbymon-a10-audit/src \
+ python3 -m fmn_filters.a10_storage_trend \
+ --before /root/orbymon-audit/antes.json \
+ --after /root/orbymon-audit/depois.json
+```
+
+Os snapshots contêm somente contagens, tamanhos, horários e
+uso de disco, **não** conteúdo de assinantes. O comparador
+mede crescimento *líquido* dos arquivos após rotações
+e compactações ocorridas no intervalo; não confundir com
+geração bruta e não extrapolar janelas curtas ou onde houve
+remoção/alteração de arquivos. O forecast é apenas indicativo.
+Não apaga nada nem altera configuração de produção.
