@@ -251,3 +251,54 @@ não a homologação de integridade do logging CGNAT. O próximo passo
 é comparar contadores cumulativos do A10 em intervalos definidos,
 analisar as lacunas e projetar recepção com framing auditável antes
 de registrar traduções históricas.
+
+
+## Localização anônima da lacuna TCP — captura 20s, revisão 6c2469e
+
+Informações fornecidas pelo servidor flow (sem payload):
+
+| Métrica | Valor |
+|---|---:|
+| Conexão por índice observacional no PCAP | 3 |
+| Segmentos TCP com dados nessa conexão | 13768 |
+| Trechos contíguos nessa conexão | 2 |
+| Lacunas entre trechos | 1 |
+| Bytes ausentes nessa lacuna | **123** |
+| SYN observado na conexão | não |
+| FIN observado | não |
+| RST observado | não |
+
+Todos os nove fluxos observados no PCAP tiveram **0 RST**
+(`conexoes_com_rst=0`). Cinco fluxos não apresentaram SYN no
+recorte e cinco não apresentaram FIN; isso é esperado em capturas
+curtas e não prova resets nem perda no equipamento.
+
+**Interpretação conservadora:** a lacuna de 123 bytes significa que
+um intervalo TCP não foi reconstruído com os segmentos disponíveis na
+captura, não que exatamente uma alocação NAT foi perdida. Não existe
+relação comprovada entre um pacote TCP e um evento Syslog neste fluxo.
+O `tcpdump` informou zero drops pelo kernel, mas isso não elimina
+outras razões para faltar um segmento no PCAP. A causa não foi
+determinada com esta amostra.
+
+### Inspeção de bordas por conexão, sem revelar dados
+
+A branch adicionou `src/fmn_filters/a10_tcp_gap_edges.py` e
+`contexto_estrutural_das_lacunas` ao relatório. O teste identifica,
+para cada lacuna em segmentos TCP, somente se:
+
+- bytes capturados antes da lacuna terminam com `]` (registro
+  aparentemente encerrado);
+- bytes capturados após a lacuna começam com cabeçalho RFC5424;
+- existe um cabeçalho seguinte e quantos bytes precedem esse
+  primeiro cabeçalho (contagem numérica);
+- os eventos adjacentes são sempre **não homologados**.
+
+Esses indicadores são heurísticos. Não mostram IPs de assinante,
+portas traduzidas, quatro-tuplas TCP ou timestamps das mensagens.
+
+A próxima revisão em produção depende de leituras em dois instantes
+do `show cgnv6 logging statistics`, para avaliar o crescimento dos
+contadores `Log Packets Dropped` e `TCP Connection Lost`.
+Mantemos `correlacao_automatica_permitida=false`,
+sem mudar o serviço TCP/5514 nem o CGNAT.
