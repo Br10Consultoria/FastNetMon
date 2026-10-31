@@ -40,6 +40,25 @@ def validate_supported_match(match):
         validate_supported_match(match["not"])
 
 
+def has_positive_scope(match):
+    """Reject rules that match broad traffic only through exclusions/OR escapes.
+
+    Positive scope is a protocol, destination port, or source CIDR.
+    For an OR branch to be safe *every* alternative must be scoped,
+    unless an enclosing AND already supplies a positive restriction.
+    A NOT clause never supplies positive scope.
+    """
+    if any(key in match for key in ("protocols", "dst_ports", "src_cidrs")):
+        return True
+    if "all_of" in match and any(has_positive_scope(child)
+                                 for child in match["all_of"]):
+        return True
+    if "any_of" in match and all(has_positive_scope(child)
+                                 for child in match["any_of"]):
+        return True
+    return False
+
+
 def validate_config(obj):
     if not isinstance(obj, dict):
         raise ValueError("configuracao JSON precisa ser objeto")
@@ -84,9 +103,10 @@ def validate_config(obj):
         if r["severity"] not in SEVERITIES:
             raise ValueError("severity invalida")
         validate_supported_match(r["match"])
-        # Um protocolo nao pode ser classificado como ataque sem escopo.
-        if not any(k in json.dumps(r["match"]) for k in ("protocols","dst_ports","src_cidrs")):
-            raise ValueError("regra precisa filtrar protocolo/porta/origem")
+        # NOT is only exclusion, never proof of positive scope.
+        # Unrestricted OR alternatives can otherwise match arbitrary traffic.
+        if not has_positive_scope(r["match"]):
+            raise ValueError("regra precisa de filtro POSITIVO de protocolo/porta/origem")
         vals=r["input_interfaces"]
         if not isinstance(vals,list) or any(type(v) is not int or v<0 or v>4294967295 for v in vals):
             raise ValueError("input_interfaces deve conter ifIndex numerico")
@@ -298,11 +318,11 @@ last_checked_at=VALUES(last_checked_at),
 latest_bucket_utc=VALUES(latest_bucket_utc),
 status=VALUES(status),signals=VALUES(signals),alerts=VALUES(alerts)""",
                             (config["source"],utc,end-timedelta(minutes=1),
-                             "passive",signals,written))
+                             "passive" if rows else "sem_dados",signals,written))
         if not dry_run:
             db.commit()
-        print("Fase3 janela=%s ate %s sinais=%d novos_alertas=%d dry_run=%s"%
-              (start,end,signals,written,dry_run))
+        print("Fase3 janela=%s ate %s estado=%s sinais=%d novos_alertas=%d dry_run=%s"%
+              (start,end,"passive" if rows else "sem_dados",signals,written,dry_run))
     except Exception:
         db.rollback()
         raise
