@@ -833,3 +833,48 @@ https://www.zabbix.com/documentation/7.4/pt/manual/installation/upgrade/packages
 Repositorio oficial de pacotes, com `zabbix-sender` para
 ubuntu24.04:
 https://repo.zabbix.com/zabbix/7.4/stable/ubuntu/pool/main/z/zabbix/
+
+
+## Destino de monitoramento confirmado — Zabbix 7.4, 187.87.201.148
+
+O operador confirmou que **187.87.201.148** e o endereco
+do servidor Zabbix, corrigindo a digitacao anterior
+`17.87.201.148`. **Nao usar o endereco errado em scripts**.
+
+Pre-flight no `flow` — sem enviar nenhuma metrica Zabbix:
+
+```bash
+command -v zabbix_sender
+zabbix_sender -V
+ip route get 187.87.201.148
+timeout 5 bash -c ': > /dev/tcp/187.87.201.148/10051' \
+  && echo "TCP 10051 acessivel" || echo "TCP 10051 inacessivel"
+```
+
+O teste abre e fecha uma conexao, sem remeter payload
+ou enviar as metricas. Caso `zabbix_sender` ainda nao
+esteja presente, seguir a instalacao isolada documentada
+acima; nao instalar Agent apenas para ter Sender.
+
+Para envio **posterior** das 15 metricas:
+1. Importar `zabbix/templates/orbymon-a10-receiver-7.4.json`
+   no Zabbix de teste.
+2. Vincular template ao host tecnico cujo nome exato seja
+   `flow` (ou mudar `--host` para o nome real, mantendo
+   sintaxe da chave); autorizar o IP de origem que o Zabbix
+   efetivamente ve em `Allowed hosts`, sem liberar todos
+   os remetentes.
+3. Confirmar que esse host e monitorado pelo Zabbix Server
+   diretamente; se estiver atribuido a Proxy, usar o IP
+   do Proxy no comando.
+4. Regerar o relatório de saúde para nao enviar metricas
+   de uma amostra antiga, converter com
+   `a10_zabbix_sender --input ... --host flow`.
+5. Somente apos o operador confirmar template, destino e
+   permissao do host, remeter manualmente o arquivo via
+   `zabbix_sender -z 187.87.201.148 -p 10051 -i ...`,
+   e verificar `processed: 15; failed: 0` e o menu
+   de `Dados recentes`. Sem envio periodico nesta fase.
+
+**Nao confundir porta acessivel com modelo importado**.
+A integridade do Syslog original continua nao homologada.
