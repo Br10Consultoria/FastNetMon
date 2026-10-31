@@ -878,3 +878,53 @@ Para envio **posterior** das 15 metricas:
 
 **Nao confundir porta acessivel com modelo importado**.
 A integridade do Syslog original continua nao homologada.
+
+
+### Pré-requisito de rede atendido — 31/10/2026 (flow → Zabbix)
+
+O operador instalou `zabbix_sender` 7.4.16 (binário
+`/usr/bin/zabbix_sender`) e confirmou que a conexão TCP de
+`flow` para `187.87.201.148:10051` foi estabelecida:
+
+```text
+zabbix_sender (Zabbix) 7.4.16
+ZABBIX TCP 10051 ACESSIVEL
+```
+
+Esse teste não transmitiu métricas nem confirmou itens trapper.
+**Não criar agendamento de envio nem remover políticas atuais.**
+
+Antes do envio, importar o template de teste Zabbix 7.4 em
+`zabbix/templates/orbymon-a10-receiver-7.4.json`, vincular ao
+host técnico de nome exato `flow` (ou ajustar `--host`) e
+restringir o campo `Allowed hosts` ao IP de origem que o
+servidor Zabbix efetivamente vê. Consultar no flow:
+
+```bash
+ip route get 187.87.201.148
+```
+
+**Depois** de template/host/autorização confirmados, emitir
+um lote recente de métricas agregadas, com acesso restrito:
+
+```bash
+sudo install -d -m 0700 /root/orbymon-audit
+sudo sh -c 'umask 077; PYTHONPATH=/opt/orbymon-a10-audit/src \
+ python3 -m fmn_filters.a10_receiver_health > /root/orbymon-audit/health.json'
+sudo sh -c 'umask 077; PYTHONPATH=/opt/orbymon-a10-audit/src \
+ python3 -m fmn_filters.a10_zabbix_sender \
+ --input /root/orbymon-audit/health.json --host flow \
+ > /root/orbymon-audit/zabbix-sender.txt'
+sudo zabbix_sender -z 187.87.201.148 -p 10051 \
+ -i /root/orbymon-audit/zabbix-sender.txt -vv
+```
+
+Se o host Zabbix for monitorado por um Proxy, enviar ao
+Proxy correto, e não diretamente ao Server. Esperar
+`processed: 15; failed: 0` e confirmar `Dados recentes`
+no Zabbix, com números atuais, antes de qualquer operação
+automatizada. Não confundir tráfego TCP/10051 permitido com
+recepção de itens autorizados.
+
+O arquivo de envio contém **somente 15 indicadores numéricos**
+sem IP/portas NAT de assinantes, e não modifica logs brutos.
