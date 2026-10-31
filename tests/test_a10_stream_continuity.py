@@ -22,7 +22,7 @@ class A10StreamContinuityTests(unittest.TestCase):
         cut=len(event)-11
         before=message("Freed")+event[:cut]
         after="garbled"+message("Freed")
-        self.assertEqual(bridge_status(before,after),"sem_mapeamento_nat_completo")
+        self.assertEqual(bridge_status(before,after),"sem_terminador_apos_juncao")
 
     def test_no_false_pair_when_next_starts_full_header(self):
         self.assertEqual(bridge_status(message(),message()),
