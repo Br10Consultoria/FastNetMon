@@ -32,6 +32,44 @@ REQUIRED = (
 KNOWN = frozenset(COUNTERS)
 LINE = re.compile(r"^\s*(?P<name>.*?)\s{2,}(?P<value>[0-9]+)\s*$")
 KEYS = {key: key.lower().replace(" ", "_") for key in COUNTERS}
+EVENT_COUNTERS = (
+    "tcp_port_allocated", "tcp_port_freed",
+    "udp_port_allocated", "udp_port_freed",
+    "icmp_resource_allocated", "icmp_resource_freed",
+)
+
+
+def reconcile_log_sent_with_events(delta: dict[str, int]) -> dict:
+    """Compare internal A10 counters, without assuming end-to-end delivery."""
+    missing = [name for name in EVENT_COUNTERS if name not in delta]
+    if missing:
+        return {
+            "status": "inconclusivo_sem_todos_os_contadores",
+            "contadores_ausentes": missing,
+            "concordancia_contadores_internos": None,
+            "entrega_ao_servidor_comprovada": False,
+        }
+    sent = delta["log_packets_sent"]
+    tcp = delta["tcp_port_allocated"] + delta["tcp_port_freed"]
+    udp = delta["udp_port_allocated"] + delta["udp_port_freed"]
+    icmp = delta["icmp_resource_allocated"] + delta["icmp_resource_freed"]
+    total = tcp + udp + icmp
+    match = total == sent
+    return {
+        "status": "contadores_internos_coincidem" if match else "contadores_internos_divergem",
+        "eventos_tcp": tcp,
+        "eventos_udp": udp,
+        "eventos_icmp": icmp,
+        "soma_eventos_nat": total,
+        "log_packets_sent_delta": sent,
+        "diferenca_log_sent_menos_eventos": sent - total,
+        "concordancia_contadores_internos": match,
+        "entrega_ao_servidor_comprovada": False,
+        "observacao": (
+            "Concordancia numerica dos contadores do A10; nao comprova "
+            "mensagens individuais entregues ao rsyslog nem bytes TCP no disco."
+        ),
+    }
 
 
 def parse_snapshot(content: str) -> dict[str, int]:
@@ -86,6 +124,7 @@ def compare(before: dict[str, int], after: dict[str, int], seconds: float) -> di
         "status": "incrementos_de_erro" if dropped or lost else "sem_incremento_de_erro_nos_contadores",
         "intervalo_informado_segundos": seconds,
         "delta": differences,
+        "reconciliacao_contadores_nat_e_log_sent": reconcile_log_sent_with_events(differences),
         "pacotes_log_enviados_por_segundo": round(sent / seconds, 2),
         "pacotes_log_descartados_por_segundo": round(dropped / seconds, 4),
         "proporcao_descartada_dos_pacotes_contabilizados_percentual": pct,
