@@ -31,6 +31,15 @@ def _other_event_group(payload: bytes) -> str:
     if match is None:
         return "sem_marcador_lsn"
     marker = match.group(1).lower()
+    # Some A10 variants encode the protocol after PortAllocated/PortFreed
+    # instead of using an LSN:ICMP prefix. Do not expose arbitrary tokens.
+    if marker.startswith((b"portallocated", b"portallocation", b"portfreed")):
+        if re.search(rb"LSN:Port(?:Allocated|Allocation|Freed):ICMP(?:v6)?\b", payload, re.I):
+            return "lsn_icmp"
+        if re.search(rb"LSN:Port(?:Allocated|Allocation|Freed):GRE\b", payload, re.I):
+            return "lsn_gre"
+        if re.search(rb"LSN:Port(?:Allocated|Allocation|Freed):ESP\b", payload, re.I):
+            return "lsn_esp"
     if marker.startswith(b"icmp"):
         return "lsn_icmp"
     if marker.startswith(b"gre"):
