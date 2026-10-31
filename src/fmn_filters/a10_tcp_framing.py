@@ -25,6 +25,7 @@ MAGIC = {b"\xd4\xc3\xb2\xa1": "<", b"\xa1\xb2\xc3\xd4": ">",
 class Stream:
     seen_syn: bool = False
     seen_fin: bool = False
+    seen_rst: bool = False
     initial_seq: int | None = None
     final_seq: int | None = None
     segments: list[tuple[int, bytes]] = field(default_factory=list)
@@ -108,7 +109,7 @@ def tcp_packet(link: int, pkt: bytes):
     source_port, dest_port, seq = struct.unpack_from("!HHI", tcp)
     return (ip[12:16], source_port, ip[16:20], dest_port,
             seq + bool(tcp[13] & 2), bool(tcp[13] & 2),
-            bool(tcp[13] & 1), tcp[off:])
+            bool(tcp[13] & 1), bool(tcp[13] & 4), tcp[off:])
 
 
 def spans_for_stream(stream: Stream, stats: Counter):
@@ -216,7 +217,7 @@ def audit(path: Path, *, source_ip: str = "10.100.10.10", port: int = 5514,
         if decoded is None:
             stats["pacotes_nao_ipv4_tcp_validos"] += 1
             continue
-        src, sport, dst, dport, seq, syn, fin, payload = decoded
+        src, sport, dst, dport, seq, syn, fin, rst, payload = decoded
         if src != address or dport != port:
             continue
         stats["pacotes_syslog_a10"] += 1
@@ -228,6 +229,7 @@ def audit(path: Path, *, source_ip: str = "10.100.10.10", port: int = 5514,
         stream = current[key]
         stream.seen_syn |= syn
         stream.seen_fin |= fin
+        stream.seen_rst |= rst
         if syn:
             stream.initial_seq = seq
         if fin:
@@ -241,8 +243,36 @@ def audit(path: Path, *, source_ip: str = "10.100.10.10", port: int = 5514,
     stats["conexoes_observadas"] = len(sessions)
     stats["conexoes_sem_syn_na_captura"] = sum(not s.seen_syn for s in sessions)
     stats["conexoes_sem_fin_na_captura"] = sum(not s.seen_fin for s in sessions)
-    for stream in sessions:
-        for span in spans_for_stream(stream, stats):
+    stats["conexoes_com_rst"] = sum(s.seen_rst for s in sessions)
+    stats["conexoes_sem_fin_nem_rst_na_captura"] = sum(
+        not s.seen_fin and not s.seen_rst for s in sessions
+    )
+    # Identify exactly which observed TCP connection has sequence gaps,
+    # without exporting 4-tuples, raw packet bytes or sequence numbers.
+    gap_details = []
+    for index, stream in enumerate(sessions, 1):
+        local = Counter()
+        spans = spans_for_stream(stream, local)
+        stats.update(local)
+        if local["lacunas_tcp"] or local["lacunas_tcp_inicio"] or local["lacunas_tcp_fim"]:
+            detail = {
+                "conexao_indice_na_captura": index,
+                "syn_observado": stream.seen_syn,
+                "fin_observado": stream.seen_fin,
+                "rst_observado": stream.seen_rst,
+                "segmentos_com_payload": len(stream.segments),
+                "trechos_tcp_contiguos": len(spans),
+                "lacunas_tcp": local["lacunas_tcp"],
+                "lacunas_tcp_bytes": local["lacunas_tcp_bytes"],
+                "lacunas_tcp_inicio": local["lacunas_tcp_inicio"],
+                "lacunas_tcp_inicio_bytes": local["lacunas_tcp_inicio_bytes"],
+                "lacunas_tcp_fim": local["lacunas_tcp_fim"],
+            }
+            if len(gap_details) < 20:
+                gap_details.append(detail)
+            else:
+                stats["conexoes_com_lacunas_omitidas_por_limite"] += 1
+        for span in spans:
             inspect_span(span, stats, audit_nat_candidates=audit_nat_candidates)
     if stats["fronteiras_coladas_apos_colchete"]:
         classification = "concatenacao_sem_delimitador_visivel"
@@ -257,11 +287,12 @@ def audit(path: Path, *, source_ip: str = "10.100.10.10", port: int = 5514,
          "lacunas_tcp_inicio", "lacunas_tcp_fim",
          "sobreposicoes_conflitantes", "segmentos_descartados_por_limite",
          "fluxos_com_seq_wrap_nao_suportado", "conexoes_sem_syn_na_captura",
-         "conexoes_sem_fin_na_captura")))
+         "conexoes_sem_fin_na_captura", "conexoes_com_rst")))
     return {
         "status": "ok", "classificacao_framing_na_amostra": classification,
         "captura_tcp_completa_no_intervalo_observado": can_rely_on_capture,
         "contadores": dict(sorted(stats.items())),
+        "diagnostico_de_lacunas_por_conexao": gap_details,
         "correlacao_automatica_permitida": False,
         "aviso": "Nao comprova integridade de historico NAT, entrega ao rsyslog, identificacao de assinantes ou conformidade legal. Nao habilita persistencia."
     }
