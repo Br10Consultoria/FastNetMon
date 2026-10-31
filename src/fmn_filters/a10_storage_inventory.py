@@ -14,6 +14,7 @@ from pathlib import Path
 import shutil
 import stat
 import sys
+import time
 
 DEFAULT_DIR = Path("/var/log/orbymon/a10")
 PREFIX = "a10-current.ndjson"
@@ -43,6 +44,7 @@ def inventory(directory: Path = DEFAULT_DIR, *, max_entries: int = 100000,
         "outros_regulares": {"arquivos": 0, "bytes": 0},
         "links_simbolicos_ignorados": {"arquivos": 0, "bytes": 0},
     }
+    observed_at = time.time() if now is None else now
     active_mtime = None
     scanned = 0
     with os.scandir(directory) as entries:
@@ -71,9 +73,10 @@ def inventory(directory: Path = DEFAULT_DIR, *, max_entries: int = 100000,
         value["gib"] = _gib(value["bytes"])
     active_size = groups["arquivo_ativo"]["bytes"]
     timestamp = datetime.fromtimestamp(active_mtime, timezone.utc).isoformat() if active_mtime else None
-    seconds_idle = max(0, (now if now is not None else datetime.now(timezone.utc).timestamp()) - active_mtime) if active_mtime is not None else None
+    seconds_idle = max(0, observed_at - active_mtime) if active_mtime is not None else None
     return {
         "status": "ok" if groups["arquivo_ativo"]["arquivos"] == 1 else "sem_arquivo_ativo_unico",
+        "observado_em_utc": datetime.fromtimestamp(observed_at, timezone.utc).isoformat(),
         "arquivo_ativo_existe": groups["arquivo_ativo"]["arquivos"] == 1,
         "grupos": groups,
         "total_de_arquivos_regulares_bytes": sum(v["bytes"] for v in groups.values()),
