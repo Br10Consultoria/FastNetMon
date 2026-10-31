@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fastnetmon-combined-filters"
-version = "0.3.0"
+version = "0.4.0"
 description = "OrbyMon: filtros DDoS combinados, ASN/Geo, Grafana e incidentes (POC)"
 requires-python = ">=3.10"
 dependencies = []
@@ -20,6 +20,10 @@ fmn-filters = "fmn_filters.__main__:main"
 orbymon-enrich = "fmn_filters.enrich_stream:main"
 orbymon-mysql-sink = "fmn_filters.mysql_sink:main"
 orbymon-incidents = "fmn_filters.incidents:main"
+orbymon-nat = "fmn_filters.a10_nat:main"
+orbymon-flow-rollup = "fmn_filters.flow_rollup:main"
+orbymon-bidir = "fmn_filters.bidir_detector:main"
+orbymon-attacks = "fmn_filters.attack_report:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

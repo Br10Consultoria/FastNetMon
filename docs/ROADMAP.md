@@ -40,3 +40,13 @@
 - [ ] Homologar upstream e medir impacto em tráfego legítimo
 
 **Nunca acionar mitigação apenas com a POC.** Ataques acima do link contratado precisam de ação do provedor de trânsito / upstream.
+
+## Fase 5: bidirecional e CGNAT (etapa 1 implementada, ver BIDIRECTIONAL.md)
+
+- [x] Receptor NAT do A10 com framing RFC5424 correto e consulta IP publico:porta -> IP privado
+- [x] Rollup in/out com escopo (dedicado, pool CGNAT, IP privado), porta de servico e SYN
+- [x] Detector de ataque recebido e originado, limites por escopo, soma entre interfaces
+- [x] Regras nao amostradas por alocacao de portas NAT
+- [ ] Homologar SQL em MariaDB real e calibrar limites com trafego real
+- [ ] Etapa 2: consulta do cliente e verificacao em listas de IPs nao seguros
+- [ ] Dashboard Grafana F4; detector em tempo real (segundos)

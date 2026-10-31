@@ -1,0 +1,11 @@
+[Unit]
+Description=OrbyMon F4 - rollup de fluxos a cada 30 segundos
+
+[Timer]
+OnBootSec=1min
+OnUnitInactiveSec=30s
+AccuracySec=5s
+Unit=orbymon-flow-rollup-huawei.service
+
+[Install]
+WantedBy=timers.target

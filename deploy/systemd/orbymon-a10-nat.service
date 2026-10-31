@@ -1,0 +1,29 @@
+[Unit]
+Description=OrbyMon receptor NAT do A10 (CGNAT): framing RFC5424 sem delimitador
+After=network-online.target mariadb.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=orbymon
+Group=orbymon
+WorkingDirectory=/opt/orbymon
+EnvironmentFile=/etc/orbymon/pipeline.env
+RuntimeDirectory=orbymon
+RuntimeDirectoryMode=0750
+ExecStart=/opt/orbymon/.venv/bin/python -m fmn_filters.a10_nat --config /etc/orbymon/bidir.json --listen 0.0.0.0 --port 5515 --allow 10.100.10.10 --log-dir /var/log/orbymon/a10nat --time-source received
+Restart=on-failure
+RestartSec=5
+MemoryMax=3G
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ReadWritePaths=/var/log/orbymon/a10nat
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

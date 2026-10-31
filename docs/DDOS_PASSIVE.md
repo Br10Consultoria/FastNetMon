@@ -1,5 +1,7 @@
 # OrbyMon Fase 3 - deteccao PASSIVA de anomalias DDoS
 
+> Limitacoes conhecidas desta fase (so entrada, ifIndex nao somado, sem porta de origem, sem CGNAT): a [F4 bidirecional](BIDIRECTIONAL.md) as corrige.
+
 Sem qualquer comando no Huawei, Mikrotik, firewall, CGNAT, PPPoE,
 FlowSpec ou RTBH. Alertas representam sinais de anomalia, nao ataques provados.
 

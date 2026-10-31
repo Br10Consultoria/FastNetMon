@@ -1,0 +1,18 @@
+[Unit]
+Description=OrbyMon F4 - rollup bidirecional de fluxos Huawei com IP privado CGNAT
+After=network-online.target mariadb.service orbymon-a10-nat.service
+Wants=network-online.target mariadb.service
+
+[Service]
+Type=oneshot
+User=orbymon
+Group=orbymon
+WorkingDirectory=/opt/orbymon
+EnvironmentFile=/etc/orbymon/pipeline.env
+ExecStart=/opt/orbymon/.venv/bin/python -m fmn_filters.flow_rollup --config /etc/orbymon/bidir.json
+TimeoutStartSec=180
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=-/run/orbymon

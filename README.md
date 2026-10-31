@@ -60,6 +60,8 @@ O instalador configura HTTPS autofirmado na porta 3000, datasource somente leitu
 
 **Fase 4 CGNAT:** [diagnostico read-only, IP publico como origem/destino, perfis de pool e baseline p95](docs/CGNAT_BASELINE.md): `sudo bash scripts/setup-cgnat-baseline.sh`.
 
+**Fase 4 bidirecional (ataque recebido e originado, CGNAT-aware):** [receptor NAT do A10, rollup com IP privado do assinante e detector nos dois sentidos](docs/BIDIRECTIONAL.md). Instalar com `sudo bash scripts/setup-bidir.sh` apos o perfil CGNAT. Substitui a F3 para deteccao; mantenha a F3 apenas durante a validacao.
+
 **A10 CGNAT Syslog:** [recepcao TCP/5514 exclusiva, spool bruto e inspecao sem correlacao prematura](docs/A10_SYSLOG.md). Instalar com sudo bash scripts/setup-a10-syslog.sh --a10-source-ip IP_REAL_DO_A10.
 
 **A10 Syslog framing:** [auditoria read-only de mensagens RFC 5424 e integridade antes de correlacao NAT](docs/A10_SYSLOG_AUDIT.md). Use `python3 -m fmn_filters.a10_syslog_audit` com usuario orbymon.
@@ -74,6 +76,7 @@ O instalador configura HTTPS autofirmado na porta 3000, datasource somente leitu
 | Incidentes SQLite, API local autenticada e replay idempotente | v0.3 laboratório |
 | Grafana e MariaDB (SQL, dashboards JSON, GeoLite2 offline) | Pipeline idempotente MariaDB e instalador automatico Grafana disponiveis (piloto) |
 | Verificação em links reais 10/40/100G e sampling | Não homologado |
+| Deteccao bidirecional CGNAT-aware (F4), log NAT do A10, IP privado do assinante | **Piloto**, testes unitarios; SQL ainda nao exercitado em MariaDB real |
 | BGP FlowSpec, RTBH, comandos em roteadores | **Não implementados**; nenhuma ação automática |
 | Multiempresa com autorização robusta | Ainda não homologado para produção |
 

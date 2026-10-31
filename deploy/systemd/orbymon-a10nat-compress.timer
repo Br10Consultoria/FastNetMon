@@ -1,0 +1,10 @@
+[Unit]
+Description=OrbyMon - compactacao diaria dos logs NAT
+
+[Timer]
+OnCalendar=*-*-* 03:20:00
+Persistent=true
+Unit=orbymon-a10nat-compress.service
+
+[Install]
+WantedBy=timers.target
