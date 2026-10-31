@@ -329,3 +329,65 @@ nem destino, nao ajustar limiares DDoS para encobrir
 falta de cobertura. Mesmo com amostra em 60/60 minutos,
 a visibilidade de ataques aos IPs publicos do CGNAT
 **ainda nao foi validada**.
+
+
+### Auditoria real dos enderecos visiveis no Huawei (31/10/2026)
+
+O operador rodou `sql/ddos_ip_scope_audit_readonly.sql`.
+Janela UTC ate 21:03, cobertura de 60/60 minutos:
+
+```text
+2106 pares agregados; 8.603.648 pacotes estimados; 44.890,16 megabits estimados.
+Nenhum CIDR protegido como origem OU destino.
+origem 177.85/16 = 946 pares; destino 168.0/16 = 738;
+destino 187.87/16 = 543; destino 177.85/16 = 445.
+```
+
+Nas categorias de IP, quase todos os pares sao
+`OUTRO_IPv4 -> OUTRO_IPv4`. **Nenhum** registro
+`CGNAT_100.64/10` foi identificado; somente
+dois registros residuais tinham ponta RFC1918.
+A hipotese de que a amostra observa principalmente
+IPs CGNAT privados fica menos plausivel; isso nao
+estabelece propriedade dos prefixos nem cobertura dos
+links da Internet. Pode haver fluxos duplos em diferentes
+interfaces e direcoes: ainda nao somar as duas pontas
+para afirmar vazao de link/ataque.
+
+Para localizar os **/24 realmente observados**, sem
+exibir IP de host nem mapear assinante, foi criada
+`sql/ddos_public_scope_detail_readonly.sql` (SELECT unico).
+A saída limita aos 35 principais agrupamentos por prefixo,
+ponta e ifIndex, sem misturar entrada/saida/direcao.
+
+Execute no worktree isolado:
+
+```bash
+set -o pipefail
+git -C /opt/orbymon-a10-audit fetch origin \
+  fix/ddos-passive-reliability-20261031 &&
+git -C /opt/orbymon-a10-audit show \
+  FETCH_HEAD:sql/ddos_public_scope_detail_readonly.sql | mariadb orbymon
+```
+
+Se existir a tabela `orby_interface_names`, a consulta
+somente leitura abaixo mostra nomes **verificados** por SNMP
+ou operador (nunca supor que 86 seja uma porta especifica):
+
+```bash
+mariadb orbymon -e "
+SHOW TABLES LIKE 'orby_interface_names';
+SELECT if_index,if_name,updated_at FROM orby_interface_names
+WHERE source='huawei' AND if_index IN (16,86,334);"
+```
+
+Se a tabela nao existir, o segundo `SELECT` falha sem
+alterar dados; criar tabela ou popular ifIndex requer
+processo separado e consentido. O `ifIndex=0` e ausencia
+de index exportado e **nao** uma interface fisica.
+
+Nao editar `/etc/orbymon/ddos-rules.json` ate
+validar os /24 realmente roteados/administrados pelo
+ISP e seu ponto de observacao (lado Internet vs lado
+assinante). O resultado so demonstra presenca do
+prefixo **no fluxo observado**, nao titularidade BGP.
