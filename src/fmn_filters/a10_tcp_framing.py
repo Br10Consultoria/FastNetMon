@@ -118,6 +118,7 @@ def spans_for_stream(stream: Stream, stats: Counter):
     segments = sorted(stream.segments, key=lambda item: item[0])
     if stream.initial_seq is not None and segments[0][0] != stream.initial_seq:
         stats["lacunas_tcp_inicio"] += 1
+        stats["lacunas_tcp_inicio_bytes"] += segments[0][0] - stream.initial_seq
     if segments[-1][0] - segments[0][0] > 0x80000000:
         stats["fluxos_com_seq_wrap_nao_suportado"] += 1
         return []
@@ -130,6 +131,7 @@ def spans_for_stream(stream: Stream, stats: Counter):
             expected = seq + len(chunk)
         elif seq > expected:
             stats["lacunas_tcp"] += 1
+            stats["lacunas_tcp_bytes"] += seq - expected
             spans.append(bytes(current))
             current = bytearray(chunk)
             expected = seq + len(chunk)
@@ -151,6 +153,7 @@ def spans_for_stream(stream: Stream, stats: Counter):
         stats["lacunas_tcp_fim"] += 1
     if current:
         spans.append(bytes(current))
+    stats["trechos_tcp_contiguos"] += len(spans)
     return spans
 
 
