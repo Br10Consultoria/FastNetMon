@@ -589,3 +589,50 @@ e compactações ocorridas no intervalo; não confundir com
 geração bruta e não extrapolar janelas curtas ou onde houve
 remoção/alteração de arquivos. O forecast é apenas indicativo.
 Não apaga nada nem altera configuração de produção.
+
+
+## Frente independente de monitoramento: recepção Syslog no flow
+
+Enquanto se aguarda a segunda medição (recomendado intervalo de
+pelo menos 2h entre os JSON `antes`/`depois` para atravessar
+rotações horárias), foi desenvolvido um cheque de saúde **passivo**.
+
+`src/fmn_filters/a10_receiver_health.py`:
+- consulta somente `systemctl show` das units
+  `rsyslog.service`, `orbymon-a10-logrotate.timer` e
+  `orbymon-a10-logrotate.service`;
+- consulta somente `ss -H -ltn` para saber se há escuta TCP/5514
+  e eventual fila observada no instante;
+- usa o inventário local de metadados dos arquivos para conferir
+  atualização recente do NDJSON e espaço livre do filesystem;
+- marca atenção quando a gravação está há 120 segundos sem mudança,
+  o último ciclo de rotação há mais de 90 minutos, o timer não está
+  ativo ou o disco tem menos de 20% livre;
+- marca crítico quando o rsyslog ou a escuta TCP não estão ativos,
+  o arquivo não é modificado há 300 segundos ou há menos de 10%
+  de espaço livre;
+- quando uma checagem não pode ser lida, não a marca como sucesso:
+  registra `verificacoes_indisponiveis`.
+- devolve JSON só de estados, contagens, tamanhos e flags, adequado
+  para futura integração ao Zabbix/Grafana.
+
+**É um indicador operacional, não um coletor de logs ou verificação
+de entrega integral:** `homologacao_entrega_syslog=false` e
+`historico_cgnat_integral_comprovado=false`, inclusive se status
+for `operacional_na_amostra`.
+
+Executar exclusivamente na branch/worktree de auditoria (não reinicia,
+não instala, não escreve em NDJSON, não executa TCP connect):
+
+```bash
+git -C /opt/orbymon-a10-audit fetch origin feat/a10-tcp-framing-audit
+git -C /opt/orbymon-a10-audit switch --detach origin/feat/a10-tcp-framing-audit
+
+sudo env PYTHONPATH=/opt/orbymon-a10-audit/src \
+  python3 -m fmn_filters.a10_receiver_health
+```
+
+O programa não imprime linhas Syslog nem nomes de arquivos
+sensíveis. Não configurar cron, serviço recorrente ou alarmes
+externos automaticamente enquanto as regras forem homologadas.
+O estado mostrado corresponde ao instante do comando.
