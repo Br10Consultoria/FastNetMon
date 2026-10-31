@@ -266,3 +266,63 @@ e `correlacao_automatica_permitida=false`.
 Depois deste diagnóstico não é necessário repetir a mesma captura
 para obter novas contagens; prosseguir com verificações independentes
 de emissão/recepção antes de criar histórico CGNAT.
+
+
+## Protótipo offline de separação de mensagens, sem tocar a produção
+
+A leitura final do PCAP, em `HEAD=32fb522`, revelou o seguinte
+contexto estrutural na conexão TCP nº 3:
+
+- o trecho anterior termina em `]`;
+- o trecho seguinte começa **imediatamente** com cabeçalho RFC5424;
+- entre eles faltam 123 bytes de sequência TCP capturada;
+- não foram observados SYN, FIN ou RST nessa conexão.
+
+Isso é **compatível com uma mensagem completa ausente no PCAP**,
+mas não prova perda na transmissão, no A10 ou no rsyslog. A captura
+inicial foi unidirecional; não contém ACKs do coletor para confirmar
+a recepção pelo sistema operacional.
+
+O projeto passa a ter um **protótipo de replay isolado** em
+`src/fmn_filters/a10_rfc5424_replay.py`. Ele processa os bytes de
+trechos TCP previamente reconstruídos em pequenas leituras simuladas.
+Observa os cabeçalhos RFC5424 consecutivos e aceita **somente candidatos
+sintáticos**, nunca uma tradução NAT juridicamente homologada.
+
+O protótipo:
+- lida com cabeçalhos e eventos divididos entre blocos de leitura;
+- aceita somente intervalos delimitados por **cabeçalho seguinte**
+  e classificados pela gramática de eventos A10 conhecida;
+- descarta o evento final de cada trecho e **nunca cruza a lacuna**
+  de sequência TCP para juntar eventos;
+- limita o buffer, falha fechado em eventos grandes e não escreve
+  arquivos, base de dados, fila ou logs de assinantes;
+- exporta exclusivamente contagens numéricas e rótulos fixos
+  (TCP/UDP, allocated/freed, ICMP e outros);
+- não gera um servidor de escuta, não interfere no rsyslog ativo nem
+  modifica a configuração A10.
+
+Depois de atualizar exclusivamente `/opt/orbymon-a10-audit`, rode:
+
+```bash
+git -C /opt/orbymon-a10-audit fetch origin feat/a10-tcp-framing-audit
+git -C /opt/orbymon-a10-audit switch --detach origin/feat/a10-tcp-framing-audit
+sudo env PYTHONPATH=/opt/orbymon-a10-audit/src \
+  python3 -m fmn_filters.a10_tcp_framing \
+  --pcap /root/a10-framing-local.pcap \
+  --audit-nat-candidates --audit-offline-replay
+```
+
+Os campos extras começam por `replay_`. Compreenda:
+`replay_eventos_delimitados_por_cabecalho_seguinte` não é
+quantidade entregue ao rsyslog; `replay_nat_sintaticamente_candidato`
+não é registro legal armazenado; `replay_eventos_finais_sem_fronteira_confiavel`
+são eventos suspeitos intencionalmente descartados da classificação
+estrita. Se houver `replay_buffers_acima_do_limite`, a análise precisa
+investigar a causa antes de integrar qualquer parser.
+
+Esse teste valida a viabilidade da lógica offline, **não libera
+automação de correlação, armazenamento histórico ou substituição do
+receptor na porta TCP/5514**. A próxima validação independente deve
+comparar deltas cronometrados de `show cgnv6 logging statistics` e
+desempenho/capacidade de recebimento sem dados de assinantes públicos.
