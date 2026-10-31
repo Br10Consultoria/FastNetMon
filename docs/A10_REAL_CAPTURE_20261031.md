@@ -168,3 +168,45 @@ Documentação consultada:
 O login de gerenciamento foi feito por `telnet`, sem cifragem
 em trânsito. Planejar migração de gerenciamento para SSH,
 sem desabilitar Telnet antes de validar acesso alternativo.
+
+
+## Template confirmado no equipamento (31/10/2026)
+
+Consulta `show running-config | section ORBY_LOG_TEMPLATE`:
+
+```text
+cgnv6 template logging ORBY_LOG_TEMPLATE
+  format rfc5424
+  service-group ORBY_SYSLOG
+cgnv6 lsn logging default-template ORBY_LOG_TEMPLATE
+```
+
+**Conclusões:** o formato RFC5424 está explicitamente definido, o
+template está ativo como default do LSN e a saída não contém opção
+explícita `batched-logging-disable`. Isso não prova se a opção está
+atuando por default no patch P11, e o comportamento de batching de
+mensagens difere do `cgnv6 enable-port-batch-v1`. O fato de os
+eventos aparecerem concatenados no *wire* justifica investigar o
+enquadramento de aplicação RFC6587 sem mudar a operação do CGNAT.
+
+A documentação A10 de aXAPI ACOS 5.2.1-P5 descreve o default
+`batched-logging-disable=0`; um guia oficial posterior (ACOS 7.0.1)
+diz que batching de log não se aplica a `format rfc5424`. Esse
+comportamento do P11 ainda **não foi confirmado** no equipamento.
+Não recomendar habilitar `batched-logging-disable` em produção para
+resolver concatenação de TCP; nem envio TCP unitário garante leitura
+unitária pelo receptor.
+
+Próxima consulta **somente leitura**:
+```text
+show running-config | section ORBY_SYSLOG
+```
+
+Depois é possível avançar o diagnóstico no coletor, isolado de
+produção, com detecção segura de cabeçalhos RFC5424 e verificação
+estrita de completude de eventos; **sem associar assinantes
+automaticamente e sem remover logs brutos**.
+
+Fontes:
+- https://documentation.a10networks.com/ACOS-Docs/axapi/521p5/cgnv6_template_logging.html
+- https://documentation.a10networks.com/ACOS/701x/ACOS_7.0.1/pdf/Traffic_Logging_for_IPv6_Migration.pdf
