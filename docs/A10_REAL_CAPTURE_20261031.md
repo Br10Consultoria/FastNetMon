@@ -210,3 +210,44 @@ automaticamente e sem remover logs brutos**.
 Fontes:
 - https://documentation.a10networks.com/ACOS-Docs/axapi/521p5/cgnv6_template_logging.html
 - https://documentation.a10networks.com/ACOS/701x/ACOS_7.0.1/pdf/Traffic_Logging_for_IPv6_Migration.pdf
+
+
+## Classificação efetiva dos eventos RFC5424 — 31/10/2026
+
+Auditoria realizada no servidor flow com `HEAD=a86f4df` e com a mesma
+captura PCAP de 20 segundos. A opção `--audit-nat-candidates`
+produziu somente estatísticas:
+
+| Tipo | Quantidade |
+|---|---:|
+| LSN PortAllocated TCP | 12646 |
+| LSN PortFreed TCP | 13113 |
+| LSN PortAllocated UDP | 19720 |
+| LSN PortFreed UDP | 19798 |
+| Outros marcadores LSN classificados como ICMP | 3913 |
+| **Total dos eventos delimitados heuristicamente** | **69190** |
+| Eventos finais sem cabeçalho seguinte | 6 |
+
+`65277/69190=94,34%` são candidatos NAT TCP/UDP que passam na
+validação estrutural dos pools/portas. Todos os `3913` restantes
+foram classificados por marcador **ICMP** (`5,66%`). Não houve
+eventos indefinidos nos trechos analisados. **Isso não valida
+o conteúdo/mapeamento ICMP**.
+
+Revisão de integridade: `conexoes_observadas=9`, `lacunas_tcp=1`,
+`conexoes_sem_syn_na_captura=5`,
+`conexoes_sem_fin_na_captura=5` e
+`captura_tcp_completa_no_intervalo_observado=false`.
+`correlacao_automatica_permitida=false`.
+
+**Não interpretar** diferença entre `allocated=32366` e
+`freed=32911` como 545 eventos perdidos; sessões podem iniciar
+antes e terminar depois da janela. Da mesma forma, 0 pacotes
+descartados pelo kernel tcpdump não implica perda zero entre A10,
+transporte e persistência de Syslog.
+
+Este resultado encerra a **classificação de marcadores da amostra**,
+não a homologação de integridade do logging CGNAT. O próximo passo
+é comparar contadores cumulativos do A10 em intervalos definidos,
+analisar as lacunas e projetar recepção com framing auditável antes
+de registrar traduções históricas.
