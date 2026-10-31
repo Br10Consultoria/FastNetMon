@@ -171,3 +171,35 @@ processamento pode ser alto e exige janela supervisionada.
 Fontes:
 https://www.rfc-editor.org/rfc/rfc6587.html
 https://documentation.a10networks.com/ACOS-Docs/axapi/521p3/axapiv3/cgnv6_template_logging.html
+
+## Detalhe de juncoes ambíguas apos o teste de continuidade
+
+A amostra anterior de 200 chunks encontrou 199 pares, com:
+56 candidatos NAT sintaticamente reconstruidos, 113 na categoria
+"sem_evento_nat_unico" e 25 mapeamentos incompletos.
+
+O diagnostico agora separa "sem_evento_nat_unico" em:
+- sem_marcador_nat_tcp_udp_nem_LSN: dados sem marcador conhecido;
+- sem_marcador_nat_tcp_udp_com_outro_LSN: formato diferente de
+  PortAllocated/PortFreed TCP/UDP, eventualmente outro protocolo;
+- multiplos_marcadores_nat_tcp_udp: mais de um evento atravessando
+  a juncao, que nao pode ser associado sem prova de integridade;
+- marcador_nat_unico_com_outros_LSN: outros marcadores no mesmo
+  candidato impedem inferencia confiavel.
+
+    cd /opt/orbymon
+    git pull --ff-only origin main
+    sudo -u orbymon env PYTHONPATH=/opt/orbymon/src \
+      /opt/orbymon/.venv/bin/python \
+      -m fmn_filters.a10_stream_continuity --last 200
+
+A ferramenta continua SOMENTE de leitura. Mesmo origem 10.100.10.10
+nao comprova que dois blocos adjacentes sao da mesma sessao TCP; e
+capturas iniciadas a meio do stream podem omitir fronteiras de eventos.
+Nao habilitar gravacao juridica ou associacao de assinantes. O proximo
+passo e confirmar o formato do template A10 e o framing original TCP.
+
+A10 Port Batch Allocated=0 indica ausencia de registros de lote de
+portas NAT; nao confundir isso com agrupamento de mensagens Syslog.
+A10 documenta que log batching nao se aplica ao formato RFC5424.
+Consultar a versao ACOS antes de tentar batched-logging-disable.

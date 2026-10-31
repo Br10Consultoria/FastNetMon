@@ -3,7 +3,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from fmn_filters.a10_stream_continuity import bridge_status, probe
+from fmn_filters.a10_stream_continuity import bridge_status, bridge_detail, probe
 
 def message(kind="Allocated"):
     return ("<135>1 2026-10-30T23:00:00-03:00 A10 CGNAT_ENTER - - - "
@@ -23,6 +23,56 @@ class A10StreamContinuityTests(unittest.TestCase):
         before=message("Freed")+event[:cut]
         after="garbled"+message("Freed")
         self.assertEqual(bridge_status(before,after),"sem_terminador_apos_juncao")
+
+    def test_ambiguous_reason_zero_tcp_udp_markers(self):
+        prefix=message("Freed")+message("Allocated").split("LSN:")[0]
+        before=prefix+"Other:ICMP [fragment"
+        after=" remainder]"+message("Freed")
+        self.assertEqual(
+            bridge_detail(before,after),
+            ("sem_evento_nat_unico","sem_marcador_nat_tcp_udp_nem_LSN"),
+        )
+
+    def test_ambiguous_reason_other_lsn_but_no_port_markers(self):
+        before=message("Freed")+message("Allocated").split("LSN:")[0]
+        before+="LSN:Other:ICMP [fragment"
+        after=" remainder]"+message("Freed")
+        self.assertEqual(
+            bridge_detail(before,after),
+            ("sem_evento_nat_unico","sem_marcador_nat_tcp_udp_com_outro_LSN"),
+        )
+
+    def test_ambiguous_multiple_nat_markers(self):
+        before=message("Freed")+message("Allocated")[:-1]+" LSN:PortFreed:UDP [partial"
+        after=" done]"+message("Freed")
+        self.assertEqual(
+            bridge_detail(before,after),
+            ("sem_evento_nat_unico","multiplos_marcadores_nat_tcp_udp"),
+        )
+
+    def test_ambiguous_one_nat_and_other_lsn(self):
+        before=message("Freed")+message("Allocated")[:-1]+" LSN:Other [partial"
+        after=" done]"+message("Freed")
+        self.assertEqual(
+            bridge_detail(before,after),
+            ("sem_evento_nat_unico","marcador_nat_unico_com_outros_LSN"),
+        )
+
+    def test_breakdown_matches_total_without_sensitive_values(self):
+        with TemporaryDirectory() as d:
+            p=Path(d)/"a10.ndjson"
+            prefix=message("Freed")+message("Allocated").split("LSN:")[0]
+            data=[prefix+"LSN:Other:ICMP [partial"," done]"+message("Freed")]
+            p.write_text("".join(
+                json.dumps({"source_ip":"10.100.10.10","raw":raw})+"\n" for raw in data
+            ))
+            result=probe(p)
+            breakdown=result["detalhamento_sem_evento_nat_unico"]
+            self.assertEqual(sum(breakdown.values()),
+                             result["classificacao_das_juncoes"]["sem_evento_nat_unico"])
+            self.assertEqual(breakdown["sem_marcador_nat_tcp_udp_com_outro_LSN"],1)
+            self.assertFalse(result["correlacao_automatica_permitida"])
+            self.assertNotIn("100.64.64.12",json.dumps(result))
 
     def test_no_false_pair_when_next_starts_full_header(self):
         self.assertEqual(bridge_status(message(),message()),
