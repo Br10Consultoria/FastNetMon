@@ -1,5 +1,4 @@
 """Regression guard for the DDoS baseline: read-only and privacy-conserving."""
-import re
 from pathlib import Path
 import unittest
 
@@ -15,7 +14,7 @@ class DdosBaselineSqlTests(unittest.TestCase):
         ).strip()
         statements = [p.strip() for p in no_comments.split(";") if p.strip()]
         self.assertEqual(len(statements), 3)
-        self.assertTrue(all(re.match(r"(?i)^SELECT\\b", p) for p in statements))
+        self.assertTrue(all(p.upper().startswith("SELECT\n") for p in statements))
         self.assertNotRegex(no_comments.upper(),
             r"\b(?:DELETE|UPDATE|INSERT|REPLACE|DROP|ALTER|TRUNCATE|CALL|LOAD|INTO OUTFILE)\b")
         self.assertEqual(sql.count("FROM orby_ip_pairs_minute"), 3)
