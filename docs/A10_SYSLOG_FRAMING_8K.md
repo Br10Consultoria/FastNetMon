@@ -99,3 +99,38 @@ Interpretar os novos campos:
 
 Esta alteracao NAO modifica a configuracao rsyslog nem reinicia servicos.
 Nao muda logs historicos e nao habilita gravacao de NAT ou assinantes.
+
+
+## Auditoria dos delimitadores (depois do rsyslog 64k)
+
+O ultimo relatorio apresentou 296 blocos raw com tamanho EXATO
+de 65536 bytes, 294 prefixos fragmentados, 159999 cabecalhos
+RFC5424 e 99,84% de candidatos estruturais reconhecidos.
+
+Para investigar se os cabecalhos aparecem colados, separados por
+quebra de linha, NUL ou prefixo numerico de comprimento:
+
+    cd /opt/orbymon
+    git pull --ff-only origin main
+    sudo -u orbymon env PYTHONPATH=/opt/orbymon/src \
+      /opt/orbymon/.venv/bin/python -m fmn_filters.a10_framing_probe \
+      --last 200 --max-bytes 64000000
+
+O teste e somente leitura: nao envia nem imprime payload, IP ou
+porta de assinante; tambem nao altera rsyslog, Huawei ou A10.
+
+Interpretacao:
+- colado_apos_fechamento_colchete predominante significa que o
+  texto dos eventos aparece concatenado sem delimitador visivel
+  DENTRO dos blocos gravados;
+- delimitador_LF_visivel ou delimitador_NUL_visivel sugere framing
+  por delimitador visivel no texto persistido;
+- prefixo_comprimento_candidato sugere possivel RFC6587 octet-counting.
+
+O rsyslog ja remove ou transforma delimitadores que reconhece, logo
+o resultado NAO prova o formato original enviado via TCP.
+Se inconclusivo, fazer captura de rede supervisionada, restrita e
+processada localmente antes de configurar o input.
+NAO compartilhar captura bruta com dados NAT.
+
+Referencia: https://www.rfc-editor.org/rfc/rfc6587.html
