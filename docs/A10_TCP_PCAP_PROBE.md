@@ -188,3 +188,46 @@ atualize o worktree de auditoria e rode novamente
 `a10_tcp_framing --audit-nat-candidates`. São adicionados
 os campos `lacunas_tcp_bytes` e
 `trechos_tcp_contiguos` sem imprimir tráfego.
+
+
+## 31/10/2026 — lacuna TCP de 123 bytes localizada na auditoria
+
+Nova leitura do flow, usando a mesma captura de 20 segundos,
+commit `6a00a9b`:
+
+- `lacunas_tcp=1`, `lacunas_tcp_bytes=123`;
+- `trechos_tcp_contiguos=6`;
+- `conexoes_observadas=9`, 5 sem SYN e 5 sem FIN na captura;
+- `candidate_nat_sintaticamente_candidato=65277` e
+  `candidate_detalhe_outro_lsn_icmp=3913`.
+
+A lacuna é um **intervalo de bytes ausentes da sequência capturada e
+reconstruída**, não necessariamente perda no emissor, enlace ou rsyslog.
+Zero drops no `tcpdump` não elimina falhas na captura nem no Syslog.
+Uma mensagem RFC5424 concatenada não equivale necessariamente a um
+registro individual confiável para fins históricos.
+
+### Nova ferramenta de localização por conexão (sem conteúdo)
+
+O auditor atualizado agora produz `diagnostico_de_lacunas_por_conexao`:
+somente índice anônimo da conexão **na ordem de observação no PCAP**,
+quantidade de bytes faltantes, número de trechos, observação de SYN/FIN/RST
+e número de segmentos com payload. Não inclui IPs, portas, sequências
+TCP, timestamps de assinantes nem payload. Também conta
+`conexoes_com_rst` e `conexoes_sem_fin_nem_rst_na_captura`.
+
+Não interpretar RST como causa isolada de perda. A existência de RST
+no PCAP não garante que a aplicação perdeu mensagens; ausência de FIN
+em captura curta tampouco demonstra desconexão.
+
+Após atualizar o **worktree de auditoria**, não a produção:
+```bash
+git -C /opt/orbymon-a10-audit fetch origin feat/a10-tcp-framing-audit
+git -C /opt/orbymon-a10-audit switch --detach origin/feat/a10-tcp-framing-audit
+sudo env PYTHONPATH=/opt/orbymon-a10-audit/src \
+ python3 -m fmn_filters.a10_tcp_framing \
+ --pcap /root/a10-framing-local.pcap --audit-nat-candidates
+```
+
+Não apague o PCAP até terminar a análise aprovada pela política de
+evidências. Não compartilhe o PCAP nem arquivos NDJSON brutos.
