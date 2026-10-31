@@ -69,7 +69,15 @@ def candidate_mapping(text):
     return next(candidate_mappings(text),None)
 
 
-def tail_bytes(path, max_bytes):
+def tail_bytes(path, max_bytes, *, max_line_bytes=65536):
+    """Tail a byte budget; reject oversized complete NDJSON lines.
+
+    The legacy inspect tool still defaults to a 64 KiB line bound.
+    A10 audit after rsyslog maxMessageSize=64k needs a larger JSON envelope.
+    Never split an oversized NDJSON record into artificial log entries.
+    """
+    if not 1024 <= max_line_bytes <= 1048576:
+        raise ValueError("limite de linha fora de 1KiB..1MiB")
     with path.open("rb") as stream:
         stream.seek(0,2)
         size=stream.tell()
@@ -79,7 +87,7 @@ def tail_bytes(path, max_bytes):
         else:
             stream.seek(0)
         for line in stream:
-            yield None if len(line)>65536 else line.decode("utf-8",errors="replace")
+            yield None if len(line)>max_line_bytes else line.decode("utf-8",errors="replace")
 
 
 def inspect(path=LOG, last=200, max_bytes=8000000, examples=3):

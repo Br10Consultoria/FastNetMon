@@ -64,6 +64,37 @@ class AuditTests(unittest.TestCase):
             self.assertEqual(result["rawmsg_bytes_p95"],len(frame.encode()))
             self.assertNotIn("100.64.64.12",json.dumps(result))
 
+    def test_new_64kb_rsyslog_message_json_envelope_is_parsed(self):
+        # Raw Syslog near 64 KiB yields NDJSON record above 65536 bytes.
+        # The previous 64 KiB audit line cap incorrectly discarded it.
+        from fmn_filters.a10_syslog_inspect import tail_bytes
+        with TemporaryDirectory() as d:
+            frame = message()
+            frames = (frame * (65520 // len(frame) + 1))[:65520]
+            p = self.write(d, frames)
+            size = p.stat().st_size
+            self.assertGreater(size, 65536)
+            old = list(tail_bytes(p, max_bytes=size + 100))
+            self.assertEqual(old, [None])  # legacy inspect 64 KiB limit
+            report = audit(p, max_bytes=size + 100)
+            self.assertEqual(report["linhas_consideradas"], 1)
+            self.assertEqual(report["linhas_validas"], 1)
+            self.assertEqual(report["linhas_maiores_64KiB"], 1)
+            self.assertEqual(report["linhas_descartadas_por_limite_de_leitura"], 0)
+            self.assertEqual(report["rawmsg_bytes_max"], len(frames))
+            self.assertEqual(report["rawmsg_acima_8192_bytes"], 1)
+            self.assertFalse(report["correlacao_automatica_permitida"])
+            self.assertNotIn("100.64.64.12", json.dumps(report))
+
+    def test_explicit_safe_limit_still_rejects_abnormally_large_records(self):
+        with TemporaryDirectory() as d:
+            p = self.write(d, message() * 4500)
+            out = audit(p, max_bytes=p.stat().st_size + 100,
+                        max_line_bytes=262144)
+            self.assertEqual(out["linhas_descartadas_por_limite_de_leitura"], 1)
+            self.assertEqual(out["linhas_validas"], 0)
+            self.assertIsNone(out["rawmsg_bytes_max"])
+
     def test_invalid_and_absent_file(self):
         with TemporaryDirectory() as d:
             missing=Path(d)/"missing"

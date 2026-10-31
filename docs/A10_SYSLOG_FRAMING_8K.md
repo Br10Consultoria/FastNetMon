@@ -65,3 +65,37 @@ Rollback (usar o nome EXATO impresso por [BACKUP]):
 
 A preparacao altera apenas a configuracao do servidor flow; nao muda
 equipamento Huawei, A10, CGNAT, NetFlow, MariaDB ou Grafana.
+
+
+## Apos maxMessageSize=64k: corrigir o auditor para NDJSON maior que 64 KiB
+
+O operador aplicou a configuracao e reiniciou rsyslog com sucesso.
+Uma amostra de 500 linhas mostrou 46 com mais de 65536 bytes, que a
+auditoria anterior ignorou. As outras 454 tinham rawmsg de 8096 bytes.
+Nao interpretar rawmsg_bytes_max=8096 como tamanho maximo real do arquivo:
+ele se refere somente as linhas analisadas, excluindo as 46 maiores.
+
+O auditor (read-only) agora aceita ate 256 KiB por linha NDJSON e usa
+janela de leitura de 64 MB por padrao, adequada a 500 mensagens
+novas de aproximadamente 64 KiB. O antigo inspector conserva o limite
+historico de 64 KiB, sem mudar sua interface.
+
+    cd /opt/orbymon
+    git pull --ff-only origin main
+    sudo -u orbymon env PYTHONPATH=/opt/orbymon/src \
+      /opt/orbymon/.venv/bin/python -m fmn_filters.a10_syslog_audit \
+      --last 500 --max-bytes 64000000
+
+Interpretar os novos campos:
+- linhas_maiores_64KiB: registros NDJSON maiores que o limite antigo;
+- linhas_descartadas_por_limite_de_leitura: registros acima do NOVO
+  limite, nao analisados; precisam ser zerados para medicao confiavel;
+- rawmsg_entre_64000_66000_bytes: possiveis chunks no novo limite;
+- rawmsg_acima_8192_bytes: registros efetivamente maiores que 8 KiB;
+- rawmsg_bytes_p05/p50/p95/max: distribuicao apenas de registros validos;
+- fragmentos_antes_do_cabecalho e eventos_sem_mapeamento_completo:
+  devem permanecer sob investigacao; mensagens concatenadas sem
+  delimitação TCP nao viram automaticamente eventos completos.
+
+Esta alteracao NAO modifica a configuracao rsyslog nem reinicia servicos.
+Nao muda logs historicos e nao habilita gravacao de NAT ou assinantes.
