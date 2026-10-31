@@ -45,7 +45,11 @@ METRIC_NAMES = {
 
 
 def _boolean(value) -> int:
-    return int(value) if value is not None else -1
+    if value is None:
+        return -1
+    if not isinstance(value, bool):
+        raise ValueError("Campo booleano invalido no relatorio")
+    return int(value)
 
 
 def _numeric(value, *, whole=False) -> int | float:
