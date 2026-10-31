@@ -71,3 +71,81 @@ Para parar SOMENTE detector:
 - Se volume superar max_query_rows, falha sem produzir resultado parcial.
 - Reinicios longos podem perder janelas historicas; catch-up e futuro.
 - Ausencia de campos para payload HTTPS, DNS QNAME e TCP flags no rollup.
+
+
+## Foco DDoS — sem dependencia do Zabbix ou Syslog do A10
+
+Fluxo efetivo: **Huawei NetFlow v9/IPFIX → nfcapd/nfdump →
+`orby_ip_pairs_minute` (MariaDB) → `ddos_passive` →
+`orby_alerts` → Grafana OrbyMon**.
+
+A entrada A10 RFC5424/TCP 5514 fica **separada**. Os contadores
+A10 de alocacao/liberacao de portas CGNAT nao identificam sozinhos
+volume por IP de destino, fontes e portas associadas a um ataque.
+Podem complementar diagnosticos de carga e funcionamento do CGNAT,
+mas **nao sao requisito** para a deteccao DDoS baseada no Huawei.
+
+A fase 3 atual detecta **sinais**, passivamente, principalmente
+**inundacoes volumetricas para destinos publicos protegidos**.
+Portas 53/123 sao indicios de trafego DNS/NTP, nao prova de
+reflexao/amplificacao. HTTP, HTTPS e caminho `*.php` nao
+podem ser inspecionados com os rollups de NetFlow por minuto;
+para deteccao por URL, usar futuramente logs HTTP do
+servidor/WAF que termina o TLS.
+
+### Melhorias de confiabilidade propostas (PR separado, sem deploy)
+
+- Regras negativas como `{"not":{"protocols":["udp"]}}` ou
+  `any_of` com ramo sem restricao positiva **nao passam**
+  a validacao: evitam cobrir trafego quase arbitrario e
+  producao de falsos sinais.
+- Janela sem nenhuma linha NetFlow em `orby_ip_pairs_minute`
+  passa a registrar `status='sem_dados'` em
+  `orby_ddos_checks`, em vez de `passive` como se
+  tivesse observado os fluxos. Zero sinal com dados e
+  **diferente** de zero sinal porque nao ha dados.
+- Dashboard inclui minutos desde ultima amostra Huawei e
+  estado da ultima verificacao (0=janela analisada,
+  1=sem dados, 2=verificacao atrasada, -1=ausente).
+- Regras de bloqueio de trafego **nao** sao implementadas
+  nem habilitadas.
+
+### Confirmar prontidao do detector no flow (somente leitura)
+
+Nao executar `scripts/setup-ddos-passive.sh` em producao
+antes de homologar a configuracao e a importacao do PR.
+Para coletar o estado atual sem modificar servicos:
+
+```bash
+systemctl is-active orbymon-ip-huawei.timer orbymon-ddos-huawei.timer
+systemctl list-timers --all | grep -E 'orbymon-(ip|ddos)-huawei'
+journalctl -u orbymon-ddos-huawei.service -n 15 --no-pager
+mariadb orbymon -e "
+SELECT COUNT(*) AS pares_ultimos_10m,
+       MAX(bucket_utc) AS ultimo_bucket_utc
+FROM orby_ip_pairs_minute
+WHERE source='huawei'
+  AND bucket_utc>=UTC_TIMESTAMP()-INTERVAL 10 MINUTE;
+SELECT source,last_checked_at,latest_bucket_utc,status,signals,alerts
+FROM orby_ddos_checks;"
+```
+
+Estes SQLs apenas consultam **contagens e metadados**,
+sem retornar IPs de assinantes nem registros brutos.
+Se a tabela `orby_ddos_checks` nao existir, a fase 3
+ainda nao foi instalada no host: nao criar automaticamente.
+
+### Baseline obrigatorio antes de alertar como DDoS
+
+Os limites demonstrativos atuais nao foram calibrados.
+Medir trafego real por hora, dia, interface e protocolo,
+comparar Huawei/SNMP e ajustar `min_pps`, `min_mbps`,
+`min_sources` e `input_interfaces` por servico.
+Com sampling 1:2048, `nfdump` pode extrapolar
+bytes/pacotes, mas **nao extrapola quantidade de flows**:
+fontes distintas observadas sao apenas amostra e podem
+subestimar uma inundacao distribuida. Portanto nao
+tratar `unique_sources` como cardinalidade real.
+
+Referencia para comportamento do sampling no nfdump:
+https://github.com/phaag/nfdump#sampling
