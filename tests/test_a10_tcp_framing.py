@@ -151,6 +151,8 @@ class A10TcpFramingTests(unittest.TestCase):
         self.assertEqual(replay["contadores"]["replay_nat_sintaticamente_candidato"], 2)
         self.assertEqual(replay["contadores"]["replay_nat_allocated_tcp"], 2)
         self.assertEqual(replay["contadores"]["replay_eventos_finais_sem_fronteira_confiavel"], 1)
+        self.assertTrue(replay["verificacao_de_consistencia_offline"]["contagens_replay_consistentes_com_auditoria"])
+        self.assertFalse(replay["verificacao_de_consistencia_offline"]["historico_nat_automatico_permitido"])
         self.assertFalse(replay["correlacao_automatica_permitida"])
         self.assertNotIn("100.64.64.10", json.dumps(replay))
 
