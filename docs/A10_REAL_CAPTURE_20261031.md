@@ -636,3 +636,75 @@ O programa não imprime linhas Syslog nem nomes de arquivos
 sensíveis. Não configurar cron, serviço recorrente ou alarmes
 externos automaticamente enquanto as regras forem homologadas.
 O estado mostrado corresponde ao instante do comando.
+
+
+## 31/10/2026 16:56 BRT — diagnóstico vivo saudável
+
+O operador executou `a10_receiver_health` em `HEAD=89e6bca`:
+
+- `status=operacional_na_amostra` e **nenhum alerta**;
+- `rsyslog_ativo=true`, `tcp_5514.escutando=true`,
+  `fila_recebimento_maxima=0`, backlog de listen=25;
+- timer de logrotate ativo, último `Result=success`,
+  rotação havia 3316,4s (~55min);
+- arquivo ativo foi modificado no momento da consulta;
+- disco livre **74,14 GiB / 77,71%**, logs totais **6,54 GiB**,
+  **29 compactados**, ativo **1,346 GiB**;
+- `homologacao_entrega_syslog=false`,
+  `historico_cgnat_integral_comprovado=false`.
+
+A leitura foi realizada às `2026-10-31T19:56:12.030168+00:00`.
+O arquivo grande é esperado com a periodicidade horária:
+não equivale a falha de rotação. A próxima execução era 17:00 BRT.
+O estado confirma funcionamento **local** da recepção e rotação
+na amostra, sem inferir entrega individual/retencão de NAT.
+
+## Protótipo de envio de saúde ao Zabbix 7.4 (ainda sem ativação)
+
+Para integrar observabilidade com baixo risco:
+- `src/fmn_filters/a10_zabbix_sender.py` converte o relatório
+  de saúde em **15 linhas de métricas numéricas de lista fechada**,
+  no formato `<host> <key> <value>`, apropriado para
+  `zabbix_sender -i`. **Não envia dados pela rede**.
+- `zabbix/templates/orbymon-a10-receiver-7.4.json` oferece
+  template Zabbix 7.4 com 15 itens do tipo **Zabbix trapper**,
+  triggers de estado crítico, atenção, inconclusivo e falta de
+  atualização (10 min). Precisa de importação/validação de
+  configuração no Zabbix de teste antes de usar em produção.
+- O conversor retira nomes de arquivos, payloads, IP e portas
+  dos eventos NAT; rejeita valores inesperados; desconhecido
+  numérico é representado por `-1`. A interpretação de `health.state`:
+  `0` operacional local, `1` atenção, `2` crítico,
+  `3` inconclusivo. O template não autoriza correlacão PPPoE.
+- Sem processo ativo, sem instalação de Zabbix Agent ou sender,
+  sem modificação do rsyslog, firewall ou rotacão.
+
+### Validar agora no flow, **sem enviar nada ao servidor Zabbix**
+
+```bash
+git -C /opt/orbymon-a10-audit fetch origin feat/a10-tcp-framing-audit
+git -C /opt/orbymon-a10-audit switch --detach origin/feat/a10-tcp-framing-audit
+sudo install -d -m 0700 /root/orbymon-audit
+sudo sh -c 'umask 077; PYTHONPATH=/opt/orbymon-a10-audit/src \
+  python3 -m fmn_filters.a10_receiver_health > /root/orbymon-audit/health.json'
+sudo env PYTHONPATH=/opt/orbymon-a10-audit/src \
+  python3 -m fmn_filters.a10_zabbix_sender \
+  --input /root/orbymon-audit/health.json --host flow
+```
+
+O resultado deve ter 15 linhas como
+`flow orbymon.a10.health.state 0`,
+`flow orbymon.a10.tcp.listening 1`,
+`flow orbymon.a10.disk.free.pct 77.71`
+(valores reais variam a cada execução). Não inclui logs brutos.
+
+Para receber valores na interface Zabbix, será necessário
+**importar o template, vincular ao host cujo nome exato seja
+`flow` e configurar o envio autorizado** via
+`zabbix_sender` ou mecanismo equivalente; não instalar
+ou habilitar serviços automaticamente. A ligação com
+Grafana usa o datasource Zabbix se instalado ou outro caminho
+aprovado, **não é feita por este protótipo**.
+
+Referência do formato oficial de template Zabbix 7.4:
+https://www.zabbix.com/documentation/7.4/en/manual/xml_export_import/templates
