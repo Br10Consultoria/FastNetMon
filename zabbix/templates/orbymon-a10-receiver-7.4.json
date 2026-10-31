@@ -1,0 +1,292 @@
+{
+  "zabbix_export": {
+    "version": "7.4",
+    "template_groups": [
+      {
+        "uuid": "d6f283d8a45d43b2879a4a1000000001",
+        "name": "Templates/OrbyMon"
+      }
+    ],
+    "templates": [
+      {
+        "uuid": "d6f283d8a45d43b2879a4a1000000002",
+        "template": "Template OrbyMon A10 Receiver",
+        "name": "OrbyMon - A10 Receiver Health",
+        "description": "15 metricas numericas agregadas enviadas opcionalmente via zabbix_sender. Sem historico de mapeamentos NAT, sem reinicializacao do rsyslog.",
+        "groups": [
+          {
+            "name": "Templates/OrbyMon"
+          }
+        ],
+        "items": [
+          {
+            "uuid": "d6f283d8a45d43b2879a4a1000000004",
+            "name": "Estado geral (0=operacional 1=atencao 2=critico 3=inconclusivo)",
+            "type": "TRAP",
+            "key": "orbymon.a10.health.state",
+            "history": "14d",
+            "trends": "90d",
+            "tags": [
+              {
+                "tag": "component",
+                "value": "cgnat-syslog"
+              }
+            ],
+            "triggers": [
+              {
+                "uuid": "d6f283d8a45d43b2879a4a1000000014",
+                "expression": "last(/Template OrbyMon A10 Receiver/orbymon.a10.health.state)=2",
+                "name": "Alerta critico: receptor A10",
+                "priority": "HIGH",
+                "description": "Health check operacional do receptor, nao prova integridade de eventos NAT."
+              },
+              {
+                "uuid": "d6f283d8a45d43b2879a4a1000000015",
+                "expression": "last(/Template OrbyMon A10 Receiver/orbymon.a10.health.state)=1",
+                "name": "Atencao: receptor A10",
+                "priority": "WARNING",
+                "description": "Health check operacional do receptor, nao prova integridade de eventos NAT."
+              },
+              {
+                "uuid": "d6f283d8a45d43b2879a4a1000000016",
+                "expression": "last(/Template OrbyMon A10 Receiver/orbymon.a10.health.state)=3",
+                "name": "Monitoramento A10 inconclusivo",
+                "priority": "WARNING",
+                "description": "Health check operacional do receptor, nao prova integridade de eventos NAT."
+              },
+              {
+                "uuid": "d6f283d8a45d43b2879a4a1000000017",
+                "expression": "nodata(/Template OrbyMon A10 Receiver/orbymon.a10.health.state,10m)=1",
+                "name": "Nenhum dado novo de saude A10 em 10 minutos",
+                "priority": "HIGH",
+                "description": "Health check operacional do receptor, nao prova integridade de eventos NAT."
+              }
+            ]
+          },
+          {
+            "uuid": "d6f283d8a45d43b2879a4a1000000005",
+            "name": "Rsyslog ativo (-1=desconhecido)",
+            "type": "TRAP",
+            "key": "orbymon.a10.rsyslog.active",
+            "history": "14d",
+            "trends": "90d",
+            "tags": [
+              {
+                "tag": "component",
+                "value": "cgnat-syslog"
+              }
+            ],
+            "value_type": "FLOAT"
+          },
+          {
+            "uuid": "d6f283d8a45d43b2879a4a1000000006",
+            "name": "Porta TCP 5514 escutando (-1=desconhecido)",
+            "type": "TRAP",
+            "key": "orbymon.a10.tcp.listening",
+            "history": "14d",
+            "trends": "90d",
+            "tags": [
+              {
+                "tag": "component",
+                "value": "cgnat-syslog"
+              }
+            ],
+            "value_type": "FLOAT"
+          },
+          {
+            "uuid": "d6f283d8a45d43b2879a4a1000000007",
+            "name": "Fila de escuta TCP (-1=desconhecido)",
+            "type": "TRAP",
+            "key": "orbymon.a10.tcp.recvq",
+            "history": "14d",
+            "trends": "90d",
+            "tags": [
+              {
+                "tag": "component",
+                "value": "cgnat-syslog"
+              }
+            ],
+            "value_type": "FLOAT"
+          },
+          {
+            "uuid": "d6f283d8a45d43b2879a4a1000000008",
+            "name": "Timer logrotate ativo (-1=desconhecido)",
+            "type": "TRAP",
+            "key": "orbymon.a10.rotate.timer.active",
+            "history": "14d",
+            "trends": "90d",
+            "tags": [
+              {
+                "tag": "component",
+                "value": "cgnat-syslog"
+              }
+            ],
+            "value_type": "FLOAT"
+          },
+          {
+            "uuid": "d6f283d8a45d43b2879a4a1000000009",
+            "name": "Ultima rotacao teve sucesso (-1=desconhecido)",
+            "type": "TRAP",
+            "key": "orbymon.a10.rotate.last.success",
+            "history": "14d",
+            "trends": "90d",
+            "tags": [
+              {
+                "tag": "component",
+                "value": "cgnat-syslog"
+              }
+            ],
+            "value_type": "FLOAT"
+          },
+          {
+            "uuid": "d6f283d8a45d43b2879a4a100000000a",
+            "name": "Segundos desde ultima rotacao (-1=desconhecido)",
+            "type": "TRAP",
+            "key": "orbymon.a10.rotate.last.age",
+            "history": "14d",
+            "trends": "90d",
+            "tags": [
+              {
+                "tag": "component",
+                "value": "cgnat-syslog"
+              }
+            ],
+            "value_type": "FLOAT",
+            "units": "s"
+          },
+          {
+            "uuid": "d6f283d8a45d43b2879a4a100000000b",
+            "name": "Segundos desde ultima gravacao (-1=desconhecido)",
+            "type": "TRAP",
+            "key": "orbymon.a10.log.active.age",
+            "history": "14d",
+            "trends": "90d",
+            "tags": [
+              {
+                "tag": "component",
+                "value": "cgnat-syslog"
+              }
+            ],
+            "value_type": "FLOAT",
+            "units": "s"
+          },
+          {
+            "uuid": "d6f283d8a45d43b2879a4a100000000c",
+            "name": "Espaco disponivel no disco",
+            "type": "TRAP",
+            "key": "orbymon.a10.disk.free.pct",
+            "history": "14d",
+            "trends": "90d",
+            "tags": [
+              {
+                "tag": "component",
+                "value": "cgnat-syslog"
+              }
+            ],
+            "value_type": "FLOAT",
+            "units": "%"
+          },
+          {
+            "uuid": "d6f283d8a45d43b2879a4a100000000d",
+            "name": "Espaco livre no disco",
+            "type": "TRAP",
+            "key": "orbymon.a10.disk.free.gib",
+            "history": "14d",
+            "trends": "90d",
+            "tags": [
+              {
+                "tag": "component",
+                "value": "cgnat-syslog"
+              }
+            ],
+            "value_type": "FLOAT",
+            "units": "GiB"
+          },
+          {
+            "uuid": "d6f283d8a45d43b2879a4a100000000e",
+            "name": "Ocupacao dos arquivos A10",
+            "type": "TRAP",
+            "key": "orbymon.a10.logs.total.gib",
+            "history": "14d",
+            "trends": "90d",
+            "tags": [
+              {
+                "tag": "component",
+                "value": "cgnat-syslog"
+              }
+            ],
+            "value_type": "FLOAT",
+            "units": "GiB"
+          },
+          {
+            "uuid": "d6f283d8a45d43b2879a4a100000000f",
+            "name": "Arquivos comprimidos no diretorio",
+            "type": "TRAP",
+            "key": "orbymon.a10.logs.compressed.files",
+            "history": "14d",
+            "trends": "90d",
+            "tags": [
+              {
+                "tag": "component",
+                "value": "cgnat-syslog"
+              }
+            ],
+            "value_type": "FLOAT"
+          },
+          {
+            "uuid": "d6f283d8a45d43b2879a4a1000000010",
+            "name": "Quantidade de alertas criticos",
+            "type": "TRAP",
+            "key": "orbymon.a10.checks.critical",
+            "history": "14d",
+            "trends": "90d",
+            "tags": [
+              {
+                "tag": "component",
+                "value": "cgnat-syslog"
+              }
+            ]
+          },
+          {
+            "uuid": "d6f283d8a45d43b2879a4a1000000011",
+            "name": "Quantidade de alertas de atencao",
+            "type": "TRAP",
+            "key": "orbymon.a10.checks.warning",
+            "history": "14d",
+            "trends": "90d",
+            "tags": [
+              {
+                "tag": "component",
+                "value": "cgnat-syslog"
+              }
+            ]
+          },
+          {
+            "uuid": "d6f283d8a45d43b2879a4a1000000012",
+            "name": "Quantidade de verificacoes indisponiveis",
+            "type": "TRAP",
+            "key": "orbymon.a10.checks.unknown",
+            "history": "14d",
+            "trends": "90d",
+            "tags": [
+              {
+                "tag": "component",
+                "value": "cgnat-syslog"
+              }
+            ]
+          }
+        ],
+        "tags": [
+          {
+            "tag": "application",
+            "value": "orbymon"
+          },
+          {
+            "tag": "device",
+            "value": "a10-cgnat"
+          }
+        ]
+      }
+    ]
+  }
+}
