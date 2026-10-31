@@ -64,6 +64,12 @@ class A10SenderTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             format_sender_lines(report(homologacao_entrega_syslog=None), "flow")
 
+
+    def test_reject_malicious_boolean_without_echoing_value(self):
+        with self.assertRaisesRegex(ValueError, "Campo booleano invalido") as err:
+            format_sender_lines(report(rsyslog_ativo="SENSITIVE-SECRET"), "flow")
+        self.assertNotIn("SENSITIVE-SECRET", str(err.exception))
+
     def test_invalid_numbers_rejected(self):
         for value in (float("nan"), float("inf"), -50, "oops"):
             with self.assertRaises(ValueError):
