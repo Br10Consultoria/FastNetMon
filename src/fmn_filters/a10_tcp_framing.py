@@ -154,7 +154,12 @@ def spans_for_stream(stream: Stream, stats: Counter):
     return spans
 
 
-def inspect_span(data: bytes, stats: Counter):
+def inspect_span(data: bytes, stats: Counter, *, audit_nat_candidates=False):
+    if audit_nat_candidates:
+        from .a10_nat_candidate_audit import inspect_candidate_stream
+        nat_counts = inspect_candidate_stream(data)
+        for key, value in nat_counts.items():
+            stats["nat_" + key] += value
     headers = list(HEADER.finditer(data))
     stats["cabecalhos_rfc5424"] += len(headers)
     if not headers:
@@ -190,7 +195,8 @@ def inspect_span(data: bytes, stats: Counter):
 
 
 def audit(path: Path, *, source_ip: str = "10.100.10.10", port: int = 5514,
-          max_file_bytes: int = 128000000, max_payload_bytes: int = 32000000):
+          max_file_bytes: int = 128000000, max_payload_bytes: int = 32000000,
+          audit_nat_candidates: bool = False):
     try:
         address = ipaddress.IPv4Address(source_ip).packed
     except ipaddress.AddressValueError as exc:
@@ -234,7 +240,7 @@ def audit(path: Path, *, source_ip: str = "10.100.10.10", port: int = 5514,
     stats["conexoes_sem_fin_na_captura"] = sum(not s.seen_fin for s in sessions)
     for stream in sessions:
         for span in spans_for_stream(stream, stats):
-            inspect_span(span, stats)
+            inspect_span(span, stats, audit_nat_candidates=audit_nat_candidates)
     if stats["fronteiras_coladas_apos_colchete"]:
         classification = "concatenacao_sem_delimitador_visivel"
     elif stats["frames_octet_com_comprimento_coerente"]:
@@ -264,12 +270,15 @@ def main(argv=None):
     ap.add_argument("--source-ip", default="10.100.10.10")
     ap.add_argument("--port", type=int, default=5514)
     ap.add_argument("--max-file-bytes", type=int, default=128000000)
+    ap.add_argument("--audit-nat-candidates", action="store_true",
+                    help="Apenas contagens estruturais; nunca persiste mapeamentos NAT")
     ap.add_argument("--max-payload-bytes", type=int, default=32000000)
     args = ap.parse_args(argv)
     try:
         result = audit(args.pcap, source_ip=args.source_ip, port=args.port,
                        max_file_bytes=args.max_file_bytes,
-                       max_payload_bytes=args.max_payload_bytes)
+                       max_payload_bytes=args.max_payload_bytes,
+                       audit_nat_candidates=args.audit_nat_candidates)
         print(json.dumps(result, indent=2, ensure_ascii=False))
         return 0
     except (OSError, ValueError, struct.error) as exc:
