@@ -301,7 +301,7 @@ def audit(path: Path, *, source_ip: str = "10.100.10.10", port: int = 5514,
          "sobreposicoes_conflitantes", "segmentos_descartados_por_limite",
          "fluxos_com_seq_wrap_nao_suportado", "conexoes_sem_syn_na_captura",
          "conexoes_sem_fin_na_captura", "conexoes_com_rst")))
-    return {
+    result = {
         "status": "ok", "classificacao_framing_na_amostra": classification,
         "captura_tcp_completa_no_intervalo_observado": can_rely_on_capture,
         "contadores": dict(sorted(stats.items())),
@@ -309,6 +309,10 @@ def audit(path: Path, *, source_ip: str = "10.100.10.10", port: int = 5514,
         "correlacao_automatica_permitida": False,
         "aviso": "Nao comprova integridade de historico NAT, entrega ao rsyslog, identificacao de assinantes ou conformidade legal. Nao habilita persistencia."
     }
+    if audit_nat_candidates and audit_offline_replay:
+        from .a10_replay_consistency import compare_replay_counters
+        result["verificacao_de_consistencia_offline"] = compare_replay_counters(stats)
+    return result
 
 
 def main(argv=None):
