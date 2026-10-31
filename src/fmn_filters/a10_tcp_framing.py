@@ -200,7 +200,7 @@ def inspect_span(data: bytes, stats: Counter, *, audit_nat_candidates=False):
 
 def audit(path: Path, *, source_ip: str = "10.100.10.10", port: int = 5514,
           max_file_bytes: int = 128000000, max_payload_bytes: int = 32000000,
-          audit_nat_candidates: bool = False):
+          audit_nat_candidates: bool = False, audit_offline_replay: bool = False):
     try:
         address = ipaddress.IPv4Address(source_ip).packed
     except ipaddress.AddressValueError as exc:
@@ -277,6 +277,16 @@ def audit(path: Path, *, source_ip: str = "10.100.10.10", port: int = 5514,
                 stats["conexoes_com_lacunas_omitidas_por_limite"] += 1
         for span in spans:
             inspect_span(span, stats, audit_nat_candidates=audit_nat_candidates)
+            if audit_offline_replay:
+                from .a10_rfc5424_replay import OfflineA10Replay
+                probe = OfflineA10Replay()
+                # Artificial chunks exercise stream-boundary handling on
+                # already reconstructed TCP spans, never on raw packets.
+                for offset in range(0, len(span), 4096):
+                    probe.feed(span[offset:offset + 4096])
+                probe.close_span()
+                for key, value in probe.snapshot().items():
+                    stats["replay_" + key] += value
     if stats["fronteiras_coladas_apos_colchete"]:
         classification = "concatenacao_sem_delimitador_visivel"
     elif stats["frames_octet_com_comprimento_coerente"]:
@@ -309,13 +319,16 @@ def main(argv=None):
     ap.add_argument("--max-file-bytes", type=int, default=128000000)
     ap.add_argument("--audit-nat-candidates", action="store_true",
                     help="Apenas contagens estruturais; nunca persiste mapeamentos NAT")
+    ap.add_argument("--audit-offline-replay", action="store_true",
+                    help="Replay isolado de spans TCP em blocos; apenas contadores agregados")
     ap.add_argument("--max-payload-bytes", type=int, default=32000000)
     args = ap.parse_args(argv)
     try:
         result = audit(args.pcap, source_ip=args.source_ip, port=args.port,
                        max_file_bytes=args.max_file_bytes,
                        max_payload_bytes=args.max_payload_bytes,
-                       audit_nat_candidates=args.audit_nat_candidates)
+                       audit_nat_candidates=args.audit_nat_candidates,
+                       audit_offline_replay=args.audit_offline_replay)
         print(json.dumps(result, indent=2, ensure_ascii=False))
         return 0
     except (OSError, ValueError, struct.error) as exc:
