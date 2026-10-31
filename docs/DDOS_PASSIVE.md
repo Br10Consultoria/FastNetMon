@@ -260,3 +260,72 @@ definir se o Huawei exporta somente saida, se os
 prefixos da configuracao estao errados ou se ha outra
 causa de ausencia do tráfego de entrada. Nao modificar
 NE8000 nem regras do detector ate confirmar a causa.
+
+
+### Resultado de 60 minutos sem QUALQUER ponta dos CIDRs protegidos
+
+O operador executou `sql/ddos_direction_audit_readonly.sql` no
+`flow` em 31/10/2026 e obteve:
+
+```text
+papel_das_redes=nenhuma_ponta_protegida
+pares_agregados=2106
+minutos_com_dados=60
+pacotes_estimados=8603648
+megabits_estimados=44890.16
+ultimo_bucket_utc=2026-10-31 21:03:00
+```
+
+O segundo `SELECT` (interfaces com ponta protegida) **nao
+retornou linhas**. O terceiro mostrou interfaces `86`,
+`16`, `334` e `0`, protocolos TCP/UDP/ESP/ICMP,
+com `netflow_direction` bruta `0` e `1`.
+**Nao interpretar** `0/1` como sentido Internet sem
+validacao externa, nem `ifIndex 0` como interface fisica.
+
+Conclusao: a ausencia dos CIDRs `45.238.170.0/23` e
+`187.87.201.0/24` ocorre **tanto em src_ip como em dst_ip**
+durante essa janela. Logo, **inverter origem/destino nao
+resolve**. Suspeitas a diferenciar:
+- Huawei BNG esta vendo apenas trafego **antes/depois da
+  traducao NAT do lado dos assinantes**, enquanto o IP
+  publico compartilhado esta no segmento externo do A10;
+- prefixos escolhidos nao correspondem aos alvos que
+  atravessam o Huawei monitorado;
+- exportacao NetFlow amostrada/visibilidade parcial de
+  interfaces ou dados IPv6 em vez de IPv4.
+
+**Nao configurar mitigacao, NAT, ou exportacao em producao
+apenas a partir deste resultado.** Para uma DDoS contra IPs
+publicos do A10, a coleta relevante precisa ser feita
+no ponto que enxerga o trafego externo antes do NAT.
+A necessidade de outro exportador/link so pode ser
+decidida depois de validar topologia e interfaces.
+
+### Identificar faixas reais e se ha CGNAT 100.64/10
+
+Arquivo novo:
+`sql/ddos_ip_scope_audit_readonly.sql` — dois SELECTs,
+sem enderecos individuais nos resultados:
+1. Top 30 prefixos **IPv4 /16** observados nas pontas de
+   origem/destino, com numero de pares e minutos;
+2. categorias `CGNAT_100.64/10`, `PRIVADO_RFC1918`,
+   `IPv6`, `OUTRO_IPv4` agrupadas por `ifIndex` e
+   direcao, sem declarar que `OUTRO_IPv4` seja sempre
+   publico (inclui enderecos especiais).
+
+Execute **sem atualizar o OrbyMon de producao**:
+
+```bash
+set -o pipefail
+git -C /opt/orbymon-a10-audit fetch origin \
+  fix/ddos-passive-reliability-20261031 &&
+git -C /opt/orbymon-a10-audit show \
+  FETCH_HEAD:sql/ddos_ip_scope_audit_readonly.sql | mariadb orbymon
+```
+
+Se os blocos protegidos nao aparecem nem como origem
+nem destino, nao ajustar limiares DDoS para encobrir
+falta de cobertura. Mesmo com amostra em 60/60 minutos,
+a visibilidade de ataques aos IPs publicos do CGNAT
+**ainda nao foi validada**.
