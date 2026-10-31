@@ -142,3 +142,49 @@ exibidos como texto e não se gravam traduções.
 
 **Continua read-only:** não prova ausência de lacunas no stream,
 não valida duração de alocações e não libera correlação com PPPoE.
+
+
+## 31/10/2026 — Verificação de lacunas e perdas do A10
+
+Depois de confirmar que os `3913` eventos não-TCP/UDP da
+captura são marcadores `LSN:ICMP` (os demais `65277`
+candidatos são eventos PortAllocated/PortFreed TCP/UDP),
+foram adicionados dois diagnósticos **somente leitura**:
+
+1. O auditor PCAP reporta `lacunas_tcp_bytes` (soma das
+   lacunas entre segmentos de uma mesma conexão TCP) e
+   `lacunas_tcp_inicio_bytes` (bytes iniciais não capturados
+   em conexões cujo SYN foi observado). Lacuna em PCAP não prova
+   perda no A10 ou no rsyslog; não publicar payload nem pacotes.
+2. `python3 -m fmn_filters.a10_logging_health` compara
+   **duas** saídas de `show cgnv6 logging statistics`
+   tomadas em um intervalo cronometrado. Analisa somente campos
+   numéricos conhecidos, detecta reset/wrap de contadores e
+   informa incrementos de `Log Packets Dropped` e
+   `TCP Connection Lost`. Não faz Telnet/SSH, não altera A10
+   e não lê logs de assinantes.
+
+Para comparar duas leituras, salve *apenas* a saída de
+`show cgnv6 logging statistics` em dois arquivos locais
+restritos, obtidas em um intervalo medido (por exemplo, 60s):
+`/root/a10-before.txt` e `/root/a10-after.txt`.
+Sem automação de login nem inclusão de credenciais no texto.
+
+```bash
+sudo env PYTHONPATH=/opt/orbymon-a10-audit/src python3 \
+  -m fmn_filters.a10_logging_health \
+  --before /root/a10-before.txt --after /root/a10-after.txt \
+  --seconds 60
+```
+
+Use o intervalo efetivamente medido; não utilize 60 se houve
+mais ou menos tempo. Os números de `Log Packets Sent` e
+`Log Packets Dropped` se referem a **pacotes de logging**,
+não a um evento NAT individual, e não comprovam entrega,
+integridade histórica ou correlação PPPoE/RADIUS.
+
+Para verificar as lacunas do PCAP anterior (sem nova captura),
+atualize o worktree de auditoria e rode novamente
+`a10_tcp_framing --audit-nat-candidates`. São adicionados
+os campos `lacunas_tcp_bytes` e
+`trechos_tcp_contiguos` sem imprimir tráfego.
