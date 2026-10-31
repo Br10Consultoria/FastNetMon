@@ -132,6 +132,11 @@ class A10TcpFramingTests(unittest.TestCase):
                    (101 + len(MESSAGE) + 123, MESSAGE, 0x18)]
         out = self.run_pcap(records)
         self.assertEqual(out["contadores"]["lacunas_tcp_bytes"], 123)
+        gap = out["diagnostico_de_lacunas_por_conexao"][0]
+        boundary = gap["contexto_estrutural_das_lacunas"]
+        self.assertEqual(boundary["total_de_fronteiras_de_lacuna"], 1)
+        self.assertTrue(boundary["detalhes"][0]["eventos_adjacentes_nao_homologados"])
+        self.assertEqual(boundary["detalhes"][0]["bytes_antes_do_primeiro_cabecalho_seguinte"], 0)
         self.assertNotIn("100.64.64.12", json.dumps(out))
         self.assertNotIn("45.238.170.70", json.dumps(out))
         self.assertNotIn("34055", json.dumps(out))
