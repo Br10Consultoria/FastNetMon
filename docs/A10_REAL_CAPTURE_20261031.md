@@ -302,3 +302,34 @@ do `show cgnv6 logging statistics`, para avaliar o crescimento dos
 contadores `Log Packets Dropped` e `TCP Connection Lost`.
 Mantemos `correlacao_automatica_permitida=false`,
 sem mudar o serviço TCP/5514 nem o CGNAT.
+
+
+## Alinhamento das bordas da lacuna — 31/10/2026
+
+A última auditoria real do flow (commit `32fb522`) verificou
+a lacuna de 123 bytes da conexão TCP #3:
+
+```text
+trecho_anterior_termina_colchete: true
+trecho_seguinte_inicia_cabecalho_rfc5424: true
+trecho_seguinte_tem_cabecalho_rfc5424: true
+bytes_antes_do_primeiro_cabecalho_seguinte: 0
+eventos_adjacentes_nao_homologados: true
+```
+
+É possível que a lacuna contenha um evento inteiro, mas sem
+quadro/ACKs de sentido inverso e sem comprovação de entrega pelo
+rsyslog, isso é somente uma hipótese. Não afirmar perda efetiva
+de um registro NAT ou culpa do A10.
+
+### Prototipagem de replay sem produção
+
+A branch inclui `a10_rfc5424_replay.py` e
+`--audit-offline-replay` em `a10_tcp_framing`, para comparar
+o reconhecedor existente com um decodificador incremental que
+recebe blocos arbitrários, mantém buffer limitado e descarta
+trechos finais em cada lacuna. **Nunca persiste traduções NAT,
+não muda rsyslog/A10 e não liga associação de assinantes**.
+
+A execução e interpretação ficam em
+`docs/A10_TCP_PCAP_PROBE.md`.
