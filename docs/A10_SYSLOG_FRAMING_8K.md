@@ -134,3 +134,40 @@ processada localmente antes de configurar o input.
 NAO compartilhar captura bruta com dados NAT.
 
 Referencia: https://www.rfc-editor.org/rfc/rfc6587.html
+
+## Continuidade entre blocos consecutivos de 65536 bytes
+
+Como 107903 de 107903 fronteiras internas eram cabeçalhos colados apos
+colchete, 199 de 200 blocos terminaram sem colchete e 198 dos 200
+comecaram com fragmentos, verificar se um evento NAT inteiro pode ser
+recuperado unindo o final do chunk anterior com o prefixo do proximo.
+
+Ferramenta SOMENTE de leitura:
+
+    cd /opt/orbymon
+    git pull --ff-only origin main
+    sudo -u orbymon env PYTHONPATH=/opt/orbymon/src \
+      /opt/orbymon/.venv/bin/python -m fmn_filters.a10_stream_continuity \
+      --last 200 --max-bytes 64000000
+
+Interpretação:
+- candidato_nat_recuperado_na_juncao: fragmentos de dois blocos
+  permitem reconstruir UM candidato sintaticamente valido. Isso NAO
+  prova entrega integral, ordem TCP, correlacao de assinantes ou
+  integridade juridica.
+- sem_mapeamento_nat_completo: o candidato remontado esta incompleto
+  ou fora dos pools/formato esperado. Pode haver perda, evento diferente
+  de NAT ou variacao no template.
+- proximo_bloco_inicia_com_cabecalho: novo chunk inicia diretamente
+  com outro evento completo; nao criar uma uniao artificial.
+- pares_com_origem_diferente e linhas invalidas interrompem a analise.
+- Nao habilitar persistencia de NAT com base apenas nesse teste.
+
+Confirmar o template de logging do A10 antes de editar a configuracao.
+Em documentacao do fabricante, batched-logging-disable existe para
+desabilitar multiplos eventos por pacote. O impacto de trafego/
+processamento pode ser alto e exige janela supervisionada.
+
+Fontes:
+https://www.rfc-editor.org/rfc/rfc6587.html
+https://documentation.a10networks.com/ACOS-Docs/axapi/521p3/axapiv3/cgnv6_template_logging.html
