@@ -100,5 +100,41 @@ class A10TcpFramingTests(unittest.TestCase):
             audit(Path("/definitely-not-present/pcap"))
 
 
+
+    def test_anonymous_gap_diagnostics(self):
+        records = [(100, b"", 0x02), (101, b"abcde", 0x18),
+                   (129, b"after-gap", 0x18), (138, b"", 0x11)]
+        out = self.run_pcap(records)
+        info = out["diagnostico_de_lacunas_por_conexao"]
+        self.assertEqual(len(info), 1)
+        self.assertEqual(info[0]["conexao_indice_na_captura"], 1)
+        self.assertEqual(info[0]["lacunas_tcp_bytes"], 23)
+        self.assertTrue(info[0]["syn_observado"])
+        self.assertTrue(info[0]["fin_observado"])
+        self.assertFalse(info[0]["rst_observado"])
+        self.assertEqual(info[0]["trechos_tcp_contiguos"], 2)
+        self.assertEqual(out["contadores"]["lacunas_tcp_bytes"], 23)
+        self.assertNotIn("10.100.10.10", json.dumps(out))
+        self.assertNotIn("44221", json.dumps(out))
+
+    def test_rst_is_reported_as_different_from_fin(self):
+        records = [(100, b"", 0x02), (101, MESSAGE, 0x18),
+                   (101 + len(MESSAGE), b"", 0x14)]
+        out = self.run_pcap(records)
+        self.assertEqual(out["contadores"]["conexoes_com_rst"], 1)
+        self.assertEqual(out["contadores"]["conexoes_sem_fin_nem_rst_na_captura"], 0)
+        self.assertEqual(out["contadores"]["conexoes_sem_fin_na_captura"], 1)
+        self.assertFalse(out["captura_tcp_completa_no_intervalo_observado"])
+        self.assertEqual(out["diagnostico_de_lacunas_por_conexao"], [])
+
+    def test_gap_output_does_not_leak_subscriber_data(self):
+        records = [(100, b"", 0x02), (101, MESSAGE, 0x18),
+                   (101 + len(MESSAGE) + 123, MESSAGE, 0x18)]
+        out = self.run_pcap(records)
+        self.assertEqual(out["contadores"]["lacunas_tcp_bytes"], 123)
+        self.assertNotIn("100.64.64.12", json.dumps(out))
+        self.assertNotIn("45.238.170.70", json.dumps(out))
+        self.assertNotIn("34055", json.dumps(out))
+
 if __name__ == "__main__":
     unittest.main()
