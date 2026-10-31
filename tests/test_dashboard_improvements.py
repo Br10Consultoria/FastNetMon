@@ -47,6 +47,22 @@ class DashboardImprovementsTests(unittest.TestCase):
             self.assertIn("orby_interface_names",qs)
             self.assertIn("Não informado",qs)
             self.assertIn("ifIndex ",qs)
+    def test_ddos_health_shows_missing_data_and_freshness_without_zabbix(self):
+        d=dash("orbymon-ddos-passive.json")
+        panels={p["id"]:p for p in d["panels"]}
+        self.assertEqual(len(panels),len(d["panels"]))
+        self.assertIn("SEM DADOS NA JANELA",panels[3]["targets"][0]["rawSql"])
+        self.assertIn("TIMESTAMPDIFF(MINUTE,last_checked_at,UTC_TIMESTAMP())",
+                      panels[3]["targets"][0]["rawSql"])
+        self.assertIn("MAX(bucket_utc)",panels[9]["targets"][0]["rawSql"])
+        self.assertIn("UTC_TIMESTAMP()",panels[9]["targets"][0]["rawSql"])
+        self.assertNotIn("$__timeFilter",panels[9]["targets"][0]["rawSql"])
+        self.assertIn("status='sem_dados'",panels[10]["targets"][0]["rawSql"])
+        text=json.dumps(d).lower()
+        self.assertNotIn("zabbix",text)
+        self.assertTrue(all(p["datasource"]["uid"]=="orbymon-mysql"
+                            for p in d["panels"]))
+
     def test_no_duplicate_uids(self):
         self.assertEqual(len({dash(n)["uid"] for n in
            ("orbymon-overview.json","orbymon-ip-analytics.json",
