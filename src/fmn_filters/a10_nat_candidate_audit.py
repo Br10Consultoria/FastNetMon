@@ -20,6 +20,29 @@ HEADER = re.compile(
 )
 NAT_MARKER = re.compile(rb"LSN:Port(?:Allocated|Allocation|Freed):(?:TCP|UDP)", re.I)
 
+# The unknown-event histogram uses only fixed, non-sensitive category names.
+# Never use arbitrary values from payload as a JSON key or print event text.
+OTHER_LSN_MARKER = re.compile(rb"LSN:([A-Za-z][A-Za-z0-9_-]{0,31})", re.I)
+
+
+def _other_event_group(payload: bytes) -> str:
+    """Return a fixed label for non-TCP/UDP-PortAllocated/PortFreed events."""
+    match = OTHER_LSN_MARKER.search(payload)
+    if match is None:
+        return "sem_marcador_lsn"
+    marker = match.group(1).lower()
+    if marker.startswith(b"icmp"):
+        return "lsn_icmp"
+    if marker.startswith(b"gre"):
+        return "lsn_gre"
+    if marker.startswith(b"esp"):
+        return "lsn_esp"
+    if b"batch" in marker or marker.startswith(b"portblock"):
+        return "lsn_lote_portas"
+    if marker.startswith(b"session"):
+        return "lsn_sessao"
+    return "lsn_outro_marcador"
+
 
 def _classify_event(payload: bytes) -> str:
     """Classify only the structure. IP/port data never leave this function."""
@@ -77,5 +100,14 @@ def inspect_candidate_stream(data: bytes) -> dict[str, int]:
             stats["cabecalho_invalido"] += 1
             continue
         payload = data[h.end():following.start()]
-        stats[_classify_event(payload)] += 1
+        status = _classify_event(payload)
+        stats[status] += 1
+        if status == "outro_tipo_ou_sem_nat_tcp_udp":
+            stats["detalhe_outro_" + _other_event_group(payload)] += 1
+        elif status == "nat_sintaticamente_candidato":
+            # The event and protocol are from strict whitelists in
+            # candidate_mappings, not user-supplied output strings.
+            mapping = next(candidate_mappings(payload.decode("ascii")), None)
+            if mapping:
+                stats["detalhe_nat_" + mapping["event"] + "_" + mapping["protocol"]] += 1
     return dict(stats)
