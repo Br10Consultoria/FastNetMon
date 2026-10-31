@@ -48,3 +48,47 @@ Se a conexão TCP já estiver aberta antes da captura, normalmente `conexoes_sem
 ## Próximo bloqueio para habilitar histórico pesquisável
 
 Confirmar o framing no wire e a compatibilidade de configuração da versão **ACOS instalada**; medir diferenças dos contadores acumulados `Log Packets Dropped` e `TCP Connection Lost`; registrar lacunas e perdas do rsyslog, e testar reinício/rotação; só então definir um parser validado para `LSN:PortAllocated`/`LSN:PortFreed` com idempotência, retenção protegida e correlação temporal posterior com PPPoE/RADIUS. Não ativar log de todas as sessões ou `batched-logging-disable` sem estudo de impacto.
+
+
+## Segunda etapa: auditoria estrutural dos candidatos NAT (somente leitura)
+
+Depois de validar o transporte e identificar a cadeia ativa
+`ORBY_LOG_TEMPLATE` -> `ORBY_SYSLOG` ->
+`187.87.201.198:5514/TCP`, pode-se medir quais eventos TCP/UDP
+`LSN:PortAllocated` e `LSN:PortFreed` estão sintaticamente completos
+**dentro da captura local já realizada**.
+
+Atualizar **somente** o worktree de auditoria:
+```bash
+git -C /opt/orbymon-a10-audit fetch origin feat/a10-tcp-framing-audit
+git -C /opt/orbymon-a10-audit switch --detach FETCH_HEAD
+```
+
+Executar sem alterar o rsyslog nem os logs históricos:
+```bash
+sudo env PYTHONPATH=/opt/orbymon-a10-audit/src \
+  python3 -m fmn_filters.a10_tcp_framing \
+  --pcap /root/a10-framing-local.pcap \
+  --source-ip 10.100.10.10 --port 5514 \
+  --audit-nat-candidates
+```
+
+Campos adicionais começam por `candidate_`:
+- `candidate_nat_sintaticamente_candidato` conta eventos com um único marcador TCP/UDP, intervalo entre dois cabeçalhos RFC5424, endereços/portas nos pools conhecidos e fechamento `]`;
+- `candidate_nat_sem_terminador`, `candidate_marcadores_ambiguos`,
+  `candidate_nat_mapeamento_invalido_ou_fora_pool` descrevem motivos
+  de rejeição;
+- `candidate_ultimo_evento_sem_fronteira_comprovada` reflete
+  eventos terminais não confirmados no recorte da captura.
+
+**Atenção:** ainda que `candidate_nat_sintaticamente_candidato` seja alto,
+o método usa detecção heurística de cabeçalhos, **não** framing RFC6587
+comprovado; `captura_tcp_completa_no_intervalo_observado` pode ser
+`false` por conexões abertas e gaps. Nenhum evento é salvo, nenhum
+usuário é identificado, nenhum vínculo é homologado e a flag
+`correlacao_automatica_permitida` permanece `false`. A porcentagem
+de candidatos aceitos não é taxa de entrega comprovada.
+
+Depois deste teste, a evolução planejada é um coletor experimental
+com framing verificável, controle de continuidade por conexão e
+fila durável, sem interromper a porta TCP 5514 atual.
