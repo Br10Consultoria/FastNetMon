@@ -70,7 +70,7 @@ class AuditTests(unittest.TestCase):
         from fmn_filters.a10_syslog_inspect import tail_bytes
         with TemporaryDirectory() as d:
             frame = message()
-            frames = (frame * (65440 // len(frame) + 1))[:65440]
+            frames = (frame * (65520 // len(frame) + 1))[:65520]
             p = self.write(d, frames)
             size = p.stat().st_size
             self.assertGreater(size, 65536)
