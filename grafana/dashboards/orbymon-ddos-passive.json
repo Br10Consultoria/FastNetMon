@@ -5,7 +5,7 @@
   "description": "Deteccao passiva de possiveis anomalias (NetFlow amostrado 1:2048). Sem bloqueio, alertas nao sao provas de DDoS.",
   "timezone": "browser",
   "schemaVersion": 40,
-  "version": 1,
+  "version": 2,
   "refresh": "1m",
   "time": {
     "from": "now-24h",
@@ -126,7 +126,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT source AS Exportador,last_checked_at AS 'Ultima verificacao UTC',latest_bucket_utc AS 'Janela avaliada UTC',status AS Estado,signals AS Sinais,alerts AS 'Alertas novos' FROM orby_ddos_checks WHERE source='huawei'",
+          "rawSql": "SELECT source AS Exportador,last_checked_at AS 'Ultima verificacao UTC',latest_bucket_utc AS 'Janela avaliada UTC',CASE WHEN status='sem_dados' THEN 'SEM DADOS NA JANELA' WHEN status='passive' THEN 'Analise passiva executada' ELSE status END AS 'Estado',TIMESTAMPDIFF(MINUTE,last_checked_at,UTC_TIMESTAMP()) AS 'Min desde verificacao',signals AS Sinais,alerts AS 'Alertas novos' FROM orby_ddos_checks WHERE source='huawei'",
           "format": "table",
           "editorMode": "code"
         }
@@ -325,6 +325,134 @@
         "overrides": []
       },
       "options": {}
+    },
+    {
+      "id": 9,
+      "title": "Atraso do NetFlow Huawei (min) — verificar se > 8",
+      "description": "Minutos desde o ultimo bucket armazenado. -1 significa que nao ha dados. O alerta de ataque depende da continuidade desse fluxo.",
+      "type": "stat",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 31,
+        "w": 12,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT COALESCE(TIMESTAMPDIFF(MINUTE,MAX(bucket_utc),UTC_TIMESTAMP()),-1) AS value FROM orby_ip_pairs_minute WHERE source='huawei'",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 8
+              },
+              {
+                "color": "red",
+                "value": 15
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 10,
+      "title": "Estado da ultima janela DDoS (0=analisada; 1=sem dados; 2=atrasada; -1=ausente)",
+      "description": "Indica confiabilidade operacional da deteccao, nao a existencia ou ausencia de ataques.",
+      "type": "stat",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 31,
+        "w": 12,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT COALESCE((SELECT CASE WHEN TIMESTAMPDIFF(MINUTE,last_checked_at,UTC_TIMESTAMP())>5 THEN 2 WHEN status='sem_dados' THEN 1 WHEN status='passive' THEN 0 ELSE -1 END FROM orby_ddos_checks WHERE source='huawei'),-1) AS value",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "gray",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
     }
   ]
 }
