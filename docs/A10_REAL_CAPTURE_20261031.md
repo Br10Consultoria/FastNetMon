@@ -387,3 +387,68 @@ A etapa seguinte **não** deve mudar `cgnv6`,
 `batched-logging-disable`, `rsyslog` ativo ou porta TCP/5514
 enquanto o receptor alternativo não tiver sido testado de forma
 isolada com failover/rollback definido.
+
+
+## 31/10/2026 — duas leituras de contadores A10 (16:12:46 a 16:13:59, BRT)
+
+O operador enviou duas saídas de `show clock` +
+`show cgnv6 logging statistics`. A distância entre os horários
+é de **73 segundos**; as consultas de estatísticas ocorreram logo
+após os comandos de relógio, portanto as taxas por segundo são
+**aproximadas** ao considerar 73s como o intervalo de amostragem.
+
+| Contador | Primeiro | Segundo | Delta |
+|---|---:|---:|---:|
+| TCP Port Allocated | 64473214 | 64522289 | 49075 |
+| TCP Port Freed | 64451447 | 64501236 | 49789 |
+| UDP Port Allocated | 98746827 | 98817707 | 70880 |
+| UDP Port Freed | 98724267 | 98797250 | 72983 |
+| ICMP Resource Allocated | 10655007 | 10662314 | 7307 |
+| ICMP Resource Freed | 10654962 | 10662317 | 7355 |
+| Log Packets Sent | 347702775 | 347960164 | **257389** |
+| Log Packets Dropped | 2629 | 2629 | **0** |
+| TCP Connection Established | 15 | 15 | **0** |
+| TCP Connection Lost | 30 | 30 | **0** |
+
+- **Soma dos 6 deltas de eventos NAT: 257389**;
+- **Delta Log Packets Sent: 257389**;
+- Diferença: **0**; os contadores internos do A10 se reconciliam
+  exatamente nesta janela.
+- Taxa aproximada de `Log Packets Sent`: **3525,88/s**.
+- Nenhum novo `Log Packets Dropped` ou
+  `TCP Connection Lost` foi contabilizado.
+
+**Interpretação:** existe evidência forte de consistência entre a
+contabilização interna dos eventos NAT e do envio de logs do A10
+nessa janela. Não significa que cada registro se transformou
+em um pacote físico TCP distinto, nem comprova que os eventos
+chegaram ao rsyslog, foram persistidos no arquivo NDJSON ou
+foram retidos com integridade.
+
+A captura offline anterior permanece com lacuna de 123 bytes
+e framing RFC5424 concatenado sem delimitador RFC6587 detectado.
+Essa lacuna não foi "resolvida" por esta medição e não podemos
+atribuí-la automaticamente a falha do emissor. Também não há
+evidência nova de impacto no tráfego de clientes.
+
+A função `a10_logging_health.reconcile_log_sent_with_events`
+foi acrescentada para verificar automaticamente essa igualdade
+em futuros intervalos, retornando estado inconclusivo se
+faltar um contador opcional e recusando taxas em caso de
+reinício/wrap. Mantém `integridade_do_logging_comprovada=false`.
+
+### Próximo teste distinto — saúde do receptor flow, sem restart
+
+Executar exclusivamente consultas no servidor flow:
+```bash
+systemctl is-active rsyslog
+sudo ss -lntp '( sport = :5514 )'
+sudo systemctl --no-pager --full status rsyslog
+df -hT /var/log/orbymon/a10
+sudo du -sh /var/log/orbymon/a10
+sudo stat -c '%n %s bytes alterado=%y' /var/log/orbymon/a10/a10-current.ndjson
+sudo systemctl status orbymon-a10-logrotate.timer --no-pager
+```
+Esses comandos não revelam mapeamentos NAT, não alteram o
+A10 e não reiniciam o rsyslog. O diretório pode conter arquivos
+sensíveis: **não compartilhar conteúdo de NDJSON**.
