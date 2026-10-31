@@ -37,6 +37,11 @@ class MarkerBreakdownTests(unittest.TestCase):
         self.assertEqual(sum(value for key, value in result.items()
                              if key.startswith("detalhe_outro_")), 6)
 
+    def test_classifies_icmp_protocol_suffix(self):
+        packet = b"LSN:PortAllocated:ICMP [synthetic]"
+        result = inspect_candidate_stream(HEADER + packet + HEADER + ALLOCATED)
+        self.assertEqual(result["detalhe_outro_lsn_icmp"], 1)
+
     def test_unknown_marker_never_leaks_user_supplied_string(self):
         private = b"LSN:PrivateSubscriberSecret99999 [sensitive]"
         result = inspect_candidate_stream(HEADER + private + HEADER + ALLOCATED)
