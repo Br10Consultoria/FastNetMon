@@ -199,3 +199,64 @@ As taxas sao estimadas de NetFlow amostrado: picos de PPS,
 Mbps e origens podem vir de minutos ou destinos diferentes.
 O objetivo imediato e observar cobertura e ordem de grandeza,
 **sem alterar automaticamente os limiares atuais**.
+
+
+### Baseline real: 60/60 minutos, mas nenhuma linha para destinos protegidos
+
+Em 31/10/2026, o operador executou o
+`sql/ddos_baseline_readonly.sql` no `flow`:
+
+```text
+pares_60min=2103
+minutos_com_dados=60
+ultimo_bucket_consolidado_utc=2026-10-31 21:00:00
+pacotes_estimados_60min=8613888
+```
+
+As consultas seguintes (picos por destino público protegido
+e por destino DNS/NTP, UDP/53 e 123) **não retornaram linhas**.
+Isso mostra que **nenhum destino** na hora analisada
+correspondia aos prefixos configurados
+`45.238.170.0/23` e `187.87.201.0/24`
+na representação `dst_ip` do rollup Huawei.
+
+**Consequencia:** o detector direcionado a esses prefixos pode
+estar cego ao tráfego relevante. Zero alertas **nao comprova**
+ausência de DDoS. Antes de ajustar limiares, conferir se
+os prefixos aparecem em `src_ip`, qual ifIndex/direcao e
+quais protocolos chegam. Nao inverter src/dst automaticamente,
+pois isso pode disparar falsos alertas em tráfego de saida.
+
+### Diagnostico de sentido e interfaces (sem IPs individuais)
+
+Arquivo em PR #33: `sql/ddos_direction_audit_readonly.sql`.
+Ele usa tres consultas **SELECT** no mesmo intervalo de
+60 minutos finalizado 5 minutos antes da execucao:
+1. Classifica se as redes protegidas aparecem como origem,
+   destino, ambas as pontas ou nenhuma.
+2. Quando ha prefixo protegido, aponta protocolos,
+   ifIndex de entrada/saida e `netflow_direction` bruta.
+3. Lista protocolos, interfaces e direcoes de maior
+   movimento independentemente das redes protegidas.
+
+Os enderecos `src_ip`/`dst_ip` sao consultados somente
+para testes de pertencimento ao prefixo; os resultados
+**nao projetam enderecos de clientes**. As taxas sao
+medias na janela observada, nao PPS exato do Huawei.
+
+Execucao isolada no `flow`, sem atualizar checkout produtivo:
+
+```bash
+git -C /opt/orbymon-a10-audit fetch origin \
+  fix/ddos-passive-reliability-20261031 &&
+git -C /opt/orbymon-a10-audit show \
+  FETCH_HEAD:sql/ddos_direction_audit_readonly.sql | mariadb orbymon
+```
+
+Se o `fetch` falhar, **nao** executar o `show` de
+`FETCH_HEAD` antigo. Com `set -o pipefail`, erros na
+consulta serao sinalizados. Com os tres resultados
+definir se o Huawei exporta somente saida, se os
+prefixos da configuracao estao errados ou se ha outra
+causa de ausencia do tráfego de entrada. Nao modificar
+NE8000 nem regras do detector ate confirmar a causa.
