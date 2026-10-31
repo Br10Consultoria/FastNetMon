@@ -268,6 +268,9 @@ def audit(path: Path, *, source_ip: str = "10.100.10.10", port: int = 5514,
                 "lacunas_tcp_inicio_bytes": local["lacunas_tcp_inicio_bytes"],
                 "lacunas_tcp_fim": local["lacunas_tcp_fim"],
             }
+            if local["lacunas_tcp"]:
+                from .a10_tcp_gap_edges import classify_gap_edges
+                detail["contexto_estrutural_das_lacunas"] = classify_gap_edges(spans)
             if len(gap_details) < 20:
                 gap_details.append(detail)
             else:
