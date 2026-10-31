@@ -452,3 +452,69 @@ sudo systemctl status orbymon-a10-logrotate.timer --no-pager
 Esses comandos não revelam mapeamentos NAT, não alteram o
 A10 e não reiniciam o rsyslog. O diretório pode conter arquivos
 sensíveis: **não compartilhar conteúdo de NDJSON**.
+
+
+## 31/10/2026, 16:18 BRT — estado do receptor flow
+
+Leitura somente de metadados fornecida pelo operador:
+
+| Verificação | Resultado |
+|---|---|
+| `systemctl is-active rsyslog` | `active` |
+| `ss -lntp '( sport = :5514 )'` | `0.0.0.0:5514 LISTEN`, `rsyslogd`, Recv-Q=0 |
+| `df -hT /var/log/orbymon/a10` | ext4 raiz 96G; 16G usados; 76G livres; 18% |
+| `du -sh /var/log/orbymon/a10` | 5,7G |
+| Arquivo atual `a10-current.ndjson` | 456276719 bytes (~435,1 MiB) |
+| Última modificação do arquivo atual | 2026-10-31 16:18:21 -03 |
+| `systemctl is-active orbymon-a10-logrotate.timer` | `active` |
+
+**Interpretação:** o daemon do receptor e o socket TCP estavam ativos
+e o arquivo registrou modificação recente. Isso não prova chegada
+dos 257389 eventos contabilizados pelo A10 no intervalo anterior.
+
+O repositório instala o timer com `OnCalendar=hourly` e a regra
+`maxsize 128M` para logrotate. **Este valor é limiar avaliado
+somente quando logrotate executa**, não tamanho máximo contínuo
+do arquivo. O arquivo atual estar ~435 MiB não demonstra por si
+só falha do logrotate. A condição `active` do timer tampouco
+comprova que a última execução da unidade `.service` deu certo.
+
+A configuração gerada pelo instalador usa `rotate -1`
+(retém arquivos rodados), `compress`, `delaycompress`,
+sem remoção automática. Com disco finito, o acervo crescerá até
+precisar de capacidade adicional/arquivamento durável.
+
+Medição anterior de ~31,36 GiB/dia raw sugere que os 76 GiB
+livres, **sem compressão e se a taxa for constante**, equivalem
+a apenas ~2,42 dias. Não é previsão real de esgotamento;
+é uma estimativa provisória. É preciso considerar compressão,
+outros arquivos e taxa atual medida. Não excluir logs CGNAT.
+
+### Verificações seguintes sem restart nem risco à coleta
+
+No flow:
+
+```bash
+systemctl list-timers --all orbymon-a10-logrotate.timer
+systemctl show orbymon-a10-logrotate.service \
+  -p Result -p ExecMainStatus -p ExecMainStartTimestamp -p ExecMainExitTimestamp
+journalctl -u orbymon-a10-logrotate.service --since today --no-pager -n 30
+sudo sed -n '1,60p' /etc/logrotate.d/orbymon-a10
+sudo env PYTHONPATH=/opt/orbymon-a10-audit/src \
+  python3 -m fmn_filters.a10_storage_inventory
+sudo env PYTHONPATH=/opt/orbymon/src \
+  python3 -m fmn_filters.a10_syslog_capacity --seconds 15
+```
+
+`a10_storage_inventory` reporta apenas quantidades/tamanhos de
+arquivos ativos/rodados/comprimidos e espaço disponível; não lê
+payload, IPs ou portas dos assinantes. Não verifica execuções
+systemd. `a10_syslog_capacity` mede crescimento durante 15s,
+mas descarta o resultado se o arquivo for rotacionado no período;
+é taxa raw sem compressão.
+
+Não alterar periodicidade/limites da rotação nem reiniciar rsyslog
+até conferir a execução real e disponibilidade de armazenamento.
+Se o disco se aproximar de seu limite, priorizar adicionar
+armazenamento ou arquivamento com retenção verificada; não apagar
+dados CGNAT por automação improvisada.
