@@ -778,3 +778,58 @@ Fontes oficiais:
 - https://www.zabbix.com/documentation/7.4/pt/manual/installation/install_from_packages
 - https://www.zabbix.com/documentation/7.4/pt/manpages/zabbix_sender
 - https://www.zabbix.com/documentation/7.4/pt/manual/config/items/itemtypes/trapper
+
+
+### Falha real apt: pacote zabbix-sender nao encontrado no Ubuntu 24.04.5
+
+Em 31/10/2026, o flow informou:
+```text
+PRETTY_NAME="Ubuntu 24.04.5 LTS"
+apt-cache policy zabbix-sender: N: Nao foi possivel encontrar o pacote
+apt-get install zabbix-sender: E: Nao foi possivel encontrar o pacote
+zabbix_sender -V: Command not found (sugere instalar zabbix-agent)
+```
+
+Isso indica ausencia do `zabbix-sender` nas fontes APT **atuais**
+do flow; nao indica defeito do projeto OrbyMon nem significa que
+`zabbix-agent` seja obrigatorio.
+
+O fabricante publica pacotes Zabbix 7.4 **separados** para Ubuntu
+24.04 (repositório oficial assinado), inclusive `zabbix-sender`.
+A documentacao oficial 7.4 fornece exatamente o pacote de
+configuracao do repositorio para a distribuicao Noble:
+
+```bash
+cd /root
+wget -O zabbix-release-7.4-ubuntu24.04.deb \
+ 'https://repo.zabbix.com/zabbix/7.4/release/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest+ubuntu24.04_all.deb'
+
+dpkg -i zabbix-release-7.4-ubuntu24.04.deb
+apt-get update
+apt-cache policy zabbix-sender
+apt-get -s install --no-install-recommends zabbix-sender
+```
+
+**Antes da instalacao real:** conferir se a simulacao instala
+somente `zabbix-sender` e dependencias adequadas, sem
+remocao, upgrade de servicos de log ou conflito com pacotes
+preexistentes. Nao executar `apt upgrade`.
+
+Apos simulacao segura:
+```bash
+apt-get install --no-install-recommends zabbix-sender
+zabbix_sender -V
+systemctl is-active rsyslog
+ss -lntp '( sport = :5514 )'
+```
+
+Sem instalação de agent/agent2, sem cron ou automação.
+Registrar o endereço e nome técnico do host Zabbix e validar
+template/allowed hosts antes de qualquer envio real.
+
+Referencia oficial:
+https://www.zabbix.com/documentation/7.4/pt/manual/installation/upgrade/packages/debian_ubuntu
+
+Repositorio oficial de pacotes, com `zabbix-sender` para
+ubuntu24.04:
+https://repo.zabbix.com/zabbix/7.4/stable/ubuntu/pool/main/z/zabbix/
