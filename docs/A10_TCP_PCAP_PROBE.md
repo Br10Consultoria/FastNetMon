@@ -92,3 +92,53 @@ de candidatos aceitos não é taxa de entrega comprovada.
 Depois deste teste, a evolução planejada é um coletor experimental
 com framing verificável, controle de continuidade por conexão e
 fila durável, sem interromper a porta TCP 5514 atual.
+
+
+## 31/10/2026: segunda execução com dados reais
+
+A saída do flow, utilizando o PCAP de 20 segundos e a flag
+`--audit-nat-candidates`, foi:
+
+- `candidate_cabecalhos_detectados=69196`;
+- `candidate_eventos_delimitados_por_outro_cabecalho=69190`;
+- `candidate_nat_sintaticamente_candidato=65277`;
+- `candidate_outro_tipo_ou_sem_nat_tcp_udp=3913`;
+- `candidate_ultimo_evento_sem_fronteira_comprovada=6`;
+- `lacunas_tcp=1`, `captura_tcp_completa_no_intervalo_observado=false`.
+
+O percentual `65277/69190 = 94,34%` representa exclusivamente a
+proporção de candidatos NAT sintaticamente reconhecidos **entre os
+eventos delimitados heuristicamente por outro cabeçalho**. Os 3913
+restantes podem ser ICMP, controle ou outros formatos; **não são
+3913 erros nem 3913 perdas comprovadas**. Os seis últimos eventos
+de trechos não têm cabeçalho seguinte e não foram classificados.
+
+### Terceira iteração: detalhamento sem conteúdo sensível
+
+Foi incluída decomposição automática, dentro do mesmo modo
+`--audit-nat-candidates`, utilizando somente nomes fixos. Atualize
+o worktree de testes (`/opt/orbymon-a10-audit`) e rode novamente
+o comando acima sobre **o mesmo PCAP**, sem reconfigurar serviços.
+
+Novos grupos de contadores:
+- `candidate_detalhe_nat_allocated_tcp`,
+  `candidate_detalhe_nat_freed_tcp`,
+  `candidate_detalhe_nat_allocated_udp` e
+  `candidate_detalhe_nat_freed_udp`: tipo de candidato NAT validado
+  estruturalmente.
+- `candidate_detalhe_outro_lsn_icmp`,
+  `candidate_detalhe_outro_lsn_gre`,
+  `candidate_detalhe_outro_lsn_esp`,
+  `candidate_detalhe_outro_lsn_lote_portas`,
+  `candidate_detalhe_outro_lsn_sessao`,
+  `candidate_detalhe_outro_lsn_outro_marcador` e
+  `candidate_detalhe_outro_sem_marcador_lsn`: grupos
+  predefinidos de eventos não reconhecidos como NAT TCP/UDP.
+
+As somas dos quatro detalhes NAT e dos sete detalhes `outro_`
+devem bater com seus respectivos totais quando todos os formatos
+seguirem as categorias testadas. Marcadores desconhecidos não são
+exibidos como texto e não se gravam traduções.
+
+**Continua read-only:** não prova ausência de lacunas no stream,
+não valida duração de alocações e não libera correlação com PPPoE.
