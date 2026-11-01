@@ -9,9 +9,9 @@ User=orbymon
 Group=orbymon
 WorkingDirectory=/opt/orbymon
 EnvironmentFile=/etc/orbymon/pipeline.env
-EnvironmentFile=/etc/orbymon/telegram.env
 Environment=PYTHONPATH=/opt/orbymon/src
-ExecStart=/opt/orbymon/.venv/bin/python -m fmn_filters.notify_telegram
+# telegram.env e editado pelo painel: lido como dados (--env-file), nunca como ambiente do processo
+ExecStart=/opt/orbymon/.venv/bin/python -m fmn_filters.notify_telegram --env-file /etc/orbymon/telegram.env
 TimeoutStartSec=120
 NoNewPrivileges=true
 PrivateTmp=true

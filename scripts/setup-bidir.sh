@@ -42,8 +42,9 @@ done
 
 echo "=== Configuracao ==="
 if [[ -e /etc/orbymon/bidir.json && $REPLACE_CONFIG -eq 1 ]]; then
-  cp -p /etc/orbymon/bidir.json "/etc/orbymon/bidir.json.bak.$(date +%Y%m%d%H%M%S)"
-  install -o root -g orbymon -m 0640 "$BASE/rules/bidir.example.json" /etc/orbymon/bidir.json
+  CFG_REAL=$(readlink -f /etc/orbymon/bidir.json)      # pode ser link para o diretorio do painel
+  cp -p "$CFG_REAL" "/etc/orbymon/bidir.json.bak.$(date +%Y%m%d%H%M%S)"
+  install -o "$(stat -c %u "$CFG_REAL")" -g orbymon -m 0640 "$BASE/rules/bidir.example.json" "$CFG_REAL"
   echo "bidir.json substituido pelo exemplo atual (backup .bak criado)"
 elif [[ ! -e /etc/orbymon/bidir.json ]]; then
   install -o root -g orbymon -m 0640 "$BASE/rules/bidir.example.json" /etc/orbymon/bidir.json
@@ -70,13 +71,20 @@ for unit in orbymon-a10-nat.service orbymon-flow-rollup-huawei.service \
 done
 chmod 0755 "$BASE/scripts/orbymon-retention.sh"
 if [[ ! -e /etc/orbymon/retention.env ]]; then
-  install -o root -g root -m 0640 /dev/stdin /etc/orbymon/retention.env <<'ENV'
-# Dias de retencao (apaga depois disso). Para enviar a nuvem antes de apagar, defina
-# ORBYMON_ARCHIVE_CMD, ex.: ORBYMON_ARCHIVE_CMD="rclone copy {} remoto:orbymon/"
-ORBYMON_LOG_RETENTION_DAYS=15
-ORBYMON_FLOW_RETENTION_DAYS=15
-ORBYMON_ARCHIVE_CMD=
+  install -o root -g orbymon -m 0640 /dev/stdin /etc/orbymon/retention.env <<'ENV'
+# Dias de retencao (apaga depois disso). Envio a nuvem: /etc/orbymon/retention-archive.conf
+ORBYMON_LOG_RETENTION_DAYS='15'
+ORBYMON_FLOW_RETENTION_DAYS='15'
 ENV
+fi
+if [[ ! -e /etc/orbymon/retention-archive.conf ]]; then
+  ARCH_OLD=$(sed -n 's/^ORBYMON_ARCHIVE_CMD=//p' /etc/orbymon/retention.env | tail -n 1)
+  install -o root -g root -m 0600 /dev/stdin /etc/orbymon/retention-archive.conf <<ENV
+# Somente root. Envia o arquivo a nuvem antes de apagar ({} = caminho). Vazio = apenas apaga.
+# Ex.: ORBYMON_ARCHIVE_CMD=rclone copy {} remoto:orbymon/
+ORBYMON_ARCHIVE_CMD=$ARCH_OLD
+ENV
+  sed -i '/^ORBYMON_ARCHIVE_CMD=/d' "$(readlink -f /etc/orbymon/retention.env)"
 fi
 systemctl daemon-reload
 

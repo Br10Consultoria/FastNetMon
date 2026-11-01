@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% block title %}Código 2FA{% endblock %}
+{% block body %}
+<section class="card narrow">
+  <h1>Verificação em duas etapas</h1>
+  <p>Digite o código de 6 dígitos do aplicativo autenticador.</p>
+  <form method="post" autocomplete="off">
+    {% include "_csrf.html" %}
+    <label>Código <input name="code" inputmode="numeric" pattern="[0-9 ]{6,7}" maxlength="7" required autofocus autocomplete="one-time-code"></label>
+    <button>Entrar</button>
+  </form>
+</section>
+{% endblock %}

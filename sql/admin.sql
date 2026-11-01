@@ -1,0 +1,31 @@
+-- Painel web de administracao: usuarios com 2FA, tentativas de login e auditoria.
+SET NAMES utf8mb4;
+CREATE TABLE IF NOT EXISTS orby_admin_users (
+ id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+ username VARCHAR(40) CHARACTER SET ascii NOT NULL UNIQUE,
+ pw_hash VARCHAR(200) CHARACTER SET ascii NOT NULL,
+ totp_secret VARCHAR(64) CHARACTER SET ascii NULL,
+ totp_enabled TINYINT(1) NOT NULL DEFAULT 0,
+ totp_last_step BIGINT NOT NULL DEFAULT -1,
+ must_change_password TINYINT(1) NOT NULL DEFAULT 0,
+ disabled TINYINT(1) NOT NULL DEFAULT 0,
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ last_login DATETIME NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS orby_admin_login_fail (
+ id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+ ts DATETIME NOT NULL,
+ ip VARCHAR(45) CHARACTER SET ascii NOT NULL,
+ username VARCHAR(40) CHARACTER SET ascii NOT NULL,
+ INDEX ix_fail_ip_ts (ip, ts),
+ INDEX ix_fail_user_ts (username, ts)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS orby_admin_audit (
+ id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+ ts DATETIME NOT NULL,
+ username VARCHAR(40) NOT NULL,
+ ip VARCHAR(45) NOT NULL,
+ action VARCHAR(60) NOT NULL,
+ detail TEXT NOT NULL,
+ INDEX ix_audit_ts (ts)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -14,6 +14,7 @@ license = {text = "MIT"}
 geo = ["geoip2>=4.8,<6"]
 mysql = ["PyMySQL>=1.1,<2"]
 full = ["geoip2>=4.8,<6", "PyMySQL>=1.1,<2"]
+admin = ["flask==3.1.3", "gunicorn==23.0.0", "segno==1.6.6", "PyMySQL>=1.1,<2"]
 
 [project.scripts]
 fmn-filters = "fmn_filters.__main__:main"

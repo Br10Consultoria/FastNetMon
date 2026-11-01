@@ -64,7 +64,9 @@ class DeployTests(unittest.TestCase):
 
     def test_telegram_service_reads_secret_file_and_token_is_never_echoed(self):
         unit = (ROOT / "deploy/systemd/orbymon-telegram.service").read_text()
-        self.assertIn("EnvironmentFile=/etc/orbymon/telegram.env", unit)
+        # editavel pelo painel: lido como dados, nunca como ambiente (evita LD_PRELOAD e afins)
+        self.assertIn("--env-file /etc/orbymon/telegram.env", unit)
+        self.assertNotIn("EnvironmentFile=/etc/orbymon/telegram.env", unit)
         self.assertIn("User=orbymon", unit)
         timer = (ROOT / "deploy/systemd/orbymon-telegram.timer").read_text()
         self.assertIn("Unit=orbymon-telegram.service", timer)
@@ -72,6 +74,25 @@ class DeployTests(unittest.TestCase):
         self.assertIn("read -rsp", setup)                 # token digitado sem eco
         self.assertIn("-m 0640", setup)                   # arquivo do segredo restrito
         self.assertNotIn("echo \"$TOKEN", setup)
+        self.assertNotRegex(setup, r'(?m)^[^#]*(source|\.)\s+"?\$ENV_FILE')   # nunca executado
+
+    def test_panel_writable_files_are_never_environment_of_root(self):
+        unit = (ROOT / "deploy/systemd/orbymon-retention.service").read_text()
+        self.assertNotIn("EnvironmentFile", unit)
+        script = (ROOT / "scripts/orbymon-retention.sh").read_text()
+        self.assertIn("retention-archive.conf", script)
+        self.assertNotIn("${ORBYMON_ARCHIVE_CMD", script)
+
+    def test_admin_service_least_privilege(self):
+        unit = (ROOT / "deploy/systemd/orbymon-admin.service").read_text()
+        self.assertIn("User=orbymon-admin", unit)
+        self.assertIn("ReadWritePaths=/etc/orbymon/managed /var/lib/orbymon/admin", unit)
+        self.assertIn("--certfile", unit)
+        self.assertIn("CapabilityBoundingSet=\n", unit)
+        setup = (ROOT / "scripts/setup-admin.sh").read_text()
+        self.assertNotIn("GRANT ALL", setup)
+        self.assertNotIn("usermod", setup)                # nunca entra no grupo orbymon (pipeline.env)
+        self.assertIn("GRANT INSERT ON orbymon.orby_admin_audit", setup)
 
 
 if __name__ == "__main__":

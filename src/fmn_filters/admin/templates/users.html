@@ -1,0 +1,28 @@
+{% extends "base.html" %}{% block title %}Usuários{% endblock %}
+{% block body %}
+<h1>Usuários</h1>
+<section class="card">
+  <div class="scroll"><table>
+    <tr><th>Usuário</th><th>2FA</th><th>Situação</th><th>Último acesso (UTC)</th><th></th></tr>
+    {% for u in users %}
+    <tr><td>{{ u.username }}{% if u.id == g.user.id %} <small>(você)</small>{% endif %}</td>
+      <td>{{ 'ativo' if u.totp_enabled else 'pendente' }}</td>
+      <td>{{ 'desativado' if u.disabled else ('troca de senha pendente' if u.must_change_password else 'ativo') }}</td>
+      <td>{{ u.last_login or '—' }}</td>
+      <td class="actions">{% if u.id != g.user.id %}
+        {% for action, label in (('desativar', 'Reativar' if u.disabled else 'Desativar'), ('reset2fa', 'Refazer 2FA'), ('excluir', 'Excluir')) %}
+        <form method="post">{% include "_csrf.html" %}<input type="hidden" name="uid" value="{{ u.id }}"><input type="hidden" name="action" value="{{ action }}"><button class="secondary small">{{ label }}</button></form>
+        {% endfor %}{% endif %}</td></tr>
+    {% endfor %}
+  </table></div>
+</section>
+<form method="post" class="card inline" autocomplete="off">
+  {% include "_csrf.html" %}
+  <input type="hidden" name="action" value="criar">
+  <h2>Novo usuário</h2>
+  <label>Usuário <input name="username" required pattern="[a-z0-9_.\-]{3,40}" autocapitalize="none"></label>
+  <label>Senha provisória (mín. 12) <input name="password" type="password" required minlength="12" autocomplete="new-password"></label>
+  <button>Criar</button>
+  <p class="muted">No primeiro acesso o usuário troca a senha e ativa o 2FA.</p>
+</form>
+{% endblock %}

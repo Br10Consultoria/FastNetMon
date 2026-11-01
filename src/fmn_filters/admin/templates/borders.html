@@ -1,0 +1,27 @@
+{% extends "base.html" %}{% block title %}Bordas{% endblock %}
+{% block body %}
+<h1>Interfaces de borda</h1>
+<p class="muted">Marque as interfaces que ligam a rede à internet (trânsito, IX/PTT, CDN). O tráfego é medido apenas nelas, nos dois sentidos, para não contar o mesmo pacote duas vezes.</p>
+<form method="post" class="card">
+  {% include "_csrf.html" %}
+  <input type="hidden" name="action" value="bordas">
+  <div class="scroll"><table>
+    <tr><th>Borda</th><th>ifIndex</th><th>Nome</th><th class="num">Volume na última hora</th></tr>
+    {% for idx in rows %}
+    <tr><td><input type="checkbox" name="edge" value="{{ idx }}" {{ 'checked' if idx in edges }}></td>
+      <td>{{ idx }}</td><td>{{ names.get(idx, '—') }}</td>
+      <td class="num">{% set b = seen.get(idx, 0) %}{% if b >= 1e9 %}{{ '%.1f'|format(b/1e9) }} GB{% elif b >= 1e6 %}{{ '%.1f'|format(b/1e6) }} MB{% elif b > 0 %}{{ '%.0f'|format(b/1e3) }} kB{% else %}—{% endif %}</td></tr>
+    {% endfor %}
+  </table></div>
+  <label>Outros ifIndex de borda (separados por vírgula) <input name="extra_edges" placeholder="ex.: 412, 413"></label>
+  <button>Salvar bordas</button>
+</form>
+<form method="post" class="card inline">
+  {% include "_csrf.html" %}
+  <input type="hidden" name="action" value="nome">
+  <h2>Nomear interface</h2>
+  <label>ifIndex <input name="if_index" type="number" min="1" required></label>
+  <label>Nome <input name="if_name" maxlength="128" required placeholder="Vlanif2511 (PTT)"></label>
+  <button>Salvar nome</button>
+</form>
+{% endblock %}

@@ -62,6 +62,8 @@ O instalador configura HTTPS autofirmado na porta 3000, datasource somente leitu
 
 **Fase 4 bidirecional (ataque recebido e originado, CGNAT-aware):** [receptor NAT do A10, rollup com IP privado do assinante e detector nos dois sentidos](docs/BIDIRECTIONAL.md). Instalar com `sudo bash scripts/setup-bidir.sh` apos o perfil CGNAT. Substitui a F3 para deteccao; mantenha a F3 apenas durante a validacao.
 
+**Painel web de administração:** página própria em HTTPS (porta 8443, separada do Grafana) com usuário, senha e 2FA para configurar provedor, ASNs, blocos, pools CGNAT, bordas, regras, Telegram e retenção: `sudo bash scripts/setup-admin.sh`. Veja [docs/ADMIN.md](docs/ADMIN.md).
+
 **Alertas no Telegram (F4):** início, lembrete e encerramento de cada ataque, com assinante CGNAT e link para o painel: `sudo bash scripts/setup-telegram.sh`. Veja [docs/BIDIRECTIONAL.md](docs/BIDIRECTIONAL.md).
 
 **A10 CGNAT Syslog:** [recepcao TCP/5514 exclusiva, spool bruto e inspecao sem correlacao prematura](docs/A10_SYSLOG.md). Instalar com sudo bash scripts/setup-a10-syslog.sh --a10-source-ip IP_REAL_DO_A10.

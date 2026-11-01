@@ -428,7 +428,42 @@ def lookup_many(path: str, keys, timeout=10.0, chunk=20000):
     return out
 
 
-async def serve(service: NatService, host, port, socket_path, *, use_db=True):
+class ConfigWatcher:
+    """Recarrega escopos e origens aceitas quando a configuracao muda (painel web, sem reinicio)."""
+
+    def __init__(self, paths, loader):
+        self.paths = [Path(p) for p in paths]
+        self.loader = loader
+        self.stamp = self._stamp()
+
+    def _stamp(self):
+        out = []
+        for p in self.paths:
+            try:
+                st = p.stat()
+                out.append((st.st_mtime_ns, st.st_size))
+            except OSError:
+                out.append(None)
+        return tuple(out)
+
+    def check(self, service):
+        stamp = self._stamp()
+        if stamp == self.stamp:
+            return False
+        self.stamp = stamp
+        try:
+            scopes, allowed = self.loader()
+        except Exception as exc:                 # configuracao invalida: mantem a anterior
+            print("AVISO configuracao nova invalida, mantida a anterior: %s" % exc, file=sys.stderr, flush=True)
+            return False
+        service.scopes = scopes
+        if allowed:
+            service.allowed = frozenset(allowed)
+        print("configuracao recarregada (origens aceitas: %s)" % ",".join(sorted(service.allowed)), flush=True)
+        return True
+
+
+async def serve(service: NatService, host, port, socket_path, *, use_db=True, watcher=None):
     tcp = await asyncio.start_server(lambda r, w: handle_stream(service, r, w), host, port)
     Path(socket_path).parent.mkdir(parents=True, exist_ok=True)
     if os.path.exists(socket_path):
@@ -448,6 +483,8 @@ async def serve(service: NatService, host, port, socket_path, *, use_db=True):
             service.log.flush()
             if now - last >= 60:
                 last = now
+                if watcher is not None:
+                    watcher.check(service)
                 service.table.prune(now)
                 rows = service.drain_minutes(now)
                 if rows and use_db:
@@ -552,7 +589,7 @@ def main(argv=None):
                                                  max_lines=args.replay_max_lines),
                              ensure_ascii=False, indent=2))
             return 0
-        service = NatService(scopes, allowed_sources=args.allow or ["10.100.10.10"],
+        service = NatService(scopes, allowed_sources=cfg["a10_sources"] or args.allow or ["10.100.10.10"],
                              time_source=args.time_source, log_dir=args.log_dir,
                              retention_seconds=args.retention_seconds)
         now = time.time()
@@ -562,7 +599,12 @@ def main(argv=None):
             restored += replay_log(Path(args.log_dir) / name, service.table,
                                    now - args.retention_seconds)
         print("estado restaurado do log: %d eventos" % restored, flush=True)
-        asyncio.run(serve(service, args.listen, args.port, cfg["nat_socket"], use_db=not args.no_db))
+        def reload():
+            new_cfg = read_config(args.config)
+            return build_scopes(new_cfg), new_cfg["a10_sources"]
+        watcher = ConfigWatcher([args.config, cfg["cgnat_profile_path"]], reload)
+        asyncio.run(serve(service, args.listen, args.port, cfg["nat_socket"], use_db=not args.no_db,
+                          watcher=watcher))
         return 0
     except KeyboardInterrupt:
         return 0

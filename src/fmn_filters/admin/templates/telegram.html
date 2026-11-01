@@ -1,0 +1,25 @@
+{% extends "base.html" %}{% block title %}Telegram{% endblock %}
+{% block body %}
+<h1>Alertas no Telegram</h1>
+<form method="post" class="card" autocomplete="off">
+  {% include "_csrf.html" %}
+  <label>Token do bot {% if masked %}<small>atual: <code>{{ masked }}</code> — deixe vazio para manter</small>{% endif %}
+    <input name="token" type="password" autocomplete="new-password" placeholder="{{ 'manter o atual' if masked else '123456789:AA...' }}"></label>
+  <label>Chat IDs (grupos começam com -100) <input name="chats" value="{{ t.get('TELEGRAM_CHAT_IDS', '') }}" placeholder="-1001234567890"></label>
+  <div class="grid">
+    <label>Severidade mínima <select name="min_severity">{% for s, l in (('warning','aviso'),('high','alta'),('critical','crítica')) %}<option value="{{ s }}" {{ 'selected' if t.get('ORBYMON_NOTIFY_MIN_SEVERITY','high')==s }}>{{ l }}</option>{% endfor %}</select></label>
+    <label>Lembrete enquanto durar (min) <input name="reminder" type="number" min="5" max="1440" value="{{ t.get('ORBYMON_NOTIFY_REMINDER_MIN', 30) }}"></label>
+    <label>Encerrar após (min sem eventos) <input name="close" type="number" min="5" max="1440" value="{{ t.get('ORBYMON_NOTIFY_CLOSE_AFTER_MIN', 20) }}"></label>
+  </div>
+  <div class="grid">
+    <label>URL do Grafana (links nos alertas) <input name="grafana_url" value="{{ t.get('ORBYMON_GRAFANA_URL', '') }}" placeholder="https://orbymon.exemplo:3000"></label>
+    <label>Nome do site nos alertas <input name="site" value="{{ t.get('ORBYMON_SITE_NAME', '') }}" maxlength="60"></label>
+  </div>
+  <button>Salvar</button>
+</form>
+<section class="card inline">
+  <form method="post">{% include "_csrf.html" %}<input type="hidden" name="action" value="chats"><button class="secondary">Descobrir chats</button></form>
+  <form method="post">{% include "_csrf.html" %}<input type="hidden" name="action" value="teste"><button class="secondary">Enviar mensagem de teste</button></form>
+  <p class="muted">Para descobrir o chat: adicione o bot ao grupo, escreva qualquer mensagem no grupo e clique em “Descobrir chats”.</p>
+</section>
+{% endblock %}

@@ -3,7 +3,6 @@ Description=OrbyMon - retencao de logs NAT, spool A10 e arquivos nfcapd
 
 [Service]
 Type=oneshot
-EnvironmentFile=-/etc/orbymon/retention.env
 ExecStart=/opt/orbymon/scripts/orbymon-retention.sh
 Nice=10
 IOSchedulingClass=idle

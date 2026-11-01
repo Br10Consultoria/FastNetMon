@@ -92,8 +92,9 @@ O A10 reconecta sozinho; há alguns segundos sem log durante a troca. **NTP no A
 | Pares IP da Fase 2 `orby_ip_pairs_minute` | MariaDB | 72 h (`--retention-hours`) |
 | Eventos de ataque `orby_attack_events` | MariaDB | sem limite (pequeno) |
 
-Para enviar à nuvem antes de apagar, defina em `/etc/orbymon/retention.env`
-`ORBYMON_ARCHIVE_CMD="rclone copy {} remoto:orbymon/"`; se o envio falhar, o arquivo é mantido.
+Os dias ficam em `/etc/orbymon/retention.env` (editável no [painel](ADMIN.md)). Para enviar à nuvem antes
+de apagar, defina em `/etc/orbymon/retention-archive.conf` (somente root, modo 0600)
+`ORBYMON_ARCHIVE_CMD=rclone copy {} remoto:orbymon/`; se o envio falhar, o arquivo é mantido.
 Com o NetStream completo (~7 Gbps, 1:2048) o rollup recebe dezenas de milhões de linhas por dia: não aumente
 `retention_days` sem medir o disco.
 

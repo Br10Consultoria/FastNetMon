@@ -9,7 +9,8 @@ set -euo pipefail
 [[ $EUID -eq 0 ]] || { echo "Execute com sudo" >&2; exit 1; }
 BASE="$(cd "$(dirname "$0")/.." && pwd)"
 PY="$BASE/.venv/bin/python"
-ENV_FILE=/etc/orbymon/telegram.env
+ENV_FILE=$(readlink -f /etc/orbymon/telegram.env 2>/dev/null || echo /etc/orbymon/telegram.env)
+ENV_OWNER=$(stat -c %u "$ENV_FILE" 2>/dev/null || echo 0)   # preserva o dono (painel web)
 CHAT="" SEV="high" SITE="" GRAFANA=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -25,7 +26,7 @@ done
 
 TOKEN=""
 if [[ -s "$ENV_FILE" ]]; then
-  TOKEN=$(sed -n 's/^TELEGRAM_BOT_TOKEN=//p' "$ENV_FILE")
+  TOKEN=$(sed -n 's/^TELEGRAM_BOT_TOKEN=//p' "$ENV_FILE" | tail -n 1 | sed -e "s/^'\(.*\)'\$/\1/" -e 's/^"\(.*\)"$/\1/')
 fi
 if [[ -z "$TOKEN" ]]; then
   read -rsp "Token do bot (do @BotFather; nao aparece na tela): " TOKEN; echo
@@ -41,25 +42,26 @@ if [[ -z "$CHAT" ]]; then
   echo
   echo "Escolha o chat_id e rode: sudo bash $0 --chat <chat_id>   (grupos comecam com -100)"
   # guarda o token para a proxima execucao nao pedir de novo
-  install -o root -g orbymon -m 0640 /dev/stdin "$ENV_FILE" <<ENV
-TELEGRAM_BOT_TOKEN=$TOKEN
-TELEGRAM_CHAT_IDS=
+  install -o "$ENV_OWNER" -g orbymon -m 0640 /dev/stdin "$ENV_FILE" <<ENV
+TELEGRAM_BOT_TOKEN='$TOKEN'
+TELEGRAM_CHAT_IDS=''
 ENV
   exit 0
 fi
 
 FIRST=0
-grep -q '^TELEGRAM_CHAT_IDS=.' "$ENV_FILE" 2>/dev/null || FIRST=1
-install -o root -g orbymon -m 0640 /dev/stdin "$ENV_FILE" <<ENV
-# Alertas OrbyMon no Telegram (arquivo com segredo: nao compartilhe)
-TELEGRAM_BOT_TOKEN=$TOKEN
-TELEGRAM_CHAT_IDS=$CHAT
-ORBYMON_NOTIFY_MIN_SEVERITY=$SEV
-ORBYMON_NOTIFY_REMINDER_MIN=30
-ORBYMON_NOTIFY_CLOSE_AFTER_MIN=20
-ORBYMON_GRAFANA_URL=$GRAFANA
-ORBYMON_TZ=America/Bahia
-ORBYMON_SITE_NAME=$SITE
+grep -Eq "^TELEGRAM_CHAT_IDS='?-?[0-9]" "$ENV_FILE" 2>/dev/null || FIRST=1
+[[ "$GRAFANA$SITE" != *"'"* && "$GRAFANA$SITE" != *\\* ]] || { echo "--site/--grafana-url sem aspas simples ou barra invertida" >&2; exit 1; }
+install -o "$ENV_OWNER" -g orbymon -m 0640 /dev/stdin "$ENV_FILE" <<ENV
+# Alertas OrbyMon no Telegram (arquivo com segredo: nao compartilhe). Tambem editavel no painel web.
+TELEGRAM_BOT_TOKEN='$TOKEN'
+TELEGRAM_CHAT_IDS='$CHAT'
+ORBYMON_NOTIFY_MIN_SEVERITY='$SEV'
+ORBYMON_NOTIFY_REMINDER_MIN='30'
+ORBYMON_NOTIFY_CLOSE_AFTER_MIN='20'
+ORBYMON_GRAFANA_URL='$GRAFANA'
+ORBYMON_TZ='America/Bahia'
+ORBYMON_SITE_NAME='$SITE'
 ENV
 
 echo "=== Tabelas de notificacao ==="
@@ -70,8 +72,8 @@ if [[ $FIRST -eq 1 ]]; then
 fi
 
 echo "=== Mensagem de teste ==="
-set -a; source "$ENV_FILE"; set +a
-PYTHONPATH="$BASE/src" "$PY" -m fmn_filters.notify_telegram --test
+# o arquivo e lido como dados (nunca executado com source)
+PYTHONPATH="$BASE/src" "$PY" -m fmn_filters.notify_telegram --env-file "$ENV_FILE" --test
 
 install -m 0644 "$BASE/deploy/systemd/orbymon-telegram.service" /etc/systemd/system/
 install -m 0644 "$BASE/deploy/systemd/orbymon-telegram.timer" /etc/systemd/system/

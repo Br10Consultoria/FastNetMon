@@ -1,0 +1,8 @@
+{% extends "base.html" %}{% block title %}Auditoria{% endblock %}
+{% block body %}
+<h1>Auditoria</h1>
+<section class="card"><div class="scroll"><table>
+  <tr><th>Quando (UTC)</th><th>Usuário</th><th>IP</th><th>Ação</th><th>Detalhe</th></tr>
+  {% for r in rows %}<tr><td class="nowrap">{{ r[0] }}</td><td>{{ r[1] }}</td><td>{{ r[2] }}</td><td>{{ r[3] }}</td><td><code class="detail">{{ r[4] }}</code></td></tr>{% endfor %}
+</table></div></section>
+{% endblock %}

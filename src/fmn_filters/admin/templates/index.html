@@ -1,0 +1,40 @@
+{% extends "base.html" %}{% block title %}Status{% endblock %}
+{% block body %}
+<h1>Status</h1>
+<div class="grid">
+<section class="card">
+  <h2>Serviços</h2>
+  <table>
+  {% for unit, st in status.items() %}
+    <tr><td>{{ unit }}</td><td><span class="pill {{ 'ok' if st=='active' else ('idle' if st in ('inactive','unknown','desconhecido') else 'bad') }}">{{ st }}</span></td></tr>
+  {% endfor %}
+  </table>
+  <p class="muted">Timers aparecem como <i>active</i> quando agendados.</p>
+</section>
+<section class="card">
+  <h2>Dados</h2>
+  <table>
+    <tr><td>Último minuto (fase 2)</td><td>{{ health.ultimo_fluxo_fase2 or '—' }} UTC</td></tr>
+    <tr><td>Último minuto (F4 rollup)</td><td>{{ health.ultimo_rollup_f4 or '—' }} UTC</td></tr>
+    <tr><td>Última execução do detector</td><td>{{ health.ultimo_detector or '—' }} UTC</td></tr>
+    <tr><td>Último minuto do log NAT</td><td>{{ health.ultimo_nat or '—' }} UTC</td></tr>
+    <tr><td>Eventos nas últimas 24 h</td><td>{{ health.eventos_24h if health.eventos_24h is not none else '—' }}</td></tr>
+    <tr><td>Incidentes abertos</td><td>{{ health.incidentes_abertos if health.incidentes_abertos is not none else '—' }}</td></tr>
+    <tr><td>Disco /</td><td>{{ disk_pct }}% usado · {{ '%.1f'|format(disk_free) }} GB livres</td></tr>
+  </table>
+</section>
+</div>
+<section class="card">
+  <h2>Eventos recentes</h2>
+  {% if events %}
+  <div class="scroll"><table>
+    <tr><th>Hora (UTC)</th><th>Regra</th><th>Severidade</th><th>Sentido</th><th>IP</th><th>Assinante</th><th>pps</th><th>Mbps</th></tr>
+    {% for e in events %}
+    <tr><td>{{ e[0] }}</td><td>{{ e[1] }}</td><td><span class="pill sev-{{ e[2] }}">{{ e[2] }}</span></td>
+      <td>{{ 'entrada' if e[3]=='in' else 'saída' }}</td><td>{{ e[4] }}</td><td>{{ e[5] or '—' }}</td>
+      <td class="num">{{ '{:,.0f}'.format(e[6]).replace(',', '.') }}</td><td class="num">{{ '%.1f'|format(e[7]) }}</td></tr>
+    {% endfor %}
+  </table></div>
+  {% else %}<p class="muted">Nenhum evento registrado.</p>{% endif %}
+</section>
+{% endblock %}

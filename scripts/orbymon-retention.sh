@@ -4,14 +4,32 @@
 #  - apaga, apos N dias: logs NAT, spool antigo do rsyslog do A10 e arquivos nfcapd;
 #  - opcional: ORBYMON_ARCHIVE_CMD envia o arquivo para a nuvem ANTES de apagar
 #    (ex.: "rclone copy {} remoto:orbymon/"); se o envio falhar, o arquivo NAO e apagado.
-# Configuracao em /etc/orbymon/retention.env:
-#   ORBYMON_LOG_RETENTION_DAYS=15     (logs NAT e spool A10)
-#   ORBYMON_FLOW_RETENTION_DAYS=15    (arquivos nfcapd)
-#   ORBYMON_ARCHIVE_CMD=""            (vazio = nao envia; {} e trocado pelo caminho)
+# Configuracao (lida como dados; os arquivos nunca sao executados):
+#   /etc/orbymon/retention.env (editavel pelo painel web)
+#     ORBYMON_LOG_RETENTION_DAYS=15     (logs NAT e spool A10)
+#     ORBYMON_FLOW_RETENTION_DAYS=15    (arquivos nfcapd)
+#   /etc/orbymon/retention-archive.conf (somente root; nunca pelo painel, pois roda como root)
+#     ORBYMON_ARCHIVE_CMD=rclone copy {} remoto:orbymon/    (vazio = nao envia; {} = caminho)
 set -euo pipefail
-LOG_DAYS="${ORBYMON_LOG_RETENTION_DAYS:-15}"
-FLOW_DAYS="${ORBYMON_FLOW_RETENTION_DAYS:-15}"
-ARCHIVE="${ORBYMON_ARCHIVE_CMD:-}"
+RET_ENV="${ORBYMON_RETENTION_ENV:-/etc/orbymon/retention.env}"
+ARCHIVE_CONF="${ORBYMON_ARCHIVE_CONF:-/etc/orbymon/retention-archive.conf}"
+
+env_value() {   # env_value <arquivo> <CHAVE>: valor sem aspas, ou vazio
+  [[ -f "$1" ]] || return 0
+  sed -n "s/^$2=//p" "$1" | tail -n 1 | sed -e "s/^'\(.*\)'\$/\1/" -e 's/^"\(.*\)"$/\1/'
+}
+
+LOG_DAYS="$(env_value "$RET_ENV" ORBYMON_LOG_RETENTION_DAYS)"; LOG_DAYS="${LOG_DAYS:-15}"
+FLOW_DAYS="$(env_value "$RET_ENV" ORBYMON_FLOW_RETENTION_DAYS)"; FLOW_DAYS="${FLOW_DAYS:-15}"
+ARCHIVE=""
+if [[ -f "$ARCHIVE_CONF" && ! -L "$ARCHIVE_CONF" ]]; then
+  # o comando roda como root: so vale se o arquivo for do root e ninguem mais puder escrever
+  if [[ "$(stat -c '%u' "$ARCHIVE_CONF")" == 0 && $(( 0$(stat -c '%a' "$ARCHIVE_CONF") & 022 )) -eq 0 ]]; then
+    ARCHIVE="$(env_value "$ARCHIVE_CONF" ORBYMON_ARCHIVE_CMD)"
+  else
+    echo "IGNORADO $ARCHIVE_CONF: precisa ser do root e sem escrita para grupo/outros" >&2
+  fi
+fi
 NAT_DIR="${ORBYMON_NAT_DIR:-/var/log/orbymon/a10nat}"
 SPOOL_DIR="${ORBYMON_SPOOL_DIR:-/var/log/orbymon/a10}"
 FLOW_DIR="${ORBYMON_FLOW_DIR:-/var/lib/orbymon/flows}"

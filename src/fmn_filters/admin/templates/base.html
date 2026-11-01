@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}OrbyMon{% endblock %} · OrbyMon admin</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
+</head>
+<body>
+<header class="top">
+  <span class="brand">OrbyMon <small>admin</small></span>
+  {% if g.user %}
+  <nav>
+    {% set here = request.endpoint %}
+    <a href="{{ url_for('index') }}" class="{{ 'on' if here=='index' }}">Status</a>
+    <a href="{{ url_for('network') }}" class="{{ 'on' if here=='network' }}">Rede</a>
+    <a href="{{ url_for('borders') }}" class="{{ 'on' if here=='borders' }}">Bordas</a>
+    <a href="{{ url_for('rules') }}" class="{{ 'on' if here=='rules' }}">Regras</a>
+    <a href="{{ url_for('telegram') }}" class="{{ 'on' if here=='telegram' }}">Telegram</a>
+    <a href="{{ url_for('retention') }}" class="{{ 'on' if here=='retention' }}">Retenção</a>
+    <a href="{{ url_for('users') }}" class="{{ 'on' if here=='users' }}">Usuários</a>
+    <a href="{{ url_for('audit_page') }}" class="{{ 'on' if here=='audit_page' }}">Auditoria</a>
+  </nav>
+  <form method="post" action="{{ url_for('logout') }}" class="who">
+    <a href="{{ url_for('password') }}">{{ g.user.username }}</a>
+    <input type="hidden" name="csrf" value="{{ session.csrf }}">
+    <button class="link">Sair</button>
+  </form>
+  {% endif %}
+</header>
+<main>
+  {% with msgs = get_flashed_messages() %}{% for m in msgs %}<p class="flash">{{ m }}</p>{% endfor %}{% endwith %}
+  {% block body %}{% endblock %}
+</main>
+</body>
+</html>

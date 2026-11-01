@@ -299,7 +299,7 @@ def main(argv=None):
             if summary["minutos_com_dados"] < MIN_MINUTES:
                 raise ValueError("so %d minutos de dados; aguarde pelo menos %d (6 h) antes de aplicar"
                                  % (summary["minutos_com_dados"], MIN_MINUTES))
-            target = Path(args.config)
+            target = Path(os.path.realpath(args.config))   # segue o link para o diretorio do painel
             backup = target.with_name(target.name + ".bak." + datetime.now().strftime("%Y%m%d%H%M%S"))
             shutil.copy2(target, backup)            # mesmo conteudo e permissoes do original
             try:

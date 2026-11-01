@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from fmn_filters.a10_nat import (LOOKUP_LIMIT, EventLog, NatEvent, NatService, NatTable, StreamSplitter,
+from fmn_filters.a10_nat import (LOOKUP_LIMIT, ConfigWatcher, EventLog, NatEvent, NatService, NatTable, StreamSplitter,
                                  _parse_time, handle_lookup, handle_stream, lookup_many,
                                  parse_events, parse_message, replay_log, replay_rsyslog_spool)
 import gzip
@@ -277,6 +277,29 @@ class ReasonAndReplayTests(unittest.TestCase):
         dumped = json.dumps(res)
         self.assertNotIn("100.64.64.5", dumped)
         self.assertNotIn("45.238.170.70", dumped)
+
+
+class WatcherTests(unittest.TestCase):
+    def test_reload_on_change_and_keep_old_on_error(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "c.json"
+            path.write_text("1")
+            calls = {"n": 0}
+
+            def loader():
+                calls["n"] += 1
+                if calls["n"] == 2:
+                    raise ValueError("invalida")
+                return "ESCOPOS-%d" % calls["n"], ["10.9.9.9"]
+            svc = NatService(SCOPES, allowed_sources=["10.100.10.10"])
+            w = ConfigWatcher([path], loader)
+            self.assertFalse(w.check(svc))                       # sem mudanca
+            path.write_text("22")
+            self.assertTrue(w.check(svc))
+            self.assertEqual((svc.scopes, svc.allowed), ("ESCOPOS-1", frozenset({"10.9.9.9"})))
+            path.write_text("333")
+            self.assertFalse(w.check(svc))                       # erro: mantem a anterior
+            self.assertEqual(svc.scopes, "ESCOPOS-1")
 
 
 if __name__ == "__main__":

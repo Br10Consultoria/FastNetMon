@@ -1,0 +1,50 @@
+{% extends "base.html" %}{% block title %}Rede{% endblock %}
+{% block body %}
+<h1>Rede do provedor</h1>
+<p class="muted">Um item por linha (ou separados por vírgula). Tudo é validado junto antes de gravar; se algo estiver errado nada é alterado. Um backup é guardado a cada alteração.</p>
+<form method="post" class="card">
+  {% include "_csrf.html" %}
+  <div class="grid">
+    <label>Nome do provedor / site <input name="provider_name" value="{{ cfg.provider_name or '' }}" maxlength="80"></label>
+    <label>ASNs <input name="asns" value="{{ (cfg.asns or [])|join(', ') }}" placeholder="262687, 64500"></label>
+  </div>
+  <div class="grid">
+    <label>Blocos IPv4 públicos em uso
+      <textarea name="protected_cidrs" rows="4">{{ profile.protected_cidrs|join('\n') }}</textarea>
+      <small>Todos os blocos que saem por esta caixa, mesmo de ASNs diferentes.</small></label>
+    <label>Blocos IPv6 públicos
+      <textarea name="ipv6_protected_cidrs" rows="4">{{ (cfg.ipv6_protected_cidrs or [])|join('\n') }}</textarea></label>
+  </div>
+  <div class="grid">
+    <label>Rede privada dos assinantes (pré-NAT)
+      <textarea name="inside_private_cidrs" rows="3">{{ profile.inside_private_cidrs|join('\n') }}</textarea>
+      <small>Ex.: 100.64.64.0/19. Tráfego entre ela e os blocos públicos é interno.</small></label>
+    <label>Infraestrutura extra (IPs/blocos)
+      <textarea name="extra_infrastructure_cidrs" rows="3">{{ cfg.extra_infrastructure_cidrs|join('\n') }}</textarea>
+      <small>Roteadores, coletor, servidores próprios: não geram alerta de assinante.</small></label>
+    <label>IPs do A10 (origem do log NAT)
+      <textarea name="a10_sources" rows="3">{{ (cfg.a10_sources or [])|join('\n') }}</textarea>
+      <small>Somente esses IPs podem enviar log NAT ao OrbyMon.</small></label>
+  </div>
+  <h2>Pools CGNAT</h2>
+  {% set pools = profile.cgnat_pools %}
+  {% set meta = profile.cgnat_pool_metadata %}
+  <input type="hidden" name="pool_rows" value="{{ pools|length + 3 }}">
+  <div class="scroll"><table>
+    <tr><th>Bloco do pool</th><th>Nome</th><th>Usuários por IP</th><th>Remover</th></tr>
+    {% for p in pools %}
+    <tr><td><input name="pool_cidr_{{ loop.index0 }}" value="{{ p }}"></td>
+      <td><input name="pool_name_{{ loop.index0 }}" value="{{ meta.get(p, {}).get('name', '') }}" maxlength="64"></td>
+      <td><input name="pool_users_{{ loop.index0 }}" type="number" min="1" max="65535" value="{{ meta.get(p, {}).get('max_users_per_ip', 32) }}"></td>
+      <td><input type="checkbox" name="pool_del_{{ loop.index0 }}" value="1"></td></tr>
+    {% endfor %}
+    {% for i in range(pools|length, pools|length + 3) %}
+    <tr class="new"><td><input name="pool_cidr_{{ i }}" placeholder="novo bloco, ex.: 45.238.171.192/26"></td>
+      <td><input name="pool_name_{{ i }}" placeholder="NAT-POOL-12" maxlength="64"></td>
+      <td><input name="pool_users_{{ i }}" type="number" min="1" max="65535" value="32"></td><td></td></tr>
+    {% endfor %}
+  </table></div>
+  <p class="muted">Os pools precisam estar dentro dos blocos IPv4 públicos.</p>
+  <button>Salvar rede</button>
+</form>
+{% endblock %}

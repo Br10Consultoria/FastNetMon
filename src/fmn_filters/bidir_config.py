@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import math
-from ipaddress import ip_network
+from ipaddress import ip_address, ip_network
 from pathlib import Path
 
 from .cgnat_baseline import validate_config as validate_profile
@@ -21,7 +21,7 @@ CONFIG_KEYS = frozenset({
     "nat_socket", "observation_ifindexes", "keep_ports", "counter_multiplier",
     "settle_minutes", "cooldown_minutes", "max_query_rows", "retention_days",
     "rules", "nat_rules"})
-OPTIONAL_CONFIG_KEYS = frozenset({"ipv6_protected_cidrs"})
+OPTIONAL_CONFIG_KEYS = frozenset({"ipv6_protected_cidrs", "provider_name", "asns", "a10_sources"})
 RULE_KEYS = frozenset({"name", "enabled", "severity", "direction", "protocols",
                        "local_ports", "remote_ports", "split_by",
                        "consecutive_minutes", "limits"})
@@ -110,6 +110,18 @@ def validate_config(obj):
         raise ValueError("configuracao F4 com campos faltantes ou desconhecidos: esperado "
                          + ",".join(sorted(CONFIG_KEYS)) + " (opcional: "
                          + ",".join(sorted(OPTIONAL_CONFIG_KEYS)) + ")")
+    obj.setdefault("provider_name", "")
+    if not isinstance(obj["provider_name"], str) or len(obj["provider_name"]) > 80 or "\n" in obj["provider_name"]:
+        raise ValueError("provider_name: texto de ate 80 caracteres")
+    obj.setdefault("asns", [])
+    if (not isinstance(obj["asns"], list) or len(obj["asns"]) > 32
+            or any(type(a) is not int or not 1 <= a <= 4294967295 for a in obj["asns"])):
+        raise ValueError("asns: lista de numeros de AS (1 a 4294967295)")
+    obj.setdefault("a10_sources", [])
+    if not isinstance(obj["a10_sources"], list) or len(obj["a10_sources"]) > 16:
+        raise ValueError("a10_sources: lista de IPs de origem do log do A10")
+    for ip in obj["a10_sources"]:
+        ip_address(ip)
     obj.setdefault("ipv6_protected_cidrs", [])
     v6 = obj["ipv6_protected_cidrs"]
     if not isinstance(v6, list):

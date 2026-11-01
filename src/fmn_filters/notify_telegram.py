@@ -20,6 +20,7 @@ import hashlib
 import html
 import json
 import os
+from pathlib import Path
 import sys
 import urllib.error
 import urllib.parse
@@ -324,10 +325,15 @@ def main(argv=None):
     ap.add_argument("--test", action="store_true", help="envia mensagem de teste")
     ap.add_argument("--find-chat", action="store_true",
                     help="lista chats que falaram com o bot (mande uma mensagem ao bot antes)")
+    ap.add_argument("--env-file", help="le TELEGRAM_* deste arquivo KEY='valor' (o arquivo nunca e executado)")
     args = ap.parse_args(argv)
     try:
+        env = dict(os.environ)
+        if args.env_file:
+            from .admin.config_store import read_env
+            env.update(read_env(Path(args.env_file)))
         if args.find_chat:
-            token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+            token = env.get("TELEGRAM_BOT_TOKEN", "").strip()
             if not token:
                 raise ValueError("defina TELEGRAM_BOT_TOKEN")
             updates = Telegram(token, []).call("getUpdates", {"timeout": 0}) or []
@@ -343,7 +349,7 @@ def main(argv=None):
             for chat_id, name in seen.items():
                 print("chat_id=%s  %s" % (chat_id, name))
             return 0
-        settings = Settings.from_env()
+        settings = Settings.from_env(env)
         telegram = Telegram(settings.token, settings.chats)
         if args.test:
             telegram.send(Formatter(settings).header("🛡️", "OrbyMon conectado ao Telegram") +

@@ -1,0 +1,37 @@
+[Unit]
+Description=OrbyMon - painel web de administracao (HTTPS, usuario + senha + 2FA)
+After=network-online.target mariadb.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=orbymon-admin
+Group=orbymon-admin
+WorkingDirectory=/opt/orbymon
+# admin.env e do root (o painel nao consegue altera-lo): credencial do banco, porta e caminhos
+EnvironmentFile=/etc/orbymon/admin.env
+Environment=PYTHONPATH=/opt/orbymon/src
+ExecStart=/opt/orbymon/.venv/bin/gunicorn --bind ${ORBYMON_ADMIN_BIND} \
+  --certfile /etc/orbymon/admin-tls/cert.pem --keyfile /etc/orbymon/admin-tls/key.pem \
+  --workers 2 --threads 4 --timeout 60 --access-logfile - --error-logfile - \
+  --limit-request-line 4096 --limit-request-field_size 8190 \
+  "fmn_filters.admin.app:wsgi_app()"
+Restart=on-failure
+RestartSec=5
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ReadWritePaths=/etc/orbymon/managed /var/lib/orbymon/admin
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,58 @@
+{% extends "base.html" %}{% block title %}Regras{% endblock %}
+{% block body %}
+<h1>Regras de detecção</h1>
+{% if proposal %}
+<section class="card">
+  <h2>Proposta de calibração</h2>
+  {% if report %}<p class="muted">Período {{ report.periodo_utc[0] }} até {{ report.periodo_utc[1] }} UTC · {{ report.minutos_com_dados }} minutos com dados · fator {{ report.fator }} × p99,9</p>{% endif %}
+  {% set prop = {} %}{% for r in proposal.rules %}{% set _ = prop.update({r.name: r}) %}{% endfor %}
+  <div class="scroll"><table>
+    <tr><th>Regra</th><th>Escopo</th><th class="num">pps atual → proposto</th><th class="num">Mbps atual → proposto</th></tr>
+    {% for r in cfg.rules %}{% for scope, lim in r.limits.items() %}
+      {% set p = prop.get(r.name, {}).get('limits', {}).get(scope, {}) %}
+      {% if p.get('min_pps') != lim.get('min_pps') or p.get('min_mbps') != lim.get('min_mbps') %}
+      <tr><td>{{ r.name }}</td><td>{{ SCOPE_PT.get(scope, scope) }}</td>
+        <td class="num">{{ lim.get('min_pps', '—') }} → <b>{{ p.get('min_pps', '—') }}</b></td>
+        <td class="num">{{ lim.get('min_mbps', '—') }} → <b>{{ p.get('min_mbps', '—') }}</b></td></tr>
+      {% endif %}
+    {% endfor %}{% endfor %}
+  </table></div>
+  <form method="post">{% include "_csrf.html" %}<input type="hidden" name="action" value="calibracao">
+    <button>Aplicar proposta (somente pps e Mbps)</button></form>
+</section>
+{% endif %}
+<form method="post">
+  {% include "_csrf.html" %}
+  <section class="card inline">
+    <label>Intervalo entre alertas do mesmo alvo (min) <input name="cooldown_minutes" type="number" min="1" max="1440" value="{{ cfg.cooldown_minutes }}"></label>
+    <label>Espera pelos dados (min) <input name="settle_minutes" type="number" min="0" max="30" value="{{ cfg.settle_minutes }}"></label>
+  </section>
+  {% for r in cfg.rules %}{% set i = loop.index0 %}
+  <section class="card rule">
+    <div class="rulehead">
+      <label class="check"><input type="checkbox" name="r{{ i }}_enabled" value="1" {{ 'checked' if r.enabled }}> <b>{{ r.name }}</b></label>
+      <span class="muted">{{ 'entrada' if r.direction=='in' else 'saída' }} · {{ (r.protocols or ['todos'])|join(', ') }}{% if r.local_ports %} · portas {{ r.local_ports|join(', ') }}{% endif %}{% if r.remote_ports %} · portas remotas {{ r.remote_ports|join(', ') }}{% endif %}</span>
+      <label>Severidade <select name="r{{ i }}_severity">{% for s in ('warning','high','critical') %}<option {{ 'selected' if r.severity==s }}>{{ s }}</option>{% endfor %}</select></label>
+      <label>Minutos seguidos <input name="r{{ i }}_consecutive" type="number" min="1" max="60" value="{{ r.consecutive_minutes }}"></label>
+    </div>
+    <div class="scroll"><table>
+      <tr><th>Escopo</th>{% for m, label, _ in METRICS %}<th class="num">{{ label }}</th>{% endfor %}</tr>
+      {% for scope, lim in r.limits.items() %}
+      <tr><td>{{ SCOPE_PT.get(scope, scope) }}</td>
+        {% for m, label, _ in METRICS %}<td class="num">{% if m in lim %}<input name="r{{ i }}_{{ scope }}_{{ m }}" value="{{ lim[m] }}" inputmode="decimal" size="9">{% else %}—{% endif %}</td>{% endfor %}</tr>
+      {% endfor %}
+    </table></div>
+  </section>
+  {% endfor %}
+  <h2>Regras do log NAT (A10)</h2>
+  {% for r in cfg.nat_rules %}{% set i = loop.index0 %}
+  <section class="card rule"><div class="rulehead">
+    <label class="check"><input type="checkbox" name="n{{ i }}_enabled" value="1" {{ 'checked' if r.enabled }}> <b>{{ r.name }}</b></label>
+    <label>Severidade <select name="n{{ i }}_severity">{% for s in ('warning','high','critical') %}<option {{ 'selected' if r.severity==s }}>{{ s }}</option>{% endfor %}</select></label>
+    {% if 'min_allocs_per_min' in r %}<label>Alocações/min <input name="n{{ i }}_min_allocs_per_min" type="number" min="1" value="{{ r.min_allocs_per_min }}"></label>{% endif %}
+    {% if 'min_active_ports' in r %}<label>Portas ativas <input name="n{{ i }}_min_active_ports" type="number" min="1" value="{{ r.min_active_ports }}"></label>{% endif %}
+  </div></section>
+  {% endfor %}
+  <button>Salvar regras</button>
+</form>
+{% endblock %}
