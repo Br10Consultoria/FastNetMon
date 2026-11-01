@@ -10,9 +10,15 @@ PROFILE = json.loads((ROOT / "rules/cgnat-profiles.a10.json").read_text())
 
 
 def config(**over):
+    """Exemplo real, mas sem filtro de interface (fixtures usam ifIndex genericos)."""
     cfg = json.loads((ROOT / "rules/bidir.example.json").read_text())
+    cfg["observation_ifindexes"] = {"in": [], "out": []}
     cfg.update(over)
     return validate_config(cfg)
+
+
+def real_config():
+    return validate_config(json.loads((ROOT / "rules/bidir.example.json").read_text()))
 
 
 def flow(src, dst, sport, dport, proto="udp", packets=1000, nbytes=1_000_000, flags="",
@@ -99,6 +105,17 @@ class RollupTests(unittest.TestCase):
             flow("45.238.170.10", "8.8.8.8", 40000, 53, in_if=16, out_if=99)], cfg)
         self.assertEqual(sorted(r["direction"] for r in as_dicts(rows)), ["in", "out"])
         self.assertEqual(stats["filtrado_por_ifindex"], 2)
+
+    def test_real_edge_interfaces_of_ne8000(self):
+        cfg = real_config()
+        self.assertEqual(set(cfg["observation_ifindexes"]["in"]), {334, 336, 369, 368, 348, 86, 85})
+        rows, stats = run([
+            flow("8.8.8.8", "45.238.170.10", 53, 40000, in_if=369, out_if=0),   # entrou pelo PTT
+            flow("8.8.8.8", "45.238.170.10", 53, 40000, in_if=16, out_if=0),    # lado cliente: descartado
+            flow("45.238.170.10", "8.8.8.8", 40000, 53, in_if=0, out_if=334)],  # saiu pelo transito
+            cfg)
+        self.assertEqual(sorted(r["direction"] for r in as_dicts(rows)), ["in", "out"])
+        self.assertEqual(stats["filtrado_por_ifindex"], 1)
 
     def test_same_key_sums_and_multiplier_applies(self):
         cfg = config(counter_multiplier=2.0)
