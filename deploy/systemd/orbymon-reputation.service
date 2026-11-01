@@ -1,0 +1,22 @@
+[Unit]
+Description=OrbyMon - IPs do provedor em listas de bloqueio (reputacao) e assinante provavel
+After=network-online.target mariadb.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=orbymon
+Group=orbymon
+WorkingDirectory=/opt/orbymon
+EnvironmentFile=/etc/orbymon/pipeline.env
+Environment=PYTHONPATH=/opt/orbymon/src
+# reputation.env e telegram.env sao editados pelo painel: lidos como dados, nunca como ambiente
+ExecStart=/opt/orbymon/.venv/bin/python -m fmn_filters.reputation --config /etc/orbymon/bidir.json \
+  --env-file /etc/orbymon/reputation.env --telegram-env /etc/orbymon/telegram.env
+Nice=10
+TimeoutStartSec=900
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX

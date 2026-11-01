@@ -24,6 +24,8 @@ class Paths:
         self.retention = Path(env.get("ORBYMON_RETENTION_ENV", "/etc/orbymon/retention.env"))
         self.calibration = Path(env.get("ORBYMON_CALIBRATION_DIR", "/var/lib/orbymon/calibration"))
         self.backups = Path(env.get("ORBYMON_ADMIN_BACKUP_DIR", "/var/lib/orbymon/admin/backups"))
+        self.reputation = Path(env.get("ORBYMON_REPUTATION_ENV", "/etc/orbymon/reputation.env"))
+        self.nat_dir = Path(env.get("ORBYMON_NAT_DIR", "/var/log/orbymon/a10nat"))
 
 
 def read_env(path: Path) -> dict:
@@ -73,6 +75,9 @@ class ConfigStore:
 
     def retention(self) -> dict:
         return read_env(self.p.retention)
+
+    def reputation(self) -> dict:
+        return read_env(self.p.reputation)
 
     # ---------- gravacao
     def _backup(self, path: Path):
@@ -144,6 +149,9 @@ class ConfigStore:
         self._write(self.p.retention, render_env(
             {"ORBYMON_LOG_RETENTION_DAYS": log_days, "ORBYMON_FLOW_RETENTION_DAYS": flow_days},
             "Retencao de arquivos do OrbyMon"))
+
+    def save_reputation(self, values: dict):
+        self._write(self.p.reputation, render_env(values, "Reputacao dos IPs do provedor (contem chave de API: nao compartilhe)"))
 
     # ---------- calibracao
     def calibration_proposal(self):

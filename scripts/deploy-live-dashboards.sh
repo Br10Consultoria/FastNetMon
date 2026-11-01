@@ -11,11 +11,11 @@ if command -v mariadb >/dev/null; then
   mariadb orbymon < "$BASE/sql/country_names.sql"
   echo "[OK] nomes de paises em portugues: $(mariadb orbymon -NBe 'SELECT COUNT(*) FROM orby_country_names')"
 fi
-for name in orbymon-huawei-live.json orbymon-overview.json orbymon-ip-analytics.json orbymon-cgnat.json orbymon-f4-ataques.json; do
+for name in orbymon-huawei-live.json orbymon-overview.json orbymon-ip-analytics.json orbymon-cgnat.json orbymon-f4-ataques.json orbymon-reputacao.json; do
   SRC="$BASE/grafana/dashboards/$name"
   python3 -m json.tool "$SRC" >/dev/null
 done
-for name in orbymon-huawei-live.json orbymon-overview.json orbymon-ip-analytics.json orbymon-cgnat.json orbymon-f4-ataques.json; do
+for name in orbymon-huawei-live.json orbymon-overview.json orbymon-ip-analytics.json orbymon-cgnat.json orbymon-f4-ataques.json orbymon-reputacao.json; do
   SRC="$BASE/grafana/dashboards/$name"
   DEST="$D/$name"
   if [[ -f "$DEST" ]] && ! cmp -s "$SRC" "$DEST"; then

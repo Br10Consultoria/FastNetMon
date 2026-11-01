@@ -95,6 +95,34 @@ class FakeStore:
         return [(datetime(2026, 11, 1, 10, 0), "IN UDP volumetrico", "high", "in", "45.238.170.70", "100.64.64.9",
                  123456.0, 812.5)]
 
+    def reputation_listings(self, active=True, days=7):
+        if not active:
+            return []
+        detail = json.dumps({"suspeitos": [{"ip": "100.64.65.10", "fluxos": 42, "destinos": 300, "portas": "22"}],
+                             "eventos": [], "portas_analisadas": [22]})
+        return [{"entry": "45.238.170.70", "lista": "blocklist.de SSH", "categoria": "ataque/força bruta SSH",
+                 "scope": "cgnat_pool", "pool": "NAT-POOL-08", "desde": datetime(2026, 11, 1), "visto": None,
+                 "saiu": None, "remocao": "expira em 48 h", "detail": detail}]
+
+    def reputation_sources(self):
+        return [("blocklist_de_ssh", None, datetime(2026, 11, 1), 4911, 1, "ok", "")]
+
+    def with_connection(self, fn):
+        class Cur:
+            def execute(self, sql, params=()):
+                self.sql = sql
+
+            def fetchall(self):
+                return []
+
+            def fetchone(self):
+                return (None,)
+
+        class Conn:
+            def cursor(self):
+                return Cur()
+        return fn(Conn())
+
 
 def make_tree(tmp: Path):
     """Arquivos como no servidor: links em /etc/orbymon apontando para managed/."""
@@ -108,12 +136,16 @@ def make_tree(tmp: Path):
     (managed / "bidir.json").write_text(json.dumps(cfg))
     (managed / "telegram.env").write_text("TELEGRAM_BOT_TOKEN=%s\nTELEGRAM_CHAT_IDS=-1001\n" % TOKEN)
     (managed / "retention.env").write_text("ORBYMON_LOG_RETENTION_DAYS=15\nORBYMON_FLOW_RETENTION_DAYS=15\n")
+    (managed / "reputation.env").write_text("ORBYMON_REP_DISABLED=''\nABUSEIPDB_API_KEY=''\n")
+    (etc / "reputation.env").symlink_to(managed / "reputation.env")
+    (tmp / "nat").mkdir()
     for name in ("bidir.json", "cgnat-profiles.json", "telegram.env", "retention.env"):
         (etc / name).symlink_to(managed / name)
         os.chmod(managed / name, 0o640)
     return {"ORBYMON_ADMIN_TESTING": "1", "ORBYMON_CONFIG": str(etc / "bidir.json"),
             "ORBYMON_TELEGRAM_ENV": str(etc / "telegram.env"), "ORBYMON_RETENTION_ENV": str(etc / "retention.env"),
-            "ORBYMON_CALIBRATION_DIR": str(calib), "ORBYMON_ADMIN_BACKUP_DIR": str(tmp / "backups")}
+            "ORBYMON_CALIBRATION_DIR": str(calib), "ORBYMON_ADMIN_BACKUP_DIR": str(tmp / "backups"),
+            "ORBYMON_REPUTATION_ENV": str(etc / "reputation.env"), "ORBYMON_NAT_DIR": str(tmp / "nat")}
 
 
 class EnvFileTests(unittest.TestCase):
@@ -441,6 +473,59 @@ class PanelTests(unittest.TestCase):
         self.post("/usuarios", action="excluir", uid=str(other["id"]))
         self.assertIsNone(self.db.user(username="operador"))
         self.assertEqual(self.c.get("/auditoria").status_code, 200)
+
+
+    # ----- etapa 2
+    def test_reputation_page_and_settings(self):
+        self.login()
+        page = self.c.get("/reputacao")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn(b"100.64.65.10", page.data)
+        self.assertIn(b"blocklist.de SSH", page.data)
+        key = "a1" * 40
+        self.post("/reputacao", src=["blocklist_de_ssh", "ipsum", "abuseipdb"], dnsbl="1", heavy_every_h="12",
+                  abuseipdb_key=key)
+        values = read_env(Path(self.env["ORBYMON_REPUTATION_ENV"]))
+        self.assertEqual(values["ABUSEIPDB_API_KEY"], key)
+        self.assertEqual(values["ORBYMON_REP_HEAVY_EVERY_H"], "12")
+        self.assertIn("ciarmy", values["ORBYMON_REP_DISABLED"])
+        self.assertNotIn("ipsum", values["ORBYMON_REP_DISABLED"])
+        self.assertNotIn(key, json.dumps(self.db.audits))
+        page = self.c.get("/reputacao")
+        self.assertNotIn(key.encode(), page.data)
+        self.post("/reputacao", src=["ipsum"], heavy_every_h="6", abuseipdb_key="")     # mantem a chave
+        self.assertEqual(read_env(Path(self.env["ORBYMON_REPUTATION_ENV"]))["ABUSEIPDB_API_KEY"], key)
+        self.post("/reputacao", src=["ipsum"], heavy_every_h="6", abuseipdb_key="x'; rm -rf /")
+        self.assertEqual(read_env(Path(self.env["ORBYMON_REPUTATION_ENV"]))["ABUSEIPDB_API_KEY"], key)
+
+    def test_investigate_with_port_and_email(self):
+        from datetime import timezone as tzm
+        nat = Path(self.env["ORBYMON_NAT_DIR"])
+        ts = datetime(2026, 10, 30, 13, 50, tzinfo=tzm.utc).timestamp()
+        (nat / "nat-events-2026103013.tsv").write_text(
+            "%.3f\ta\ttcp\t100.64.65.10\t40001\t45.238.170.70\t51234\t%.3f\n" % (ts, ts))
+        self.login()
+        r = self.post("/investigar", ip="45.238.170.70", time="2026-10-30 10:55:01", tz="America/Sao_Paulo",
+                      port="51234", window="10")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("Assinante identificado: 100.64.65.10".encode(), r.data)
+        self.assertIn("confiança alta".encode(), r.data)
+        email = "Date: Fri, 30 Oct 2026 15:00:00 +0100\n\nOct 30 14:55:01 h sshd[1]: Failed password for root " \
+                "from 45.238.170.70 port 51234 ssh2\n"
+        r = self.post("/investigar", email=email, tz="Europe/Berlin", window="10")
+        self.assertIn("Assinante identificado: 100.64.65.10".encode(), r.data)
+        self.assertEqual(self.db.audits[-1][1], "investigacao")
+        r = self.post("/investigar", email="nada aqui 8.8.8.8", tz="UTC")
+        self.assertIn("nenhum IP deste provedor".encode(), r.data)
+        r = self.post("/investigar", ip="45.238.170.70", time="ontem", tz="UTC")
+        self.assertIn("horário não reconhecido".encode(), r.data)
+
+    def test_investigate_history(self):
+        self.login()
+        r = self.c.get("/investigar?ip=100.64.65.10")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("Histórico de 100.64.65.10".encode(), r.data)
+        self.assertEqual(self.c.get("/investigar?ip=nao-e-ip").status_code, 200)
 
 
 class CliTests(unittest.TestCase):

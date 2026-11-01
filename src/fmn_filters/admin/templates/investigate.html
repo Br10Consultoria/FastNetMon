@@ -1,0 +1,83 @@
+{% extends "base.html" %}{% block title %}Investigar{% endblock %}
+{% block body %}
+<h1>Investigar denúncia ou IP</h1>
+<p class="muted">Com <b>IP + horário + porta de origem</b> o log NAT do A10 aponta o assinante com certeza. Sem a porta, aparecem todos que usaram o IP no horário (até ~32 por IP de pool). Só com o IP, sem horário, mostra o histórico dos últimos 7 dias.</p>
+<form method="post" class="card" autocomplete="off">
+  {% include "_csrf.html" %}
+  <div class="grid">
+    <label>IP denunciado (público ou 100.64.x) <input name="ip" value="{{ form.ip }}" placeholder="45.238.170.70"></label>
+    <label>Data e hora da denúncia <input name="time" value="{{ form.time }}" placeholder="2026-10-30 14:05:00"></label>
+    <label>Fuso do horário <select name="tz">{% for z in tz_choices %}<option {{ 'selected' if z==form.tz }}>{{ z }}</option>{% endfor %}</select>
+      <small>Use o fuso que aparece na denúncia; horários com +0100, Z, UTC já trazem o fuso.</small></label>
+  </div>
+  <div class="grid">
+    <label>Porta de origem (opcional) <input name="port" value="{{ form.port }}" inputmode="numeric" placeholder="51234"></label>
+    <label>Protocolo <select name="protocol"><option value="">qualquer</option>{% for p in ('tcp','udp','icmp') %}<option {{ 'selected' if p==form.protocol }}>{{ p }}</option>{% endfor %}</select></label>
+    <label>IP atacado (opcional) <input name="remote" value="{{ form.remote }}"></label>
+    <label>Porta atacada (opcional) <input name="remote_port" value="{{ form.remote_port }}" inputmode="numeric" placeholder="22"></label>
+    <label>Janela (± minutos) <input name="window" value="{{ form.window or 10 }}" inputmode="numeric"></label>
+  </div>
+  <label>…ou cole o e-mail/relatório de abuso inteiro
+    <textarea name="email" rows="7" placeholder="Cole aqui: o OrbyMon acha os IPs do provedor, horários e portas (fail2ban, iptables, Apache, X-ARF...)">{{ form.email }}</textarea></label>
+  <button>Investigar</button>
+</form>
+
+{% if error %}<p class="flash">{{ error }}</p>{% endif %}
+
+{% for r, text in results %}
+<section class="card">
+  <h2>{{ r.query.ip }} · {{ ts(r.query.when, tz) }}{% if r.query.port is not none %} · porta {{ r.query.port }}{% endif %}
+    <span class="pill {{ {'alta':'ok','media':'sev-high','baixa':'sev-warning'}.get(r.confidence, 'idle') }}">confiança {{ r.confidence }}</span></h2>
+  {% if r.query.line %}<p class="muted"><code class="detail">{{ r.query.line }}</code></p>{% endif %}
+  <p><b>{{ r.verdict }}</b></p>
+  {% for n in r.notes %}<p class="warn">{{ n }}</p>{% endfor %}
+  {% if r.query.port is not none and r.mappings %}
+  <h3>Log NAT (A10)</h3>
+  <div class="scroll"><table><tr><th>Assinante</th><th>Porta interna</th><th>Público</th><th>Proto</th><th>Alocada</th><th>Liberada</th></tr>
+    {% for m in r.mappings[:50] %}<tr><td><code>{{ m.inside_ip }}</code></td><td>{{ m.inside_port }}</td><td>{{ m.public_ip }}:{{ m.public_port }}</td><td>{{ m.protocol }}</td><td>{{ ts(m.start, tz) }}</td><td>{{ ts(m.end, tz) }}</td></tr>{% endfor %}
+  </table></div>
+  {% elif r.subscribers %}
+  <h3>Assinantes que usaram o IP na janela</h3>
+  <div class="scroll"><table><tr><th>Assinante</th><th class="num">Portas</th><th>Proto</th><th>Primeira alocação</th><th>Última liberação</th></tr>
+    {% for s in r.subscribers[:60] %}<tr><td><code>{{ s.ip }}</code></td><td class="num">{{ s.portas }}</td><td>{{ s.protocolos }}</td><td>{{ ts(s.inicio, tz) }}</td><td>{{ ts(s.fim, tz) }}</td></tr>{% endfor %}
+  </table></div>
+  {% endif %}
+  {% if r.flows %}
+  <h3>Fluxos de saída (amostrados)</h3>
+  <div class="scroll"><table><tr><th>Assinante</th><th>Destino</th><th>Porta</th><th>Proto</th><th class="num">Fluxos</th><th>De</th><th>Até</th></tr>
+    {% for fl in r.flows[:30] %}<tr><td><code>{{ fl.assinante or fl.ip_publico }}</code></td><td>{{ fl.remoto }}</td><td>{{ fl.porta_remota }}</td><td>{{ fl.protocolo }}</td><td class="num">{{ fl.fluxos }}</td><td>{{ ts(fl.de, tz) }}</td><td>{{ ts(fl.ate, tz) }}</td></tr>{% endfor %}
+  </table></div>
+  {% endif %}
+  {% if r.events %}
+  <h3>Ataques originados/recebidos detectados</h3>
+  <div class="scroll"><table><tr><th>Hora</th><th>Regra</th><th>Sentido</th><th>Assinante/IP</th><th class="num">pps</th></tr>
+    {% for e in r.events %}<tr><td>{{ ts(e.hora, tz) }}</td><td>{{ e.regra }}</td><td>{{ 'saída' if e.sentido=='out' else 'entrada' }}</td><td><code>{{ e.assinante or e.ip_publico }}</code></td><td class="num">{{ '%.0f'|format(e.pps) }}</td></tr>{% endfor %}
+  </table></div>
+  {% endif %}
+  <details><summary>Texto para registro/resposta</summary><pre class="report">{{ text }}</pre></details>
+</section>
+{% endfor %}
+
+{% if history %}{% set h = history %}
+<section class="card">
+  <h2>Histórico de {{ h.ip }} ({{ h.dias }} dias) <small class="muted">{{ SCOPE_PT.get(h.scope, h.scope) }}{% if h.pool %} · {{ h.pool }}{% endif %}</small></h2>
+  <h3>Ataques</h3>
+  {% if h.eventos %}<div class="scroll"><table><tr><th>Sentido</th><th>Regra</th><th class="num">Vezes</th><th>Primeiro (UTC)</th><th>Último (UTC)</th><th>IPs envolvidos</th></tr>
+    {% for e in h.eventos %}<tr><td>{{ 'originado' if e.sentido=='out' else 'recebido' }}</td><td>{{ e.regra }}</td><td class="num">{{ e.quantidade }}</td><td>{{ e.primeiro }}</td><td>{{ e.ultimo }}</td><td><small>{{ e.ips }}</small></td></tr>{% endfor %}
+  </table></div>{% else %}<p class="muted">Nenhum ataque detectado.</p>{% endif %}
+  <h3>Listas de bloqueio</h3>
+  {% if h.listas %}<ul>{% for l in h.listas %}<li><b>{{ l.lista }}</b> — {{ l.categoria }} (desde {{ l.desde }}{% if l.saiu %}, saiu {{ l.saiu }}{% else %}, <b>ativo</b>{% endif %})</li>{% endfor %}</ul>{% else %}<p class="muted">Não aparece em nenhuma lista verificada.</p>{% endif %}
+  {% if h.assinantes %}<h3>Assinantes atrás deste IP (48 h)</h3>
+  <div class="scroll"><table><tr><th>Assinante</th><th class="num">Destinos distintos</th><th class="num">Fluxos</th></tr>
+    {% for a in h.assinantes %}<tr><td><a href="{{ url_for('investigate', ip=a.ip) }}"><code>{{ a.ip }}</code></a></td><td class="num">{{ a.destinos }}</td><td class="num">{{ a.fluxos }}</td></tr>{% endfor %}
+  </table></div>{% endif %}
+  {% if h.ips_publicos %}<h3>IPs públicos usados (48 h)</h3><ul>{% for p in h.ips_publicos %}<li>{{ p.ip }} ({{ p.de }} – {{ p.ate }} UTC)</li>{% endfor %}</ul>{% endif %}
+  <h3>Tráfego de saída por porta (48 h)</h3>
+  {% if h.saida_por_porta %}<div class="scroll"><table><tr><th>Porta</th><th>Proto</th><th class="num">Destinos distintos</th><th class="num">Fluxos</th></tr>
+    {% for p in h.saida_por_porta %}<tr><td>{{ p.porta if p.porta else 'efêmera/0' }}</td><td>{{ p.protocolo }}</td><td class="num">{{ p.destinos }}</td><td class="num">{{ p.fluxos }}</td></tr>{% endfor %}
+  </table></div>
+  <p class="muted">Muitos destinos distintos na mesma porta (22, 23, 25, 445, 3389...) indicam varredura ou spam a partir do cliente.</p>
+  {% else %}<p class="muted">Sem fluxos amostrados.</p>{% endif %}
+</section>
+{% endif %}
+{% endblock %}

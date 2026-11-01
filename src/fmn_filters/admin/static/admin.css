@@ -48,3 +48,9 @@ th{font-size:13px;color:var(--muted);font-weight:600}
 code.detail{font-size:12px;word-break:break-word}
 .nowrap{white-space:nowrap}
 tr.new input::placeholder{color:var(--muted)}
+h3{font-size:15px;margin:14px 0 6px}
+.checks{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:6px 16px;margin-bottom:12px}
+.checks label{font-weight:500}
+pre.report{white-space:pre-wrap;font-size:12px;background:var(--bg);padding:10px;border-radius:6px;overflow-x:auto}
+details summary{cursor:pointer;color:var(--accent);margin-top:10px}
+.checks label.check{display:block}.checks label.check input{margin-right:6px;vertical-align:-1px}

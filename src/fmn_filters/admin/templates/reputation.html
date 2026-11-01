@@ -1,0 +1,70 @@
+{% extends "base.html" %}{% block title %}Reputação{% endblock %}
+{% block body %}
+<h1>Reputação dos IPs do provedor</h1>
+<p class="muted">Listas públicas de bloqueio verificadas de hora em hora; DNSBLs e AbuseIPDB a cada {{ every }} h. Para IPs de pool CGNAT, o OrbyMon cruza a listagem com os fluxos de saída (48 h) e os ataques originados para apontar o assinante provável.</p>
+
+<section class="card">
+  <h2>Listados agora <span class="pill {{ 'bad' if active else 'ok' }}">{{ active|length }}</span></h2>
+  {% if active %}
+  <div class="scroll"><table>
+    <tr><th>IP / bloco</th><th>Tipo</th><th>Listas</th><th>Prováveis responsáveis</th><th></th></tr>
+    {% for g in active %}{% set d = g.detail %}
+    <tr>
+      <td class="nowrap"><b>{{ g.entry }}</b><br><small class="muted">desde {{ g.desde }} UTC</small></td>
+      <td>{{ {'cgnat_pool':'pool CGNAT','dedicated':'IP dedicado','infra':'infraestrutura','bloco':'bloco'}.get(g.scope, g.scope) }}{% if g.pool %}<br><small>{{ g.pool }}</small>{% endif %}</td>
+      <td>{% for l in g.lists %}<div><b>{{ l.lista }}</b> — {{ l.categoria }}{% if l.remocao %}<br><small class="muted">{{ l.remocao }}</small>{% endif %}</div>{% endfor %}</td>
+      <td>
+        {% for s in (d.suspeitos or [])[:4] %}<div><code>{{ s.ip }}</code> <small>{{ s.fluxos }} fluxos · {{ s.destinos }} destinos{% if s.portas %} · portas {{ s.portas }}{% endif %}</small></div>{% endfor %}
+        {% for e in (d.eventos or [])[:3] %}<div><code>{{ e.ip }}</code> <small>{{ e.eventos }} ataque(s) originado(s): {{ e.regras }}</small></div>{% endfor %}
+        {% if not d.suspeitos and not d.eventos %}<small class="muted">{% if g.scope == 'cgnat_pool' %}sem tráfego suspeito amostrado — use Investigar com horário e porta da denúncia{% else %}—{% endif %}</small>{% endif %}
+      </td>
+      <td><a href="{{ url_for('investigate', ip=g.entry if '/' not in g.entry else '') }}">Investigar</a></td>
+    </tr>
+    {% endfor %}
+  </table></div>
+  {% else %}<p>Nenhum IP dos blocos configurados aparece nas listas verificadas.</p>{% endif %}
+</section>
+
+{% if removed %}
+<section class="card">
+  <h2>Saíram das listas (7 dias)</h2>
+  <div class="scroll"><table>
+    <tr><th>IP / bloco</th><th>Listas</th><th>Saiu em (UTC)</th></tr>
+    {% for g in removed %}<tr><td>{{ g.entry }}</td><td>{{ g.lists|map(attribute='lista')|join(', ') }}</td><td>{{ g.saiu }}</td></tr>{% endfor %}
+  </table></div>
+</section>
+{% endif %}
+
+<section class="card">
+  <h2>Fontes</h2>
+  {% if sources %}
+  <div class="scroll"><table>
+    <tr><th>Fonte</th><th>Situação</th><th>Última consulta (UTC)</th><th class="num">Entradas</th><th class="num">Nos seus blocos</th><th>Erro</th></tr>
+    {% for s in sources %}<tr><td>{{ s[0] }}</td><td><span class="pill {{ 'ok' if s[5]=='ok' else 'bad' }}">{{ s[5] }}</span></td>
+      <td>{{ s[2] or s[1] }}</td><td class="num">{{ s[3] }}</td><td class="num">{{ s[4] }}</td><td><small>{{ s[6] }}</small></td></tr>{% endfor %}
+  </table></div>
+  {% else %}<p class="muted">Ainda não houve verificação (instale com <code>scripts/setup-reputation.sh</code>).</p>{% endif %}
+</section>
+
+<form method="post" class="card" autocomplete="off">
+  {% include "_csrf.html" %}
+  <h2>Configuração</h2>
+  <div class="checks">
+    {% for s in feeds %}<label class="check"><input type="checkbox" name="src" value="{{ s.name }}" {{ 'checked' if s.name not in disabled }}> {{ s.label }} <small class="muted">— {{ s.category }}</small></label>{% endfor %}
+  </div>
+  <h2>DNSBL (listas de spam por DNS)</h2>
+  <label class="check"><input type="checkbox" name="dnsbl" value="1" {{ 'checked' if dnsbl_on }}> Consultar DNSBLs para cada IPv4 dos blocos</label>
+  <div class="checks">
+    {% for s in dnsbls %}<label class="check"><input type="checkbox" name="src" value="{{ s.name }}" {{ 'checked' if s.name not in disabled }}> {{ s.label }} <small class="muted">({{ s.zone }})</small></label>{% endfor %}
+  </div>
+  <p class="muted">A Spamhaus recusa consultas feitas por resolvedores públicos (8.8.8.8, 1.1.1.1): o servidor precisa usar um DNS recursivo próprio. A lista PBL (faixa residencial) é ignorada porque não indica abuso.</p>
+  <div class="grid">
+    <label>DNSBL e AbuseIPDB a cada (horas) <input name="heavy_every_h" type="number" min="1" max="168" value="{{ every }}"></label>
+    <label>Chave da API do AbuseIPDB (opcional, gratuita) {% if key_masked %}<small>atual: <code>{{ key_masked }}</code> — deixe vazio para manter</small>{% endif %}
+      <input name="abuseipdb_key" type="password" autocomplete="new-password"></label>
+  </div>
+  <input type="checkbox" name="src" value="abuseipdb" checked hidden>
+  {% if key_masked %}<label class="check"><input type="checkbox" name="clear_key" value="1"> Remover a chave</label>{% endif %}
+  <button>Salvar</button>
+</form>
+{% endblock %}

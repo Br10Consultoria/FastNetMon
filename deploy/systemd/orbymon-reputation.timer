@@ -1,0 +1,12 @@
+[Unit]
+Description=OrbyMon - verificacao de reputacao de hora em hora
+
+[Timer]
+OnBootSec=10min
+OnCalendar=*-*-* *:23:00
+RandomizedDelaySec=5min
+Persistent=true
+Unit=orbymon-reputation.service
+
+[Install]
+WantedBy=timers.target

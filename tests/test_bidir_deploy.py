@@ -94,6 +94,21 @@ class DeployTests(unittest.TestCase):
         self.assertNotIn("usermod", setup)                # nunca entra no grupo orbymon (pipeline.env)
         self.assertIn("GRANT INSERT ON orbymon.orby_admin_audit", setup)
 
+    def test_reputation_service_least_privilege(self):
+        unit = (ROOT / "deploy/systemd/orbymon-reputation.service").read_text()
+        self.assertIn("User=orbymon", unit)
+        self.assertIn("--env-file /etc/orbymon/reputation.env", unit)
+        self.assertNotIn("EnvironmentFile=/etc/orbymon/reputation.env", unit)
+        self.assertNotIn("EnvironmentFile=/etc/orbymon/telegram.env", unit)
+        timer = (ROOT / "deploy/systemd/orbymon-reputation.timer").read_text()
+        self.assertIn("Unit=orbymon-reputation.service", timer)
+        setup = (ROOT / "scripts/setup-reputation.sh").read_text()
+        self.assertNotIn("GRANT ALL", setup)
+        self.assertIn("ON orbymon.$table", setup)
+        self.assertIn("u:orbymon-admin:r", setup)          # painel so le o log NAT
+        deploy = (ROOT / "scripts/deploy-live-dashboards.sh").read_text()
+        self.assertIn("orbymon-reputacao.json", deploy)
+
 
 if __name__ == "__main__":
     unittest.main()

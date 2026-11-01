@@ -64,6 +64,8 @@ O instalador configura HTTPS autofirmado na porta 3000, datasource somente leitu
 
 **Painel web de administração:** página própria em HTTPS (porta 8443, separada do Grafana) com usuário, senha e 2FA para configurar provedor, ASNs, blocos, pools CGNAT, bordas, regras, Telegram e retenção: `sudo bash scripts/setup-admin.sh`. Veja [docs/ADMIN.md](docs/ADMIN.md).
 
+**Etapa 2 — denúncias de abuso e reputação:** página *Investigar* (denúncia com IP, horário e porta → assinante atrás do CGNAT, pelo log NAT do A10) e monitoramento de hora em hora de listas de bloqueio, DNSBL e AbuseIPDB, com o assinante provável e aviso no Telegram: `sudo bash scripts/setup-reputation.sh`. Veja [docs/REPUTACAO.md](docs/REPUTACAO.md).
+
 **Alertas no Telegram (F4):** início, lembrete e encerramento de cada ataque, com assinante CGNAT e link para o painel: `sudo bash scripts/setup-telegram.sh`. Veja [docs/BIDIRECTIONAL.md](docs/BIDIRECTIONAL.md).
 
 **A10 CGNAT Syslog:** [recepcao TCP/5514 exclusiva, spool bruto e inspecao sem correlacao prematura](docs/A10_SYSLOG.md). Instalar com sudo bash scripts/setup-a10-syslog.sh --a10-source-ip IP_REAL_DO_A10.

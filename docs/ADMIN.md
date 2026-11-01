@@ -35,6 +35,8 @@ sudo ufw allow from 10.0.0.0/24 to any port 8443 proto tcp
 | Rede | nome do provedor, ASNs, blocos IPv4/IPv6, rede privada pré-NAT, infraestrutura, IPs do A10, pools CGNAT | rollup/detector no próximo minuto; receptor NAT em até 60 s, sem reiniciar |
 | Bordas | ifIndex de borda (observação) e nomes das interfaces | próximo minuto; nomes aparecem no Grafana |
 | Regras | regras ligadas/desligadas, severidade, minutos seguidos, limites por escopo; aplicar a proposta de calibração (só pps e Mbps) | próximo minuto |
+| Investigar | — denúncia (IP + horário + porta, ou o e-mail colado) → assinante CGNAT; histórico de um IP. Veja [REPUTACAO.md](REPUTACAO.md) | — |
+| Reputação | fontes ligadas, DNSBL, intervalo e chave do AbuseIPDB; mostra IPs listados e o provável responsável | próxima verificação (hora em hora) |
 | Telegram | token (mascarado), chats, severidade mínima, lembrete, encerramento, URL do Grafana, nome do site; teste e descoberta de chats | próxima verificação (30 s) |
 | Retenção | dias de logs NAT e de arquivos nfcapd | próxima hora |
 | Usuários | criar, desativar, refazer 2FA, excluir | imediato |

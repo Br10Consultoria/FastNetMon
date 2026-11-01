@@ -138,3 +138,30 @@ ON DUPLICATE KEY UPDATE if_name=VALUES(if_name)""", (if_index, name), fetch=Fals
     def recent_events(self, limit=15):
         return self._q("""SELECT event_time,rule_name,severity,direction,local_ip,subscriber_ip,pps,mbps
 FROM orby_attack_events ORDER BY event_time DESC LIMIT %s""", (limit,))
+
+    # ---------- reputacao e investigacao (etapa 2)
+    def reputation_listings(self, active=True, days=7):
+        cond = "removed_at IS NULL" if active else "removed_at IS NOT NULL AND removed_at>=UTC_TIMESTAMP()-INTERVAL %s DAY"
+        try:
+            rows = self._q("SELECT entry,source_label,category,scope,pool,first_seen,last_seen,removed_at,removal_hint,detail "
+                           "FROM orby_reputation_listings WHERE " + cond + " ORDER BY entry,source_label LIMIT 500",
+                           () if active else (days,))
+        except Exception:
+            return []
+        keys = ("entry", "lista", "categoria", "scope", "pool", "desde", "visto", "saiu", "remocao", "detail")
+        return [dict(zip(keys, r)) for r in rows]
+
+    def reputation_sources(self):
+        try:
+            return self._q("SELECT source,last_run,last_ok,entries,matched,status,error FROM orby_reputation_sources "
+                           "ORDER BY status DESC,source")
+        except Exception:
+            return []
+
+    def with_connection(self, fn):
+        """Executa fn(conexao) e fecha (para as consultas da investigacao)."""
+        db = self.conn_factory()
+        try:
+            return fn(db)
+        finally:
+            db.close()

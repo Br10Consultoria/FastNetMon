@@ -439,7 +439,113 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
     def audit_page():
         return render_template("audit.html", rows=store.audit_list())
 
+    # ---------------------------------------------------------------- etapa 2: reputacao e investigacao
+    @app.route("/reputacao", methods=["GET", "POST"])
+    def reputation():
+        from ..reputation import DNSBLS, SOURCES
+        current = config.reputation()
+        names = [x.name for x in SOURCES] + [x.name for x in DNSBLS] + ["abuseipdb"]
+        if request.method == "POST":
+            f = request.form
+
+            def apply():
+                key = "" if f.get("clear_key") else (f.get("abuseipdb_key", "").strip() or current.get("ABUSEIPDB_API_KEY", ""))
+                if key and not re.fullmatch(r"[A-Za-z0-9]{40,128}", key):
+                    raise ValueError("chave do AbuseIPDB com formato inválido")
+                every = int(f.get("heavy_every_h", "6"))
+                if not 1 <= every <= 168:
+                    raise ValueError("intervalo das DNSBL entre 1 e 168 horas")
+                enabled = set(f.getlist("src"))
+                disabled = [n for n in names if n not in enabled]
+                config.save_reputation({"ORBYMON_REP_DISABLED": ",".join(disabled),
+                                        "ORBYMON_REP_DNSBL": "1" if f.get("dnsbl") else "0",
+                                        "ORBYMON_REP_HEAVY_EVERY_H": every, "ABUSEIPDB_API_KEY": key})
+                return {"desativadas": disabled, "dnsbl": bool(f.get("dnsbl")), "intervalo_h": every,
+                        "abuseipdb": "configurada" if key else "sem chave"}
+            safe("reputacao_alterada", apply, "Configuração salva. Vale na próxima verificação (de hora em hora).")
+            return redirect(url_for("reputation"))
+        disabled = {n.strip() for n in current.get("ORBYMON_REP_DISABLED", "").split(",") if n.strip()}
+        key = current.get("ABUSEIPDB_API_KEY", "")
+        return render_template("reputation.html", active=_group_listings(store.reputation_listings(True)),
+                               removed=_group_listings(store.reputation_listings(False)),
+                               sources=store.reputation_sources(), feeds=SOURCES, dnsbls=DNSBLS, disabled=disabled,
+                               dnsbl_on=current.get("ORBYMON_REP_DNSBL", "1") != "0",
+                               every=current.get("ORBYMON_REP_HEAVY_EVERY_H", "6"),
+                               key_masked=(key[:4] + "••••" + key[-4:]) if key else "")
+
+    @app.route("/investigar", methods=["GET", "POST"])
+    def investigate():
+        from datetime import timezone as dt_timezone
+        from zoneinfo import ZoneInfo
+        from .. import abuse_lookup as al
+        from ..bidir_config import build_scopes
+        f = request.form if request.method == "POST" else request.args
+        form = {k: f.get(k, "") for k in ("ip", "time", "port", "protocol", "remote", "remote_port", "window", "email")}
+        form["tz"] = f.get("tz") if f.get("tz") in TZ_CHOICES else "America/Sao_Paulo"
+        tz = dt_timezone.utc if form["tz"] == "UTC" else ZoneInfo(form["tz"])
+        results, history, error = [], None, None
+        if form["ip"].strip() or form["email"].strip():
+            try:
+                cfg = config.bidir()
+                scopes = build_scopes(cfg, config.profile(cfg))
+                window = int(form["window"] or 10)
+                if not 1 <= window <= 120:
+                    raise ValueError("janela entre 1 e 120 minutos")
+                if form["email"].strip():
+                    queries = al.extract_reports(form["email"][:200000], scopes, tz, window)[:10]
+                    if not queries:
+                        raise ValueError("nenhum IP deste provedor com horário encontrado no texto. Confira se o IP "
+                                         "denunciado está nos blocos da página Rede.")
+                else:
+                    ip = str(parse_ips(form["ip"])[0])
+                    if form["time"].strip():
+                        when = al.parse_time(form["time"], tz)
+                        if when is None:
+                            raise ValueError("horário não reconhecido (use 2026-10-30 14:05:00 ou 30/10/2026 14:05)")
+                        opt = lambda k: int(form[k]) if form[k].strip() else None
+                        queries = [al.Query(ip, when, window, opt("port"), form["protocol"] or None,
+                                            str(parse_ips(form["remote"])[0]) if form["remote"].strip() else None,
+                                            opt("remote_port"))]
+                    else:
+                        queries = []
+                        scope = scopes.classify(ip)[0]
+                        history = store.with_connection(lambda db: al.ip_history(db.cursor(), ip, scope, cfg["source"]))
+                        history["pool"] = scopes.classify(ip)[1]
+                for q in queries:
+                    if q.protocol not in (None, "tcp", "udp", "icmp"):
+                        raise ValueError("protocolo inválido")
+                results = store.with_connection(lambda db: [
+                    (r, al.render_text(r, tz)) for r in
+                    (al.investigate(q, scopes, cfg["source"], db, str(config.p.nat_dir)) for q in queries)])
+                audit("investigacao", "; ".join("%s %s porta %s" % (q.ip, q.when, q.port) for q in queries)
+                      or "historico " + form["ip"].strip())
+            except (ValueError, IndexError) as exc:
+                error = str(exc)
+        return render_template("investigate.html", form=form, results=results, history=history, error=error,
+                               tz=tz, tz_choices=TZ_CHOICES, ts=al.fmt_ts)
+
     return app
+
+
+TZ_CHOICES = ("America/Sao_Paulo", "UTC", "America/Bahia", "America/Manaus", "Europe/Berlin", "Europe/London",
+              "Europe/Paris", "America/New_York", "America/Chicago", "America/Los_Angeles", "Asia/Tokyo")
+
+
+def _group_listings(rows):
+    from ..reputation import detail_rank
+    groups = {}
+    for r in rows:
+        g = groups.setdefault(r["entry"], {"entry": r["entry"], "scope": r["scope"], "pool": r["pool"], "lists": [],
+                                           "detail": {}, "desde": r["desde"], "saiu": r["saiu"]})
+        g["lists"].append(r)
+        g["desde"] = min(g["desde"], r["desde"]) if g["desde"] and r["desde"] else g["desde"] or r["desde"]
+        try:
+            d = json.loads(r["detail"]) if isinstance(r["detail"], (str, bytes)) else (r["detail"] or {})
+        except ValueError:
+            d = {}
+        if detail_rank(d) > detail_rank(g["detail"]):
+            g["detail"] = d
+    return list(groups.values())
 
 
 def _net_summary(cfg, profile):

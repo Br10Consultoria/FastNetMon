@@ -83,6 +83,8 @@ ORBYMON_TELEGRAM_ENV='/etc/orbymon/telegram.env'
 ORBYMON_RETENTION_ENV='/etc/orbymon/retention.env'
 ORBYMON_CALIBRATION_DIR='/var/lib/orbymon/calibration'
 ORBYMON_ADMIN_BACKUP_DIR='/var/lib/orbymon/admin/backups'
+ORBYMON_REPUTATION_ENV='/etc/orbymon/reputation.env'
+ORBYMON_NAT_DIR='/var/log/orbymon/a10nat'
 ENV
 
 echo "=== Arquivos de configuracao editaveis pelo painel ==="
@@ -101,7 +103,8 @@ ENV
 fi
 [[ -e /etc/orbymon/retention.env ]] || printf "ORBYMON_LOG_RETENTION_DAYS='15'\nORBYMON_FLOW_RETENTION_DAYS='15'\n" > /etc/orbymon/retention.env
 [[ -e /etc/orbymon/telegram.env ]] || printf "TELEGRAM_BOT_TOKEN=''\nTELEGRAM_CHAT_IDS=''\n" > /etc/orbymon/telegram.env
-for file in /etc/orbymon/bidir.json "$PROFILE" /etc/orbymon/telegram.env /etc/orbymon/retention.env; do
+EXTRA=""; [[ -e /etc/orbymon/reputation.env ]] && EXTRA=/etc/orbymon/reputation.env
+for file in /etc/orbymon/bidir.json "$PROFILE" /etc/orbymon/telegram.env /etc/orbymon/retention.env $EXTRA; do
   [[ "$file" == /etc/orbymon/* && "$file" != /etc/orbymon/managed/* ]] || { echo "ignorado (fora de /etc/orbymon): $file"; continue; }
   name=$(basename "$file")
   if [[ -L "$file" ]]; then
@@ -122,6 +125,14 @@ install -d -o orbymon -g orbymon -m 0750 /var/lib/orbymon/calibration
 setfacl -m u:orbymon-admin:rx /var/lib/orbymon/calibration
 setfacl -d -m u:orbymon-admin:r /var/lib/orbymon/calibration
 find /var/lib/orbymon/calibration -maxdepth 1 -type f -exec setfacl -m u:orbymon-admin:r {} +
+
+echo "=== Leitura do log NAT (pagina Investigar) ==="
+if [[ -d /var/log/orbymon/a10nat ]]; then
+  setfacl -m u:orbymon-admin:x /var/log/orbymon
+  setfacl -m u:orbymon-admin:rx /var/log/orbymon/a10nat
+  setfacl -d -m u:orbymon-admin:r /var/log/orbymon/a10nat
+  find /var/log/orbymon/a10nat -maxdepth 1 -type f -exec setfacl -m u:orbymon-admin:r {} +
+fi
 
 echo "=== Certificado TLS ==="
 TLS=/etc/orbymon/admin-tls
