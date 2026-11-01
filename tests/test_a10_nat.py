@@ -221,6 +221,24 @@ class ReasonAndReplayTests(unittest.TestCase):
             for b in blocks:
                 fh.write(json.dumps({"raw": b, "source_ip": "10.100.10.10"}) + "\n")
 
+    def test_icmp_and_extra_destination_fields_are_accepted(self):
+        icmp = msg(proto="ICMP", pub_port=77)
+        dst = msg(pub_port=78).replace("- -]", "8.8.8.8 53]")
+        for text, proto in ((icmp, "icmp"), (dst, "tcp")):
+            events, reason = parse_events(text, SCOPES, received=1.0)
+            self.assertIsNone(reason, text)
+            self.assertEqual(events[0].protocol, proto)
+
+    def test_unknown_shape_is_reported_without_addresses_or_ports(self):
+        weird = "<134>1 2026-10-30T12:00:00Z A10 acos - - - LSN:PortAllocated:TCP {100.64.64.5:40000 -> 45.238.170.70:20000}"
+        with tempfile.TemporaryDirectory() as d:
+            spool = Path(d) / "s.ndjson"
+            spool.write_text(json.dumps({"raw": weird + msg(), "source_ip": "10.100.10.10"}) + "\n")
+            res = replay_rsyslog_spool(spool, SCOPES, max_lines=5)
+        shapes = [k for k in res["detalhe_ignoradas_top"] if k.startswith("forma:")]
+        self.assertEqual(shapes, ["forma:LSN:PortAllocated:TCP {IP:N -> IP:N}"])
+        self.assertFalse(any(ch.isdigit() for ch in shapes[0]))
+
     def test_gz_replay_reports_period_matches_and_no_subscriber_data(self):
         parts = []
         for n in range(100):

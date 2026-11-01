@@ -31,7 +31,17 @@ import sys
 import time
 
 from .a10_syslog_audit import HEADER
-from .a10_syslog_inspect import MAPPING
+from .a10_syslog_inspect import MAPPING as _PUBLISHED_MAPPING
+
+# Variante ampliada do formato publicado: qualquer protocolo (ICMP etc.) e ate 4 campos
+# extras apos as portas (ex. destino quando o A10 registra o destino em vez de "- -").
+_pattern = _PUBLISHED_MAPPING.pattern
+assert "(?P<protocol>TCP|UDP)" in _pattern and r"(?:\s+-\s+-)?" in _pattern
+MAPPING = re.compile(
+    _pattern.replace("(?P<protocol>TCP|UDP)", "(?P<protocol>[A-Za-z0-9]{2,10})")
+            .replace(r"(?:\s+-\s+-)?", r"(?:\s+[^\s\]]+){0,4}"),
+    re.I)
+IPV4 = re.compile(r"(?:\d{1,3}\.){3}\d{1,3}")
 from .scopes import SCOPE_POOL, SCOPE_PRIVATE, ScopeMap
 
 MAX_TAIL = 65536
@@ -140,6 +150,10 @@ def _diagnose(message: str, reason: str, diag: Counter):
     if reason == "sem_marcador_nat":
         found = MARKER.search(message)
         diag["tipo:" + (found.group(0) if found else "sem_LSN")] += 1
+        if found and found.group(1) in ("PortAllocated", "PortAllocation", "PortFreed"):
+            # Forma do registro sem dados: IPs -> IP, numeros -> N. Mostra o formato nao reconhecido.
+            shape = re.sub(r"\d+", "N", IPV4.sub("IP", message[found.start():found.start() + 90]))
+            diag["forma:" + " ".join(shape.split())] += 1
     elif reason in ("interno_fora_da_rede", "publico_fora_dos_pools"):
         for m in MAPPING.finditer(message):
             if reason == "publico_fora_dos_pools":
@@ -445,7 +459,8 @@ async def serve(service: NatService, host, port, socket_path, *, use_db=True):
         service.log.close()
 
 
-def replay_rsyslog_spool(path, scopes: ScopeMap, *, max_bytes=2_000_000_000, progress=False):
+def replay_rsyslog_spool(path, scopes: ScopeMap, *, max_bytes=2_000_000_000, progress=False,
+                         max_lines=None):
     """Reprocessa o spool NDJSON do rsyslog (texto ou .gz) juntando blocos consecutivos.
 
     O rsyslog dividiu o stream em blocos sem descartar bytes: concatenar na ordem
@@ -474,6 +489,8 @@ def replay_rsyslog_spool(path, scopes: ScopeMap, *, max_bytes=2_000_000_000, pro
                 continue
             lines += 1
             service.ingest_text(text, splitters[source], now=0.0)
+            if max_lines and lines >= max_lines:
+                break
             if lines % 200 == 0 and service.span[1]:
                 service.table.prune(service.span[1])      # memoria limitada em arquivos de 1 h
             if progress and lines % 2000 == 0:
@@ -493,7 +510,7 @@ def replay_rsyslog_spool(path, scopes: ScopeMap, *, max_bytes=2_000_000_000, pro
         "eventos": {k: v for k, v in service.stats.items() if k.startswith("eventos_")},
         "eventos_por_segundo": round(total / period, 1) if period else None,
         "mensagens_ignoradas_por_motivo": ignored,
-        "detalhe_ignoradas_top": dict(service.diag.most_common(15)),
+        "detalhe_ignoradas_top": dict(service.diag.most_common(25)),
         "liberacoes_casadas_com_alocacao": freed - service.table.orphan_frees,
         "liberacoes_sem_alocacao": service.table.orphan_frees,
         "alocacoes_ainda_ativas_no_fim": service.table.sizes()["ativos"],
@@ -513,6 +530,8 @@ def main(argv=None):
     ap.add_argument("--allow", action="append", default=None,
                     help="IP de origem aceito (repetivel); padrao 10.100.10.10")
     ap.add_argument("--log-dir", default="/var/log/orbymon/a10nat")
+    ap.add_argument("--replay-max-lines", type=int, default=None,
+                    help="limita o replay as primeiras N linhas (teste rapido)")
     ap.add_argument("--time-source", choices=("received", "a10"), default="received",
                     help="use 'a10' somente depois de NTP confirmado no A10")
     ap.add_argument("--retention-seconds", type=int, default=900,
@@ -525,7 +544,8 @@ def main(argv=None):
         cfg = read_config(args.config)
         scopes = build_scopes(cfg)
         if args.replay_rsyslog:
-            print(json.dumps(replay_rsyslog_spool(args.replay_rsyslog, scopes, progress=True),
+            print(json.dumps(replay_rsyslog_spool(args.replay_rsyslog, scopes, progress=True,
+                                                 max_lines=args.replay_max_lines),
                              ensure_ascii=False, indent=2))
             return 0
         service = NatService(scopes, allowed_sources=args.allow or ["10.100.10.10"],
