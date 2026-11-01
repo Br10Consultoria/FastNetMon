@@ -52,8 +52,10 @@ class DashboardImprovementsTests(unittest.TestCase):
             d=dash(name)
             qs=" ".join(p["targets"][0]["rawSql"] for p in d["panels"])
             self.assertIn("orby_interface_names",qs)
-            self.assertIn("Não informado",qs)
-            self.assertIn("ifIndex ",qs)
+            self.assertIn("sem interface (0)",qs)              # ifIndex 0 nunca vira porta fisica
+            self.assertIn("' (sem nome)'",qs)                  # indice sem nome confirmado aparece como numero
+            self.assertNotIn("/dir",qs)
+            self.assertNotIn("Direcao raw",qs)
     def test_no_duplicate_uids(self):
         self.assertEqual(len({dash(n)["uid"] for n in
            ("orbymon-overview.json","orbymon-ip-analytics.json",

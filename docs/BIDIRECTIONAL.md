@@ -123,6 +123,11 @@ Interfaces de borda do NE8000 (VS Bgp) já preenchidas em `rules/bidir.example.j
 | 86 | Vlanif712 | CDN |
 | 85 | Vlanif1358 | backup (desligada) |
 
+Os painéis mostram o **nome** da interface a partir da tabela `orby_interface_names` (preenchida pelo
+`scripts/sync-huawei-ifnames-snmp.sh` ou manualmente com índices confirmados no `display interface`).
+Índice sem nome aparece como "ifIndex N (sem nome)"; índice 0 como "sem interface (0)". A coluna "Captura"
+diz onde o Huawei amostrou: "captura na entrada" (inbound) ou "captura na saída" (outbound).
+
 Ao criar uma nova interface de borda, ligue o NetStream nela **e** acrescente o ifIndex nas duas listas;
 caso contrário o tráfego dela é descartado pelo filtro.
 

@@ -146,7 +146,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT src_ip AS 'Origem',dst_ip AS 'Destino',protocol AS 'Protocolo',dst_port AS 'Porta',CASE WHEN input_if=0 THEN 'Não informado' ELSE COALESCE(MAX(im_in.if_name),CONCAT('ifIndex ',input_if)) END AS 'Entrada Huawei',CASE WHEN output_if=0 THEN 'Não informado' ELSE COALESCE(MAX(im_out.if_name),CONCAT('ifIndex ',output_if)) END AS 'Saída Huawei',ROUND(SUM(total_bytes),0) AS 'Volume estimado' FROM orby_ip_pairs_minute LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=input_if LEFT JOIN orby_interface_names AS im_out ON im_out.source='huawei' AND im_out.if_index=output_if WHERE orby_ip_pairs_minute.source='huawei' AND $__timeFilter(bucket_utc) GROUP BY src_ip,dst_ip,protocol,dst_port,input_if,output_if ORDER BY SUM(total_bytes) DESC LIMIT 40",
+          "rawSql": "SELECT src_ip AS 'Origem',dst_ip AS 'Destino',protocol AS 'Protocolo',dst_port AS 'Porta',CASE WHEN input_if=0 THEN 'sem interface (0)' ELSE COALESCE(MAX(im_in.if_name),CONCAT('ifIndex ',input_if,' (sem nome)')) END AS 'Entrada Huawei',CASE WHEN output_if=0 THEN 'sem interface (0)' ELSE COALESCE(MAX(im_out.if_name),CONCAT('ifIndex ',output_if,' (sem nome)')) END AS 'Saída Huawei',ROUND(SUM(total_bytes),0) AS 'Volume estimado' FROM orby_ip_pairs_minute LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=input_if LEFT JOIN orby_interface_names AS im_out ON im_out.source='huawei' AND im_out.if_index=output_if WHERE orby_ip_pairs_minute.source='huawei' AND $__timeFilter(bucket_utc) GROUP BY src_ip,dst_ip,protocol,dst_port,input_if,output_if ORDER BY SUM(total_bytes) DESC LIMIT 40",
           "format": "table",
           "editorMode": "code"
         }
@@ -199,7 +199,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT CASE WHEN input_if=0 THEN 'Não informado' ELSE COALESCE(MAX(im_in.if_name),CONCAT('ifIndex ',input_if)) END AS 'Entrada Huawei',CASE WHEN output_if=0 THEN 'Não informado' ELSE COALESCE(MAX(im_out.if_name),CONCAT('ifIndex ',output_if)) END AS 'Saída Huawei',netflow_direction AS 'Direcao raw',ROUND(SUM(total_bytes),0) AS 'Volume estimado',SUM(flow_records) AS 'Registros' FROM orby_ip_pairs_minute LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=input_if LEFT JOIN orby_interface_names AS im_out ON im_out.source='huawei' AND im_out.if_index=output_if WHERE orby_ip_pairs_minute.source='huawei' AND $__timeFilter(bucket_utc) GROUP BY input_if,output_if,netflow_direction ORDER BY SUM(total_bytes) DESC LIMIT 30",
+          "rawSql": "SELECT CASE WHEN input_if=0 THEN 'sem interface (0)' ELSE COALESCE(MAX(im_in.if_name),CONCAT('ifIndex ',input_if,' (sem nome)')) END AS 'Entrada Huawei',CASE WHEN output_if=0 THEN 'sem interface (0)' ELSE COALESCE(MAX(im_out.if_name),CONCAT('ifIndex ',output_if,' (sem nome)')) END AS 'Saída Huawei',CASE netflow_direction WHEN 0 THEN 'captura na entrada' WHEN 1 THEN 'captura na saída' ELSE 'direção não informada' END AS 'Captura',ROUND(SUM(total_bytes),0) AS 'Volume estimado',SUM(flow_records) AS 'Registros' FROM orby_ip_pairs_minute LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=input_if LEFT JOIN orby_interface_names AS im_out ON im_out.source='huawei' AND im_out.if_index=output_if WHERE orby_ip_pairs_minute.source='huawei' AND $__timeFilter(bucket_utc) GROUP BY input_if,output_if,netflow_direction ORDER BY SUM(total_bytes) DESC LIMIT 30",
           "format": "table",
           "editorMode": "code"
         }
@@ -412,7 +412,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),CASE WHEN input_if=0 THEN 'Não informado' ELSE COALESCE(CONCAT(im_in.if_name,' (',input_if,')'),CONCAT('ifIndex ',input_if)) END AS metric,ROUND(SUM(total_bytes)*8/60,2) AS value FROM orby_ip_pairs_minute LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=input_if WHERE orby_ip_pairs_minute.source='huawei' AND $__timeFilter(bucket_utc) GROUP BY 1,input_if,im_in.if_name ORDER BY 1",
+          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),CASE WHEN input_if=0 THEN 'sem interface (0)' ELSE COALESCE(CONCAT(im_in.if_name,' (',input_if,')'),CONCAT('ifIndex ',input_if,' (sem nome)')) END AS metric,ROUND(SUM(total_bytes)*8/60,2) AS value FROM orby_ip_pairs_minute LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=input_if WHERE orby_ip_pairs_minute.source='huawei' AND $__timeFilter(bucket_utc) GROUP BY 1,input_if,im_in.if_name ORDER BY 1",
           "format": "time_series",
           "editorMode": "code"
         }

@@ -330,6 +330,49 @@
     },
     {
       "id": 7,
+      "title": "Taxa por interface de borda (trânsito, PTT, CDN, peers)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "description": "Recebido: interface por onde entrou. Originado: interface por onde saiu para a internet.",
+      "gridPos": {
+        "x": 0,
+        "y": 56,
+        "w": 24,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT $__timeGroupAlias(f.bucket_utc,'1m'),CONCAT(CASE direction WHEN 'in' THEN 'recebido' ELSE 'originado' END,' · ',CASE WHEN CASE direction WHEN 'in' THEN f.input_if ELSE f.output_if END=0 THEN 'sem interface (0)' ELSE COALESCE(MAX(im.if_name),CONCAT('ifIndex ',CASE direction WHEN 'in' THEN f.input_if ELSE f.output_if END,' (sem nome)')) END) AS metric,SUM(f.bytes)*8/60 AS value FROM orby_flow_minute AS f LEFT JOIN orby_interface_names AS im ON im.source='huawei' AND im.if_index=CASE direction WHEN 'in' THEN f.input_if ELSE f.output_if END WHERE f.source='huawei' AND $__timeFilter(f.bucket_utc) AND (${ip:sqlstring}='' OR local_ip=${ip:sqlstring} OR subscriber_ip=${ip:sqlstring}) AND (${remoto:sqlstring}='' OR remote_ip=${remoto:sqlstring}) AND (${porta:sqlstring}='' OR local_port=${porta:sqlstring} OR remote_port=${porta:sqlstring}) AND (${direcao:sqlstring}='all' OR direction=${direcao:sqlstring}) AND (${proto:sqlstring}='all' OR protocol=${proto:sqlstring}) GROUP BY 1,direction,CASE direction WHEN 'in' THEN f.input_if ELSE f.output_if END ORDER BY 1",
+          "format": "time_series",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "bps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 8,
       "title": "Pacotes/s por sentido, com SYN e porta 0",
       "type": "timeseries",
       "datasource": {
@@ -372,7 +415,7 @@
       }
     },
     {
-      "id": 8,
+      "id": 9,
       "title": "Eventos de ataque detectados",
       "type": "table",
       "datasource": {
@@ -393,7 +436,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT event_time AS 'Hora',rule_name AS 'Regra',severity AS 'Severidade',CASE direction WHEN 'in' THEN 'recebido' ELSE 'originado' END AS 'Sentido',scope AS 'Tipo',pool AS 'Pool',local_ip AS 'IP público/local',subscriber_ip AS 'IP assinante',protocol AS 'Proto',local_port AS 'Porta local',remote_port AS 'Porta remota',pps AS 'Pacotes/s',mbps*1000000 AS 'Taxa',remote_ips AS 'IPs remotos',syn_ratio AS 'SYN' FROM orby_attack_events WHERE $__timeFilter(event_time) AND (${ip:sqlstring}='' OR local_ip=${ip:sqlstring} OR subscriber_ip=${ip:sqlstring}) AND (${direcao:sqlstring}='all' OR direction=${direcao:sqlstring}) AND (${proto:sqlstring}='all' OR protocol=${proto:sqlstring}) AND (${porta:sqlstring}='' OR local_port=${porta:sqlstring} OR remote_port=${porta:sqlstring}) ORDER BY event_time DESC LIMIT 200",
+          "rawSql": "SELECT event_time AS 'Hora',rule_name AS 'Regra',severity AS 'Severidade',CASE direction WHEN 'in' THEN 'recebido' ELSE 'originado' END AS 'Sentido',scope AS 'Tipo',pool AS 'Pool',local_ip AS 'IP público/local',subscriber_ip AS 'IP assinante',protocol AS 'Proto',local_port AS 'Porta local',remote_port AS 'Porta remota',pps AS 'Pacotes/s',mbps*1000000 AS 'Taxa',remote_ips AS 'IPs remotos',syn_ratio AS 'SYN',CASE WHEN e.input_if=0 THEN 'sem interface (0)' ELSE COALESCE(im.if_name,CONCAT('ifIndex ',e.input_if,' (sem nome)')) END AS 'Entrou por',CASE WHEN e.output_if=0 THEN 'sem interface (0)' ELSE COALESCE(om.if_name,CONCAT('ifIndex ',e.output_if,' (sem nome)')) END AS 'Saiu por' FROM orby_attack_events AS e LEFT JOIN orby_interface_names AS im ON im.source='huawei' AND im.if_index=e.input_if LEFT JOIN orby_interface_names AS om ON om.source='huawei' AND om.if_index=e.output_if WHERE $__timeFilter(event_time) AND (${ip:sqlstring}='' OR local_ip=${ip:sqlstring} OR subscriber_ip=${ip:sqlstring}) AND (${direcao:sqlstring}='all' OR direction=${direcao:sqlstring}) AND (${proto:sqlstring}='all' OR protocol=${proto:sqlstring}) AND (${porta:sqlstring}='' OR local_port=${porta:sqlstring} OR remote_port=${porta:sqlstring}) ORDER BY event_time DESC LIMIT 200",
           "format": "table",
           "editorMode": "code"
         }
@@ -458,7 +501,7 @@
       "options": {}
     },
     {
-      "id": 9,
+      "id": 10,
       "title": "IPs da rede com maior pico (público, pool ou assinante)",
       "type": "table",
       "datasource": {
@@ -544,7 +587,7 @@
       "options": {}
     },
     {
-      "id": 10,
+      "id": 11,
       "title": "IPs remotos (quem ataca ou é atacado)",
       "type": "table",
       "datasource": {
@@ -614,7 +657,7 @@
       "options": {}
     },
     {
-      "id": 11,
+      "id": 12,
       "title": "Protocolos e portas de serviço",
       "type": "table",
       "datasource": {
@@ -700,7 +743,7 @@
       "options": {}
     },
     {
-      "id": 12,
+      "id": 13,
       "title": "CGNAT: assinantes por trás de cada IP público do pool",
       "type": "table",
       "datasource": {
@@ -770,7 +813,7 @@
       "options": {}
     },
     {
-      "id": 13,
+      "id": 14,
       "title": "CGNAT: alocações de porta do assinante (log A10, sem amostragem)",
       "type": "timeseries",
       "datasource": {

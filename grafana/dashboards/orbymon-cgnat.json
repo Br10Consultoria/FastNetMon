@@ -39,7 +39,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT src_ip AS 'IP publico origem',protocol AS Protocolo,CASE WHEN input_if=0 THEN 'Não informado' ELSE COALESCE(MAX(im_in.if_name),CONCAT('ifIndex ',input_if)) END AS 'Entrada Huawei',CASE WHEN output_if=0 THEN 'Não informado' ELSE COALESCE(MAX(im_out.if_name),CONCAT('ifIndex ',output_if)) END AS 'Saída Huawei',netflow_direction AS 'Direcao raw',ROUND(SUM(total_bytes),0) AS 'Volume estimado' FROM orby_ip_pairs_minute LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=input_if LEFT JOIN orby_interface_names AS im_out ON im_out.source='huawei' AND im_out.if_index=output_if WHERE orby_ip_pairs_minute.source='huawei' AND $__timeFilter(bucket_utc) AND (src_ip LIKE '45.238.170.%' OR src_ip LIKE '45.238.171.%' OR src_ip LIKE '187.87.201.%') GROUP BY src_ip,protocol,input_if,output_if,netflow_direction ORDER BY SUM(total_bytes) DESC LIMIT 30",
+          "rawSql": "SELECT src_ip AS 'IP publico origem',protocol AS Protocolo,CASE WHEN input_if=0 THEN 'sem interface (0)' ELSE COALESCE(MAX(im_in.if_name),CONCAT('ifIndex ',input_if,' (sem nome)')) END AS 'Entrada Huawei',CASE WHEN output_if=0 THEN 'sem interface (0)' ELSE COALESCE(MAX(im_out.if_name),CONCAT('ifIndex ',output_if,' (sem nome)')) END AS 'Saída Huawei',CASE netflow_direction WHEN 0 THEN 'captura na entrada' WHEN 1 THEN 'captura na saída' ELSE 'direção não informada' END AS 'Captura',ROUND(SUM(total_bytes),0) AS 'Volume estimado' FROM orby_ip_pairs_minute LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=input_if LEFT JOIN orby_interface_names AS im_out ON im_out.source='huawei' AND im_out.if_index=output_if WHERE orby_ip_pairs_minute.source='huawei' AND $__timeFilter(bucket_utc) AND (src_ip LIKE '45.238.170.%' OR src_ip LIKE '45.238.171.%' OR src_ip LIKE '187.87.201.%') GROUP BY src_ip,protocol,input_if,output_if,netflow_direction ORDER BY SUM(total_bytes) DESC LIMIT 30",
           "format": "table",
           "editorMode": "code"
         }
@@ -92,7 +92,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT dst_ip AS 'IP publico destino',protocol AS Protocolo,CASE WHEN input_if=0 THEN 'Não informado' ELSE COALESCE(MAX(im_in.if_name),CONCAT('ifIndex ',input_if)) END AS 'Entrada Huawei',CASE WHEN output_if=0 THEN 'Não informado' ELSE COALESCE(MAX(im_out.if_name),CONCAT('ifIndex ',output_if)) END AS 'Saída Huawei',netflow_direction AS 'Direcao raw',ROUND(SUM(total_bytes),0) AS 'Volume estimado' FROM orby_ip_pairs_minute LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=input_if LEFT JOIN orby_interface_names AS im_out ON im_out.source='huawei' AND im_out.if_index=output_if WHERE orby_ip_pairs_minute.source='huawei' AND $__timeFilter(bucket_utc) AND (dst_ip LIKE '45.238.170.%' OR dst_ip LIKE '45.238.171.%' OR dst_ip LIKE '187.87.201.%') GROUP BY dst_ip,protocol,input_if,output_if,netflow_direction ORDER BY SUM(total_bytes) DESC LIMIT 30",
+          "rawSql": "SELECT dst_ip AS 'IP publico destino',protocol AS Protocolo,CASE WHEN input_if=0 THEN 'sem interface (0)' ELSE COALESCE(MAX(im_in.if_name),CONCAT('ifIndex ',input_if,' (sem nome)')) END AS 'Entrada Huawei',CASE WHEN output_if=0 THEN 'sem interface (0)' ELSE COALESCE(MAX(im_out.if_name),CONCAT('ifIndex ',output_if,' (sem nome)')) END AS 'Saída Huawei',CASE netflow_direction WHEN 0 THEN 'captura na entrada' WHEN 1 THEN 'captura na saída' ELSE 'direção não informada' END AS 'Captura',ROUND(SUM(total_bytes),0) AS 'Volume estimado' FROM orby_ip_pairs_minute LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=input_if LEFT JOIN orby_interface_names AS im_out ON im_out.source='huawei' AND im_out.if_index=output_if WHERE orby_ip_pairs_minute.source='huawei' AND $__timeFilter(bucket_utc) AND (dst_ip LIKE '45.238.170.%' OR dst_ip LIKE '45.238.171.%' OR dst_ip LIKE '187.87.201.%') GROUP BY dst_ip,protocol,input_if,output_if,netflow_direction ORDER BY SUM(total_bytes) DESC LIMIT 30",
           "format": "table",
           "editorMode": "code"
         }
@@ -126,7 +126,7 @@
     },
     {
       "id": 3,
-      "title": "Taxa estimada (IP local como origem)",
+      "title": "Taxa estimada (IP local como origem) — 15 maiores picos",
       "type": "timeseries",
       "datasource": {
         "type": "mysql",
@@ -145,7 +145,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'), CONCAT(src_ip,' /if',input_if,'/dir',netflow_direction) AS metric,ROUND(SUM(total_bytes)*8/60,2) AS value FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc) AND (src_ip LIKE '45.238.170.%' OR src_ip LIKE '45.238.171.%' OR src_ip LIKE '187.87.201.%') GROUP BY 1,src_ip,input_if,netflow_direction ORDER BY 1",
+          "rawSql": "SELECT $__timeGroupAlias(p.bucket_utc,'1m'),CONCAT(p.src_ip,' · entrou ',CASE WHEN p.input_if=0 THEN 'sem interface (0)' ELSE COALESCE(im.if_name,CONCAT('ifIndex ',p.input_if,' (sem nome)')) END,' · ',CASE p.netflow_direction WHEN 0 THEN 'captura na entrada' WHEN 1 THEN 'captura na saída' ELSE 'direção não informada' END) AS metric,ROUND(SUM(p.total_bytes)*8/60,2) AS value FROM orby_ip_pairs_minute AS p JOIN (SELECT ip FROM (SELECT src_ip AS ip,bucket_utc,SUM(total_bytes) AS b FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND (src_ip LIKE '45.238.170.%' OR src_ip LIKE '45.238.171.%' OR src_ip LIKE '187.87.201.%') GROUP BY src_ip,bucket_utc) x GROUP BY ip ORDER BY MAX(b) DESC LIMIT 15) AS top ON top.ip=p.src_ip LEFT JOIN orby_interface_names AS im ON im.source='huawei' AND im.if_index=p.input_if WHERE p.source='huawei' AND $__timeFilter(p.bucket_utc) GROUP BY 1,p.src_ip,p.input_if,p.netflow_direction,im.if_name ORDER BY 1",
           "format": "time_series",
           "editorMode": "code"
         }
@@ -169,7 +169,7 @@
     },
     {
       "id": 4,
-      "title": "Taxa estimada (IP local como destino)",
+      "title": "Taxa estimada (IP local como destino) — 15 maiores picos",
       "type": "timeseries",
       "datasource": {
         "type": "mysql",
@@ -188,7 +188,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'), CONCAT(dst_ip,' /if',input_if,'/dir',netflow_direction) AS metric,ROUND(SUM(total_bytes)*8/60,2) AS value FROM orby_ip_pairs_minute WHERE $__timeFilter(bucket_utc) AND (dst_ip LIKE '45.238.170.%' OR dst_ip LIKE '45.238.171.%' OR dst_ip LIKE '187.87.201.%') GROUP BY 1,dst_ip,input_if,netflow_direction ORDER BY 1",
+          "rawSql": "SELECT $__timeGroupAlias(p.bucket_utc,'1m'),CONCAT(p.dst_ip,' · entrou ',CASE WHEN p.input_if=0 THEN 'sem interface (0)' ELSE COALESCE(im.if_name,CONCAT('ifIndex ',p.input_if,' (sem nome)')) END,' · ',CASE p.netflow_direction WHEN 0 THEN 'captura na entrada' WHEN 1 THEN 'captura na saída' ELSE 'direção não informada' END) AS metric,ROUND(SUM(p.total_bytes)*8/60,2) AS value FROM orby_ip_pairs_minute AS p JOIN (SELECT ip FROM (SELECT dst_ip AS ip,bucket_utc,SUM(total_bytes) AS b FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND (dst_ip LIKE '45.238.170.%' OR dst_ip LIKE '45.238.171.%' OR dst_ip LIKE '187.87.201.%') GROUP BY dst_ip,bucket_utc) x GROUP BY ip ORDER BY MAX(b) DESC LIMIT 15) AS top ON top.ip=p.dst_ip LEFT JOIN orby_interface_names AS im ON im.source='huawei' AND im.if_index=p.input_if WHERE p.source='huawei' AND $__timeFilter(p.bucket_utc) GROUP BY 1,p.dst_ip,p.input_if,p.netflow_direction,im.if_name ORDER BY 1",
           "format": "time_series",
           "editorMode": "code"
         }
@@ -231,7 +231,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT dst_ip AS 'IP publico destino',protocol AS Protocolo,CASE WHEN input_if=0 THEN 'Não informado' ELSE COALESCE(MAX(im_in.if_name),CONCAT('ifIndex ',input_if)) END AS 'Entrada Huawei',COUNT(DISTINCT src_ip) AS 'IPs remotos observados',ROUND(SUM(total_bytes),0) AS 'Volume estimado' FROM orby_ip_pairs_minute LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=input_if LEFT JOIN orby_interface_names AS im_out ON im_out.source='huawei' AND im_out.if_index=output_if WHERE orby_ip_pairs_minute.source='huawei' AND $__timeFilter(bucket_utc) AND (dst_ip LIKE '45.238.170.%' OR dst_ip LIKE '45.238.171.%' OR dst_ip LIKE '187.87.201.%') GROUP BY dst_ip,protocol,input_if ORDER BY COUNT(DISTINCT src_ip) DESC LIMIT 25",
+          "rawSql": "SELECT dst_ip AS 'IP publico destino',protocol AS Protocolo,CASE WHEN input_if=0 THEN 'sem interface (0)' ELSE COALESCE(MAX(im_in.if_name),CONCAT('ifIndex ',input_if,' (sem nome)')) END AS 'Entrada Huawei',COUNT(DISTINCT src_ip) AS 'IPs remotos observados',ROUND(SUM(total_bytes),0) AS 'Volume estimado' FROM orby_ip_pairs_minute LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=input_if LEFT JOIN orby_interface_names AS im_out ON im_out.source='huawei' AND im_out.if_index=output_if WHERE orby_ip_pairs_minute.source='huawei' AND $__timeFilter(bucket_utc) AND (dst_ip LIKE '45.238.170.%' OR dst_ip LIKE '45.238.171.%' OR dst_ip LIKE '187.87.201.%') GROUP BY dst_ip,protocol,input_if ORDER BY COUNT(DISTINCT src_ip) DESC LIMIT 25",
           "format": "table",
           "editorMode": "code"
         }
@@ -284,7 +284,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT src_ip AS 'IP publico origem',protocol AS Protocolo,CASE WHEN input_if=0 THEN 'Não informado' ELSE COALESCE(MAX(im_in.if_name),CONCAT('ifIndex ',input_if)) END AS 'Entrada Huawei',COUNT(DISTINCT dst_ip) AS 'IPs remotos observados',ROUND(SUM(total_bytes),0) AS 'Volume estimado' FROM orby_ip_pairs_minute LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=input_if LEFT JOIN orby_interface_names AS im_out ON im_out.source='huawei' AND im_out.if_index=output_if WHERE orby_ip_pairs_minute.source='huawei' AND $__timeFilter(bucket_utc) AND (src_ip LIKE '45.238.170.%' OR src_ip LIKE '45.238.171.%' OR src_ip LIKE '187.87.201.%') GROUP BY src_ip,protocol,input_if ORDER BY COUNT(DISTINCT dst_ip) DESC LIMIT 25",
+          "rawSql": "SELECT src_ip AS 'IP publico origem',protocol AS Protocolo,CASE WHEN input_if=0 THEN 'sem interface (0)' ELSE COALESCE(MAX(im_in.if_name),CONCAT('ifIndex ',input_if,' (sem nome)')) END AS 'Entrada Huawei',COUNT(DISTINCT dst_ip) AS 'IPs remotos observados',ROUND(SUM(total_bytes),0) AS 'Volume estimado' FROM orby_ip_pairs_minute LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=input_if LEFT JOIN orby_interface_names AS im_out ON im_out.source='huawei' AND im_out.if_index=output_if WHERE orby_ip_pairs_minute.source='huawei' AND $__timeFilter(bucket_utc) AND (src_ip LIKE '45.238.170.%' OR src_ip LIKE '45.238.171.%' OR src_ip LIKE '187.87.201.%') GROUP BY src_ip,protocol,input_if ORDER BY COUNT(DISTINCT dst_ip) DESC LIMIT 25",
           "format": "table",
           "editorMode": "code"
         }
@@ -425,7 +425,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT CASE WHEN input_if=0 THEN 'Não informado' ELSE COALESCE(MAX(im_in.if_name),CONCAT('ifIndex ',input_if)) END AS 'Entrada Huawei',CASE WHEN output_if=0 THEN 'Não informado' ELSE COALESCE(MAX(im_out.if_name),CONCAT('ifIndex ',output_if)) END AS 'Saída Huawei',netflow_direction AS 'Direcao raw',ROUND(SUM(total_bytes),0) AS 'Volume estimado' FROM orby_ip_pairs_minute LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=input_if LEFT JOIN orby_interface_names AS im_out ON im_out.source='huawei' AND im_out.if_index=output_if WHERE orby_ip_pairs_minute.source='huawei' AND $__timeFilter(bucket_utc) AND ((src_ip LIKE '45.238.170.%' OR src_ip LIKE '45.238.171.%' OR src_ip LIKE '187.87.201.%') OR (dst_ip LIKE '45.238.170.%' OR dst_ip LIKE '45.238.171.%' OR dst_ip LIKE '187.87.201.%')) GROUP BY input_if,output_if,netflow_direction ORDER BY SUM(total_bytes) DESC LIMIT 30",
+          "rawSql": "SELECT CASE WHEN input_if=0 THEN 'sem interface (0)' ELSE COALESCE(MAX(im_in.if_name),CONCAT('ifIndex ',input_if,' (sem nome)')) END AS 'Entrada Huawei',CASE WHEN output_if=0 THEN 'sem interface (0)' ELSE COALESCE(MAX(im_out.if_name),CONCAT('ifIndex ',output_if,' (sem nome)')) END AS 'Saída Huawei',CASE netflow_direction WHEN 0 THEN 'captura na entrada' WHEN 1 THEN 'captura na saída' ELSE 'direção não informada' END AS 'Captura',ROUND(SUM(total_bytes),0) AS 'Volume estimado' FROM orby_ip_pairs_minute LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=input_if LEFT JOIN orby_interface_names AS im_out ON im_out.source='huawei' AND im_out.if_index=output_if WHERE orby_ip_pairs_minute.source='huawei' AND $__timeFilter(bucket_utc) AND ((src_ip LIKE '45.238.170.%' OR src_ip LIKE '45.238.171.%' OR src_ip LIKE '187.87.201.%') OR (dst_ip LIKE '45.238.170.%' OR dst_ip LIKE '45.238.171.%' OR dst_ip LIKE '187.87.201.%')) GROUP BY input_if,output_if,netflow_direction ORDER BY SUM(total_bytes) DESC LIMIT 30",
           "format": "table",
           "editorMode": "code"
         }
@@ -459,7 +459,7 @@
     },
     {
       "id": 10,
-      "title": "A10 CGNAT - Pool publico na ORIGEM (top protocolos/ifIndex)",
+      "title": "A10 CGNAT - Pool publico na ORIGEM (top protocolos/interfaces)",
       "type": "table",
       "datasource": {
         "type": "mysql",
@@ -478,7 +478,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT pool_name AS Pool, protocol AS Protocolo,CASE WHEN input_if=0 THEN 'Não informado' ELSE COALESCE(MAX(im_in.if_name),CONCAT('ifIndex ',input_if)) END AS 'Entrada Huawei',netflow_direction AS 'Direcao raw', COUNT(DISTINCT ip_publico) AS 'IPs publicos observados',ROUND(SUM(total_bytes),0) AS 'Volume estimado' FROM (SELECT bucket_utc,protocol,input_if,output_if,netflow_direction,src_ip AS ip_publico,total_bytes,total_packets,CASE WHEN INET_ATON(src_ip) BETWEEN INET_ATON('45.238.170.64') AND INET_ATON('45.238.170.127') THEN 'NAT-POOL-08' WHEN INET_ATON(src_ip) BETWEEN INET_ATON('45.238.171.64') AND INET_ATON('45.238.171.127') THEN 'NAT-POOL-09' WHEN INET_ATON(src_ip) BETWEEN INET_ATON('45.238.170.128') AND INET_ATON('45.238.170.191') THEN 'NAT-POOL-10' WHEN INET_ATON(src_ip) BETWEEN INET_ATON('45.238.171.128') AND INET_ATON('45.238.171.191') THEN 'NAT-POOL-11' ELSE NULL END AS pool_name FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc)) a LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=a.input_if WHERE pool_name IS NOT NULL GROUP BY pool_name,protocol,input_if,netflow_direction ORDER BY SUM(total_bytes) DESC LIMIT 40",
+          "rawSql": "SELECT pool_name AS Pool, protocol AS Protocolo,CASE WHEN input_if=0 THEN 'sem interface (0)' ELSE COALESCE(MAX(im_in.if_name),CONCAT('ifIndex ',input_if,' (sem nome)')) END AS 'Entrada Huawei',CASE netflow_direction WHEN 0 THEN 'captura na entrada' WHEN 1 THEN 'captura na saída' ELSE 'direção não informada' END AS 'Captura', COUNT(DISTINCT ip_publico) AS 'IPs publicos observados',ROUND(SUM(total_bytes),0) AS 'Volume estimado' FROM (SELECT bucket_utc,protocol,input_if,output_if,netflow_direction,src_ip AS ip_publico,total_bytes,total_packets,CASE WHEN INET_ATON(src_ip) BETWEEN INET_ATON('45.238.170.64') AND INET_ATON('45.238.170.127') THEN 'NAT-POOL-08' WHEN INET_ATON(src_ip) BETWEEN INET_ATON('45.238.171.64') AND INET_ATON('45.238.171.127') THEN 'NAT-POOL-09' WHEN INET_ATON(src_ip) BETWEEN INET_ATON('45.238.170.128') AND INET_ATON('45.238.170.191') THEN 'NAT-POOL-10' WHEN INET_ATON(src_ip) BETWEEN INET_ATON('45.238.171.128') AND INET_ATON('45.238.171.191') THEN 'NAT-POOL-11' ELSE NULL END AS pool_name FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc)) a LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=a.input_if WHERE pool_name IS NOT NULL GROUP BY pool_name,protocol,input_if,netflow_direction ORDER BY SUM(total_bytes) DESC LIMIT 40",
           "format": "table",
           "editorMode": "code"
         }
@@ -512,7 +512,7 @@
     },
     {
       "id": 11,
-      "title": "A10 CGNAT - Pool publico no DESTINO (top protocolos/ifIndex)",
+      "title": "A10 CGNAT - Pool publico no DESTINO (top protocolos/interfaces)",
       "type": "table",
       "datasource": {
         "type": "mysql",
@@ -531,7 +531,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT pool_name AS Pool,protocol AS Protocolo,CASE WHEN input_if=0 THEN 'Não informado' ELSE COALESCE(MAX(im_in.if_name),CONCAT('ifIndex ',input_if)) END AS 'Entrada Huawei',netflow_direction AS 'Direcao raw',COUNT(DISTINCT ip_publico) AS 'IPs publicos observados',ROUND(SUM(total_bytes),0) AS 'Volume estimado' FROM (SELECT bucket_utc,protocol,input_if,output_if,netflow_direction,dst_ip AS ip_publico,total_bytes,total_packets,CASE WHEN INET_ATON(dst_ip) BETWEEN INET_ATON('45.238.170.64') AND INET_ATON('45.238.170.127') THEN 'NAT-POOL-08' WHEN INET_ATON(dst_ip) BETWEEN INET_ATON('45.238.171.64') AND INET_ATON('45.238.171.127') THEN 'NAT-POOL-09' WHEN INET_ATON(dst_ip) BETWEEN INET_ATON('45.238.170.128') AND INET_ATON('45.238.170.191') THEN 'NAT-POOL-10' WHEN INET_ATON(dst_ip) BETWEEN INET_ATON('45.238.171.128') AND INET_ATON('45.238.171.191') THEN 'NAT-POOL-11' ELSE NULL END AS pool_name FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc)) a LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=a.input_if WHERE pool_name IS NOT NULL GROUP BY pool_name,protocol,input_if,netflow_direction ORDER BY SUM(total_bytes) DESC LIMIT 40",
+          "rawSql": "SELECT pool_name AS Pool,protocol AS Protocolo,CASE WHEN input_if=0 THEN 'sem interface (0)' ELSE COALESCE(MAX(im_in.if_name),CONCAT('ifIndex ',input_if,' (sem nome)')) END AS 'Entrada Huawei',CASE netflow_direction WHEN 0 THEN 'captura na entrada' WHEN 1 THEN 'captura na saída' ELSE 'direção não informada' END AS 'Captura',COUNT(DISTINCT ip_publico) AS 'IPs publicos observados',ROUND(SUM(total_bytes),0) AS 'Volume estimado' FROM (SELECT bucket_utc,protocol,input_if,output_if,netflow_direction,dst_ip AS ip_publico,total_bytes,total_packets,CASE WHEN INET_ATON(dst_ip) BETWEEN INET_ATON('45.238.170.64') AND INET_ATON('45.238.170.127') THEN 'NAT-POOL-08' WHEN INET_ATON(dst_ip) BETWEEN INET_ATON('45.238.171.64') AND INET_ATON('45.238.171.127') THEN 'NAT-POOL-09' WHEN INET_ATON(dst_ip) BETWEEN INET_ATON('45.238.170.128') AND INET_ATON('45.238.170.191') THEN 'NAT-POOL-10' WHEN INET_ATON(dst_ip) BETWEEN INET_ATON('45.238.171.128') AND INET_ATON('45.238.171.191') THEN 'NAT-POOL-11' ELSE NULL END AS pool_name FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc)) a LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=a.input_if WHERE pool_name IS NOT NULL GROUP BY pool_name,protocol,input_if,netflow_direction ORDER BY SUM(total_bytes) DESC LIMIT 40",
           "format": "table",
           "editorMode": "code"
         }
@@ -565,7 +565,7 @@
     },
     {
       "id": 12,
-      "title": "A10 - Taxa estimada por pool/ifIndex/direcao (IP na origem)",
+      "title": "A10 - Taxa estimada por pool, interface e captura (IP na origem)",
       "type": "timeseries",
       "datasource": {
         "type": "mysql",
@@ -584,7 +584,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),CONCAT(pool_name,' / ',CASE WHEN input_if=0 THEN 'Não informado' ELSE COALESCE(im_in.if_name,CONCAT('ifIndex ',input_if)) END,' /dir',netflow_direction) AS metric,ROUND(SUM(total_bytes)*8/60,2) AS value FROM (SELECT bucket_utc,protocol,input_if,output_if,netflow_direction,src_ip AS ip_publico,total_bytes,total_packets,CASE WHEN INET_ATON(src_ip) BETWEEN INET_ATON('45.238.170.64') AND INET_ATON('45.238.170.127') THEN 'NAT-POOL-08' WHEN INET_ATON(src_ip) BETWEEN INET_ATON('45.238.171.64') AND INET_ATON('45.238.171.127') THEN 'NAT-POOL-09' WHEN INET_ATON(src_ip) BETWEEN INET_ATON('45.238.170.128') AND INET_ATON('45.238.170.191') THEN 'NAT-POOL-10' WHEN INET_ATON(src_ip) BETWEEN INET_ATON('45.238.171.128') AND INET_ATON('45.238.171.191') THEN 'NAT-POOL-11' ELSE NULL END AS pool_name FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc)) a LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=a.input_if WHERE pool_name IS NOT NULL GROUP BY 1,2 ORDER BY 1",
+          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),CONCAT(pool_name,' / ',CASE WHEN input_if=0 THEN 'sem interface (0)' ELSE COALESCE(im_in.if_name,CONCAT('ifIndex ',input_if,' (sem nome)')) END,' · ',CASE netflow_direction WHEN 0 THEN 'captura na entrada' WHEN 1 THEN 'captura na saída' ELSE 'direção não informada' END) AS metric,ROUND(SUM(total_bytes)*8/60,2) AS value FROM (SELECT bucket_utc,protocol,input_if,output_if,netflow_direction,src_ip AS ip_publico,total_bytes,total_packets,CASE WHEN INET_ATON(src_ip) BETWEEN INET_ATON('45.238.170.64') AND INET_ATON('45.238.170.127') THEN 'NAT-POOL-08' WHEN INET_ATON(src_ip) BETWEEN INET_ATON('45.238.171.64') AND INET_ATON('45.238.171.127') THEN 'NAT-POOL-09' WHEN INET_ATON(src_ip) BETWEEN INET_ATON('45.238.170.128') AND INET_ATON('45.238.170.191') THEN 'NAT-POOL-10' WHEN INET_ATON(src_ip) BETWEEN INET_ATON('45.238.171.128') AND INET_ATON('45.238.171.191') THEN 'NAT-POOL-11' ELSE NULL END AS pool_name FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc)) a LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=a.input_if WHERE pool_name IS NOT NULL GROUP BY 1,2 ORDER BY 1",
           "format": "time_series",
           "editorMode": "code"
         }
@@ -627,7 +627,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT src_ip AS 'IP interno observado',protocol AS Protocolo,CASE WHEN input_if=0 THEN 'Não informado' ELSE COALESCE(MAX(im_in.if_name),CONCAT('ifIndex ',input_if)) END AS 'Entrada Huawei',CASE WHEN output_if=0 THEN 'Não informado' ELSE COALESCE(MAX(im_out.if_name),CONCAT('ifIndex ',output_if)) END AS 'Saída Huawei',netflow_direction AS 'Direcao raw',ROUND(SUM(total_bytes),0) AS 'Volume estimado' FROM orby_ip_pairs_minute LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=input_if LEFT JOIN orby_interface_names AS im_out ON im_out.source='huawei' AND im_out.if_index=output_if WHERE orby_ip_pairs_minute.source='huawei' AND $__timeFilter(bucket_utc) AND INET_ATON(src_ip) BETWEEN INET_ATON('100.64.64.0') AND INET_ATON('100.64.95.255') GROUP BY src_ip,protocol,input_if,output_if,netflow_direction ORDER BY SUM(total_bytes) DESC LIMIT 30",
+          "rawSql": "SELECT src_ip AS 'IP interno observado',protocol AS Protocolo,CASE WHEN input_if=0 THEN 'sem interface (0)' ELSE COALESCE(MAX(im_in.if_name),CONCAT('ifIndex ',input_if,' (sem nome)')) END AS 'Entrada Huawei',CASE WHEN output_if=0 THEN 'sem interface (0)' ELSE COALESCE(MAX(im_out.if_name),CONCAT('ifIndex ',output_if,' (sem nome)')) END AS 'Saída Huawei',CASE netflow_direction WHEN 0 THEN 'captura na entrada' WHEN 1 THEN 'captura na saída' ELSE 'direção não informada' END AS 'Captura',ROUND(SUM(total_bytes),0) AS 'Volume estimado' FROM orby_ip_pairs_minute LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=input_if LEFT JOIN orby_interface_names AS im_out ON im_out.source='huawei' AND im_out.if_index=output_if WHERE orby_ip_pairs_minute.source='huawei' AND $__timeFilter(bucket_utc) AND INET_ATON(src_ip) BETWEEN INET_ATON('100.64.64.0') AND INET_ATON('100.64.95.255') GROUP BY src_ip,protocol,input_if,output_if,netflow_direction ORDER BY SUM(total_bytes) DESC LIMIT 30",
           "format": "table",
           "editorMode": "code"
         }
@@ -680,7 +680,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT dst_ip AS 'IP interno observado',protocol AS Protocolo,CASE WHEN input_if=0 THEN 'Não informado' ELSE COALESCE(MAX(im_in.if_name),CONCAT('ifIndex ',input_if)) END AS 'Entrada Huawei',CASE WHEN output_if=0 THEN 'Não informado' ELSE COALESCE(MAX(im_out.if_name),CONCAT('ifIndex ',output_if)) END AS 'Saída Huawei',netflow_direction AS 'Direcao raw',ROUND(SUM(total_bytes),0) AS 'Volume estimado' FROM orby_ip_pairs_minute LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=input_if LEFT JOIN orby_interface_names AS im_out ON im_out.source='huawei' AND im_out.if_index=output_if WHERE orby_ip_pairs_minute.source='huawei' AND $__timeFilter(bucket_utc) AND INET_ATON(dst_ip) BETWEEN INET_ATON('100.64.64.0') AND INET_ATON('100.64.95.255') GROUP BY dst_ip,protocol,input_if,output_if,netflow_direction ORDER BY SUM(total_bytes) DESC LIMIT 30",
+          "rawSql": "SELECT dst_ip AS 'IP interno observado',protocol AS Protocolo,CASE WHEN input_if=0 THEN 'sem interface (0)' ELSE COALESCE(MAX(im_in.if_name),CONCAT('ifIndex ',input_if,' (sem nome)')) END AS 'Entrada Huawei',CASE WHEN output_if=0 THEN 'sem interface (0)' ELSE COALESCE(MAX(im_out.if_name),CONCAT('ifIndex ',output_if,' (sem nome)')) END AS 'Saída Huawei',CASE netflow_direction WHEN 0 THEN 'captura na entrada' WHEN 1 THEN 'captura na saída' ELSE 'direção não informada' END AS 'Captura',ROUND(SUM(total_bytes),0) AS 'Volume estimado' FROM orby_ip_pairs_minute LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=input_if LEFT JOIN orby_interface_names AS im_out ON im_out.source='huawei' AND im_out.if_index=output_if WHERE orby_ip_pairs_minute.source='huawei' AND $__timeFilter(bucket_utc) AND INET_ATON(dst_ip) BETWEEN INET_ATON('100.64.64.0') AND INET_ATON('100.64.95.255') GROUP BY dst_ip,protocol,input_if,output_if,netflow_direction ORDER BY SUM(total_bytes) DESC LIMIT 30",
           "format": "table",
           "editorMode": "code"
         }

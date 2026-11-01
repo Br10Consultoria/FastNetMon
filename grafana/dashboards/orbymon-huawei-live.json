@@ -631,7 +631,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),CASE WHEN input_if=0 THEN 'Não informado' ELSE COALESCE(CONCAT(im.if_name,' (',input_if,')'),CONCAT('ifIndex ',input_if)) END AS metric,ROUND(SUM(total_bytes)*8/60,3) AS value FROM orby_ip_pairs_minute AS p LEFT JOIN orby_interface_names AS im ON im.source=p.source AND im.if_index=p.input_if WHERE p.source='huawei' AND $__timeFilter(p.bucket_utc) GROUP BY 1,p.input_if,im.if_name ORDER BY 1",
+          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),CASE WHEN input_if=0 THEN 'sem interface (0)' ELSE COALESCE(CONCAT(im.if_name,' (',input_if,')'),CONCAT('ifIndex ',input_if,' (sem nome)')) END AS metric,ROUND(SUM(total_bytes)*8/60,3) AS value FROM orby_ip_pairs_minute AS p LEFT JOIN orby_interface_names AS im ON im.source=p.source AND im.if_index=p.input_if WHERE p.source='huawei' AND $__timeFilter(p.bucket_utc) GROUP BY 1,p.input_if,im.if_name ORDER BY 1",
           "format": "time_series",
           "editorMode": "code"
         }

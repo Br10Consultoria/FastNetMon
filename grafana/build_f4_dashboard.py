@@ -56,6 +56,17 @@ panel("Taxa por sentido e tipo de IP", "timeseries",
       f"SELECT $__timeGroupAlias(bucket_utc,'1m'),CONCAT({DIRNAME},' / ',scope) AS metric,SUM(bytes)*8/60 AS value "
       f"FROM orby_flow_minute WHERE {F} GROUP BY 1,direction,scope ORDER BY 1",
       0, 8, 12, 9, fmt="time_series", unit="bps", options={"legend": {"displayMode": "table", "placement": "bottom"}})
+FQ = F.replace("bucket_utc", "f.bucket_utc").replace("source='huawei'", "f.source='huawei'")
+EDGE = "CASE direction WHEN 'in' THEN f.input_if ELSE f.output_if END"
+panel("Taxa por interface de borda (trânsito, PTT, CDN, peers)", "timeseries",
+      f"SELECT $__timeGroupAlias(f.bucket_utc,'1m'),CONCAT({DIRNAME},' · ',"
+      f"CASE WHEN {EDGE}=0 THEN 'sem interface (0)' ELSE COALESCE(MAX(im.if_name),CONCAT('ifIndex ',{EDGE},' (sem nome)')) END) AS metric,"
+      "SUM(f.bytes)*8/60 AS value FROM orby_flow_minute AS f "
+      f"LEFT JOIN orby_interface_names AS im ON im.source='huawei' AND im.if_index={EDGE} "
+      f"WHERE {FQ} GROUP BY 1,direction,{EDGE} ORDER BY 1",
+      0, 56, 24, 9, fmt="time_series", unit="bps", options={"legend": {"displayMode": "table", "placement": "bottom"}},
+      desc="Recebido: interface por onde entrou. Originado: interface por onde saiu para a internet.")
+
 panel("Pacotes/s por sentido, com SYN e porta 0", "timeseries",
       f"SELECT $__timeGroupAlias(bucket_utc,'1m'),{DIRNAME} AS metric,SUM(packets)/60 AS value FROM orby_flow_minute WHERE {F} GROUP BY 1,direction "
       f"UNION ALL SELECT $__timeGroupAlias(bucket_utc,'1m'),CONCAT({DIRNAME},' SYN'),SUM(syn_packets)/60 FROM orby_flow_minute WHERE {F} GROUP BY 1,direction "
@@ -64,12 +75,20 @@ panel("Pacotes/s por sentido, com SYN e porta 0", "timeseries",
       12, 8, 12, 9, fmt="time_series", unit="pps", options={"legend": {"displayMode": "table", "placement": "bottom"}},
       desc="SYN alto em relação ao total sugere SYN flood/varredura; porta 0/fragmentos alto sugere amplificação UDP fragmentada.")
 
+def IFN(col, alias):
+    return (f"CASE WHEN {col}=0 THEN 'sem interface (0)' "
+            f"ELSE COALESCE({alias}.if_name,CONCAT('ifIndex ',{col},' (sem nome)')) END")
+
 panel("Eventos de ataque detectados", "table",
       "SELECT event_time AS 'Hora',rule_name AS 'Regra',severity AS 'Severidade',"
       f"{DIRNAME} AS 'Sentido',scope AS 'Tipo',pool AS 'Pool',local_ip AS 'IP público/local',"
       "subscriber_ip AS 'IP assinante',protocol AS 'Proto',local_port AS 'Porta local',remote_port AS 'Porta remota',"
-      "pps AS 'Pacotes/s',mbps*1000000 AS 'Taxa',remote_ips AS 'IPs remotos',syn_ratio AS 'SYN' "
-      f"FROM orby_attack_events WHERE {EV} ORDER BY event_time DESC LIMIT 200",
+      "pps AS 'Pacotes/s',mbps*1000000 AS 'Taxa',remote_ips AS 'IPs remotos',syn_ratio AS 'SYN',"
+      f"{IFN('e.input_if','im')} AS 'Entrou por',{IFN('e.output_if','om')} AS 'Saiu por' "
+      "FROM orby_attack_events AS e "
+      "LEFT JOIN orby_interface_names AS im ON im.source='huawei' AND im.if_index=e.input_if "
+      "LEFT JOIN orby_interface_names AS om ON om.source='huawei' AND om.if_index=e.output_if "
+      f"WHERE {EV} ORDER BY event_time DESC LIMIT 200",
       0, 17, 24, 9, overrides=[ov("Taxa", "bps"), ov("Pacotes/s", "pps", 0), ov("SYN", "percentunit", 0)])
 
 panel("IPs da rede com maior pico (público, pool ou assinante)", "table",
