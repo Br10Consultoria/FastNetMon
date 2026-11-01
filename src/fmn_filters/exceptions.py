@@ -258,6 +258,14 @@ def main(argv=None):
             print("excecoes: %d ASN(s) atualizados" % n)
         finally:
             db.close()
+        if args.sync:
+            from .tools import update_asnames
+            try:                                  # nomes de AS para a busca da pagina Ferramentas
+                lines = update_asnames()
+                if lines:
+                    print("nomes de AS: %d" % lines)
+            except Exception as exc:
+                print("nomes de AS: falha (%s); mantida a lista anterior" % type(exc).__name__, file=sys.stderr)
         return 0
     except Exception as exc:
         print("FALHA excecoes: %s" % exc, file=sys.stderr)

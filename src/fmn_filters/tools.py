@@ -8,6 +8,7 @@ import re
 import shutil
 import socket
 import subprocess
+import urllib.parse
 import urllib.request
 
 HOST_RE = re.compile(r"^(?=.{1,253}$)([A-Za-z0-9_]([A-Za-z0-9_-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}\.?$")
@@ -148,3 +149,61 @@ def traceroute(host, run=None, which=None):
     if which("traceroute"):
         return run(["traceroute", "-n", "-q", "1", "-w", "2", "-m", "20", host], 50)
     return run(["tracepath", "-n", "-m", "20", host], 50)
+
+
+ASNAMES = "/var/lib/orbymon/asnames/asn.txt"      # lista do RIPE (asn.txt), atualizada pelo orbymon-exceptions
+
+
+def asn_search(query, path=ASNAMES, opener=urllib.request.urlopen, limit=50):
+    """AS por nome ou numero: [(asn, nome)]. Usa a lista local do RIPE; sem ela, consulta o RIPEstat."""
+    q = " ".join((query or "").split())
+    if not 2 <= len(q) <= 80 or re.search(r"[^\w .,&()/-]", q):
+        raise ToolError("busca de 2 a 80 caracteres (letras, números, espaço e . , & ( ) / -)")
+    terms = [t.lower() for t in q.split()]
+    out = []
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                low = line.lower()
+                if all(t in low for t in terms):
+                    num, _, name = line.strip().partition(" ")
+                    if num.isdigit():
+                        out.append((int(num), name.strip()))
+                        if len(out) >= limit:
+                            break
+        return out
+    except FileNotFoundError:
+        pass
+    data = _get_json("https://stat.ripe.net/data/searchcomplete/data.json?resource=%s&limit=%d&sourceapp=orbymon"
+                     % (urllib.parse.quote(q), limit), opener)
+    for cat in (data.get("data") or {}).get("categories") or []:
+        for sug in cat.get("suggestions") or []:
+            m = re.match(r"^AS(\d+)$", str(sug.get("value") or sug.get("label") or ""), re.I)
+            if m:
+                out.append((int(m.group(1)), str(sug.get("description") or "")))
+    return out[:limit]
+
+
+def update_asnames(path=ASNAMES, opener=urllib.request.urlopen, max_age_h=20, now=None):
+    """Baixa a lista de nomes de AS do RIPE (uma vez por dia). Devolve o numero de linhas ou None se recente."""
+    import os
+    import time
+    now = now or time.time()
+    try:
+        if now - os.stat(path).st_mtime < max_age_h * 3600:
+            return None
+    except FileNotFoundError:
+        pass
+    req = urllib.request.Request("https://ftp.ripe.net/ripe/asnames/asn.txt", headers={"User-Agent": UA["User-Agent"]})
+    with opener(req, timeout=60) as resp:
+        raw = resp.read(64 * 1024 * 1024).decode("utf-8", "replace")
+    lines = [l for l in raw.splitlines() if l[:1].isdigit()]
+    if len(lines) < 1000:
+        raise ToolError("lista de AS incompleta (%d linhas); mantida a anterior" % len(lines))
+    tmp = path + ".tmp"
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(tmp, "w", encoding="utf-8") as fh:
+        fh.write("\n".join(lines) + "\n")
+    os.chmod(tmp, 0o644)
+    os.replace(tmp, path)
+    return len(lines)

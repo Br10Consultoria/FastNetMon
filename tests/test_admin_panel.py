@@ -844,6 +844,10 @@ class PanelTests(unittest.TestCase):
         self.assertIn(b"64 bytes from", r.data)
         r = self.post("/ferramentas", tool="ping", q="-f 1.1.1.1")
         self.assertIn("válido".encode(), r.data)
+        with mock.patch.object(tl, "asn_search", return_value=[(13335, "CLOUDFLARENET - Cloudflare, Inc.")]):
+            r = self.c.get("/ferramentas?tool=asn_busca&q=cloudflare")
+        self.assertIn(b"AS13335", r.data)
+        self.assertIn(b"/excecoes?kind=asn&amp;value=13335", r.data)
         with mock.patch.object(tl, "asn_info", side_effect=OSError("sem rede")):
             r = self.post("/ferramentas", tool="asn", q="AS262687")
         self.assertIn(b"consulta falhou: sem rede", r.data)

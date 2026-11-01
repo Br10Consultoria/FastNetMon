@@ -25,6 +25,8 @@ if mariadb -NBe "SELECT 1 FROM mysql.user WHERE User='orbymon_admin'" | grep -q 
   echo "painel pode editar as excecoes"
 fi
 
+install -d -o orbymon -g orbymon -m 0755 /var/lib/orbymon/asnames     # nomes de AS (busca na pagina Ferramentas)
+
 echo "=== Timers ==="
 install -m 0644 "$BASE/deploy/systemd/orbymon-exceptions.service" /etc/systemd/system/
 install -m 0644 "$BASE/deploy/systemd/orbymon-exceptions.timer" /etc/systemd/system/
@@ -32,6 +34,7 @@ install -m 0644 "$BASE/deploy/systemd/orbymon-calibrate.service" /etc/systemd/sy
 systemctl daemon-reload
 systemctl enable --now orbymon-exceptions.timer
 systemctl is-active orbymon-exceptions.timer
+systemctl start orbymon-exceptions.service || true                     # baixa a lista de nomes de AS agora
 
 echo "=== Primeira linha de base (ultimas 24 h) ==="
 if systemctl start orbymon-calibrate.service; then

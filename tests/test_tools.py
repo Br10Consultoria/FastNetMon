@@ -66,6 +66,34 @@ class ToolTests(unittest.TestCase):
         with self.assertRaises(tl.ToolError):
             tl.asn_info("ASxyz", op)
 
+    def test_asn_search_local_and_ripestat(self):
+        import os
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "asn.txt")
+            raw = "\n".join(["13335 CLOUDFLARENET - Cloudflare, Inc., US", "262687 BR10 TELECOM LTDA, BR",
+                             "15169 GOOGLE - Google LLC, US"] + ["%d FILLER, US" % i for i in range(1, 1200)])
+
+            class R(Resp):
+                pass
+            n = tl.update_asnames(path, lambda req, timeout: R(("# cabecalho\n" + raw).encode()))
+            self.assertEqual(n, 1202)
+            self.assertIsNone(tl.update_asnames(path, lambda req, timeout: R(b"")))     # recente: nao baixa
+            self.assertEqual(tl.asn_search("cloudflare", path), [(13335, "CLOUDFLARENET - Cloudflare, Inc., US")])
+            self.assertEqual(tl.asn_search("br10 telecom", path), [(262687, "BR10 TELECOM LTDA, BR")])
+            self.assertEqual(len(tl.asn_search("filler", path)), 50)
+            with self.assertRaises(tl.ToolError):
+                tl.update_asnames(path, lambda req, timeout: R(b"1 x\n"), max_age_h=0)
+            self.assertEqual(tl.asn_search("google", path)[0][0], 15169)                 # lista anterior mantida
+        op = opener_for({"searchcomplete": {"data": {"categories": [
+            {"category": "ASNs", "suggestions": [{"value": "AS13335", "label": "AS13335",
+                                                  "description": "CLOUDFLARENET - Cloudflare, Inc."}]},
+            {"category": "Prefixes", "suggestions": [{"value": "1.1.1.0/24"}]}]}}})
+        self.assertEqual(tl.asn_search("cloudflare", "/nao/existe", op), [(13335, "CLOUDFLARENET - Cloudflare, Inc.")])
+        for bad in ("a", "x;rm", "x" * 90):
+            with self.assertRaises(tl.ToolError):
+                tl.asn_search(bad, "/nao/existe", op)
+
     def test_commands_use_argument_lists(self):
         calls = []
         run = lambda args, timeout: calls.append((args, timeout)) or "ok"

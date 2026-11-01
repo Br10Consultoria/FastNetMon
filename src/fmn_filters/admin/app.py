@@ -844,6 +844,8 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
                     result = tl.rdap_ip(form["q"])
                 elif tool == "asn":
                     result = tl.asn_info(form["q"])
+                elif tool == "asn_busca":
+                    result = tl.asn_search(form["q"])
                 elif tool == "dns":
                     result = tl.dns(form["q"], form["rtype"])
                 elif tool == "ping":

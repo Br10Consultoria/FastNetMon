@@ -2,11 +2,11 @@
 {% block body %}
 <h1>Ferramentas</h1>
 <form method="post" class="card inline" autocomplete="off">{% include "_csrf.html" %}
-  <label>Ferramenta <select name="tool">{% for k, l in (('rdap','Dono e abuse de um IP (RDAP)'),('asn','AS: dono e prefixos anunciados'),('dns','DNS'),('ping','Ping'),('traceroute','Traceroute')) %}<option value="{{ k }}" {{ 'selected' if form.tool==k }}>{{ l }}</option>{% endfor %}</select></label>
-  <label>IP, nome ou AS <input name="q" value="{{ form.q }}" required placeholder="203.0.113.9, exemplo.com.br ou AS262687"></label>
+  <label>Ferramenta <select name="tool">{% for k, l in (('rdap','Dono e abuse de um IP (RDAP)'),('asn','AS: dono e prefixos anunciados'),('asn_busca','Buscar AS por nome'),('dns','DNS'),('ping','Ping'),('traceroute','Traceroute')) %}<option value="{{ k }}" {{ 'selected' if form.tool==k }}>{{ l }}</option>{% endfor %}</select></label>
+  <label>IP, nome ou AS <input name="q" value="{{ form.q }}" required placeholder="203.0.113.9, exemplo.com.br, AS262687 ou nome (cloudflare)"></label>
   <label>Registro DNS <select name="rtype">{% for t in dns_types %}<option {{ 'selected' if form.rtype==t }}>{{ t }}</option>{% endfor %}</select></label>
   <button>Executar</button>
-  <p class="muted">Ping e traceroute saem deste servidor. RDAP e AS consultam rdap.org e RIPEstat. Tudo fica na auditoria.</p>
+  <p class="muted">Ping e traceroute saem deste servidor. RDAP e AS consultam rdap.org e RIPEstat; a busca por nome usa a lista do RIPE baixada todo dia (sem ela, o RIPEstat). Tudo fica na auditoria.</p>
 </form>
 {% if error %}<p class="flash">{{ error }}</p>{% endif %}
 {% if result is not none %}
@@ -24,6 +24,13 @@
     <h2>AS{{ result.asn }} — {{ result.nome or 'sem nome' }}</h2>
     <p>{{ 'Anunciado' if result.anunciado else 'Não anunciado' }} · {{ result.total }} prefixo(s): {{ result.v4 }} IPv4, {{ result.v6 }} IPv6{% if result.total > result.prefixos|length %} (mostrando {{ result.prefixos|length }}){% endif %}</p>
     <pre class="detail">{{ result.prefixos|join('\n') }}</pre>
+  {% elif form.tool == 'asn_busca' %}
+    <h2>AS com “{{ form.q }}” ({{ result|length }}{{ '+' if result|length >= 50 }})</h2>
+    {% if result %}<div class="scroll"><table><tr><th>AS</th><th>Nome</th><th></th></tr>
+      {% for asn, name in result %}<tr><td><code>AS{{ asn }}</code></td><td>{{ name }}</td>
+        <td class="nowrap"><a href="{{ url_for('tools_page', tool='asn', q='AS%d'|format(asn)) }}">prefixos</a> ·
+          <a href="{{ url_for('exceptions_page', kind='asn', value=asn, side='remote', direction='in') }}">exceção</a></td></tr>{% endfor %}
+    </table></div>{% else %}<p class="muted">Nenhum AS encontrado.</p>{% endif %}
   {% else %}
     <h2>{{ form.tool }} {{ form.q }}</h2>
     <pre class="detail">{{ result }}</pre>

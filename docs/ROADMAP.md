@@ -23,11 +23,9 @@ Ordem pensada para deixar **detecção e alarmes certeiros antes da mitigação*
 - **Clientes e RADIUS** ([CLIENTES.md](CLIENTES.md)): clientes com prefixos dedicados e login PPPoE pelo `radacct`
   nos avisos e na investigação.
 - **Ferramentas** (página Ferramentas do painel): RDAP com contato de abuso, AS com prefixos anunciados, DNS, ping e
-  traceroute a partir do servidor, tudo auditado.
+  traceroute a partir do servidor, busca de AS por nome (lista do RIPE atualizada todo dia), tudo auditado.
 
 
-## 4. Ferramentas (restante)
-- Busca de AS por nome (base GeoLite2-ASN local).
 
 ## 5. Operação
 - Várias fontes (outros roteadores).
