@@ -44,7 +44,7 @@ ou no RADIUS. Os dados ficam só no servidor e nos chats privados configurados.<
     {% for c in items %}<tr>
       <td><b>{{ c.name }}</b>{% if c.code %} <small class="muted">{{ c.code }}</small>{% endif %}{% if c.note %}<br><small class="muted">{{ c.note }}</small>{% endif %}</td>
       <td><small class="mono">{{ c.prefixes|join(', ') }}</small></td><td><small>{{ c.contact }}</small></td>
-      <td class="nowrap"><a href="{{ url_for('customers_page', edit=c.id) }}">editar</a>
+      <td class="nowrap"><a href="{{ url_for('report_page', cliente=c.id) }}">relatório</a> · <a href="{{ url_for('customers_page', edit=c.id) }}">editar</a>
         <form method="post" class="inlineform">{% include "_csrf.html" %}<input type="hidden" name="id" value="{{ c.id }}"><button name="action" value="excluir" class="secondary small">Remover</button></form></td>
     </tr>{% endfor %}
   </table></div>{% else %}<p class="muted">Nenhum cliente cadastrado.</p>{% endif %}

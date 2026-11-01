@@ -63,3 +63,11 @@ GRANT SELECT ON radius.radacct TO 'orbymon_ro'@'IP_DO_ORBYMON';
 ```
 
 As consultas rodam em transação somente leitura e são desfeitas ao final; tempo limite de 3–5 s.
+
+## Relatório por cliente ou IP
+
+Página **Relatório** (ou o link “relatório” na lista de clientes): escolha um cliente ou informe IPs/prefixos
+(inclusive 100.64.x) e o período (até 31 dias). Mostra ataques recebidos e originados, alarmes por filtro, tráfego
+(dentro da retenção do rollup), portas de saída por destinos distintos, IPs públicos usados no CGNAT, listas de
+reputação e a identificação (cliente/login). Gera um **texto pronto** para anexar na resposta a uma denúncia, com
+download em `.txt`. Cada consulta fica na auditoria; consultas que passarem de 40 s são interrompidas.

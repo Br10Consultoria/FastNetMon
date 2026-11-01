@@ -14,6 +14,8 @@ Ordem pensada para deixar **detecção e alarmes certeiros antes da mitigação*
   semana, nunca acima do fixo), exceções por IP/rede/ASN com validade, limite próprio por IP, “acima do habitual”
   nos alarmes por filtro. Active timeout do NetStream em 1 minuto aplicado no NE8000.
 
+- **Relatório por cliente/IP** ([CLIENTES.md](CLIENTES.md)): ataques, alarmes, tráfego e listas num período, com texto
+  para resposta de abuso.
 - **E-mail e webhook** ([AVISOS.md](AVISOS.md)): todos os avisos também por SMTP e webhook.
 - **Backup** ([BACKUP.md](BACKUP.md)): diário, cifrado, com cópia externa opcional e restauração assistida.
 - **Saúde** ([SAUDE.md](SAUDE.md)): coleta, atrasos, disco, serviços e tempo de execução, com aviso no Telegram.
@@ -23,8 +25,6 @@ Ordem pensada para deixar **detecção e alarmes certeiros antes da mitigação*
 - **Ferramentas** (página Ferramentas do painel): RDAP com contato de abuso, AS com prefixos anunciados, DNS, ping e
   traceroute a partir do servidor, tudo auditado.
 
-## 3. Clientes (restante)
-- Relatório por cliente (o que ele originou/recebeu) para enviar junto com a notificação de abuso.
 
 ## 4. Ferramentas (restante)
 - Busca de AS por nome (base GeoLite2-ASN local).

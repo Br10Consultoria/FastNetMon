@@ -859,6 +859,58 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
                 error = "consulta falhou: %s" % (str(exc)[:200] or type(exc).__name__)
         return render_template("tools.html", form=form, result=result, error=error, dns_types=tl.DNS_TYPES)
 
+    # ---------------------------------------------------------------- relatorio por cliente
+    @app.route("/relatorio")
+    def report_page():
+        from datetime import timedelta as td, timezone as dt_timezone
+        from zoneinfo import ZoneInfo
+        from .. import customer_report as cr
+        from ..abuse_lookup import fmt_ts, parse_time
+        from ..bidir_config import build_scopes
+        from ..customers import build_identifier
+        a = request.args
+        form = {"cliente": a.get("cliente", ""), "alvo": a.get("alvo", "").strip()[:2000], "inicio": a.get("inicio", ""),
+                "fim": a.get("fim", "")}
+        form["tz"] = a.get("tz") if a.get("tz") in TZ_CHOICES else "America/Sao_Paulo"
+        tz = dt_timezone.utc if form["tz"] == "UTC" else ZoneInfo(form["tz"])
+        customers = store.customers() or []
+        report, text, error, title = None, "", None, ""
+        if form["cliente"] or form["alvo"]:
+            try:
+                if form["cliente"]:
+                    c = next((x for x in customers if str(x["id"]) == form["cliente"]), None)
+                    if not c:
+                        raise cr.ReportError("cliente não encontrado")
+                    nets, title = cr.parse_targets(" ".join(c["prefixes"])), c["name"]
+                else:
+                    nets = cr.parse_targets(form["alvo"])
+                end = parse_time(form["fim"], tz) if form["fim"].strip() else dt_now_utc()
+                start = parse_time(form["inicio"], tz) if form["inicio"].strip() else end - td(days=1)
+                if start is None or end is None:
+                    raise cr.ReportError("horário não reconhecido (use 2026-10-30 14:05)")
+                cfg = config.bidir()
+                scopes = build_scopes(cfg, config.profile(cfg))
+                radius_path = config.p.radius if config.p.radius.exists() else None
+
+                def run_report(db):
+                    ident = build_identifier(db, radius_path)
+                    try:
+                        return cr.build(db.cursor(), nets, start, end, cfg["source"], scopes, ident)
+                    finally:
+                        if ident is not None and ident.radius is not None:
+                            ident.radius.close()
+                report = store.with_connection(run_report)
+                text = cr.render_text(report, lambda t: fmt_ts(t, tz), title)
+                audit("relatorio", "%s %s a %s" % (title or " ".join(report["alvos"])[:200], start, end))
+                if a.get("formato") == "txt":
+                    name = "relatorio-%s.txt" % (re.sub(r"[^A-Za-z0-9_.-]+", "_", title or report["alvos"][0])[:60])
+                    return app.response_class(text + "\n", mimetype="text/plain; charset=utf-8",
+                                              headers={"Content-Disposition": "attachment; filename=%s" % name})
+            except (cr.ReportError, ValueError) as exc:
+                error = str(exc)
+        return render_template("report.html", form=form, customers=customers, report=report, text=text, error=error,
+                               title=title, tz=tz, tz_choices=TZ_CHOICES, ts=fmt_ts, human_bytes=cr.human_bytes)
+
     # ---------------------------------------------------------------- e-mail e webhook
     @app.route("/avisos", methods=["GET", "POST"])
     def channels_page():

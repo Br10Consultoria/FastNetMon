@@ -941,6 +941,32 @@ class PanelTests(unittest.TestCase):
         self.assertIn("Não salvo".encode(), r.data)
 
 
+    def test_report_page(self):
+        from fmn_filters import customer_report as cr
+        self.login()
+        self.assertEqual(self.c.get("/relatorio").status_code, 200)
+        fake = {"alvos": ["187.87.201.40/32"], "inicio": datetime(2026, 10, 30, 12), "fim": datetime(2026, 10, 31, 12),
+                "eventos": [{"sentido": "out", "regra": "OUT SSH", "severidade": "high", "quantidade": 3,
+                             "primeiro": datetime(2026, 10, 30, 13), "ultimo": datetime(2026, 10, 30, 14),
+                             "pps": 900.0, "mbps": 1.5}], "eventos_lista": [], "incidentes": [],
+                "trafego": {"out": {"bytes": 1.5e9, "pacotes": 1e6, "fluxos": 900, "remotos": 300}},
+                "portas_saida": [{"protocolo": "tcp", "porta": 22, "destinos": 300, "fluxos": 900, "bytes": 1e6}],
+                "remotos": [], "listas": [], "ips_publicos": [], "trafego_desde": datetime(2026, 10, 30),
+                "identificacao": [{"ip": "187.87.201.40", "escopo": "dedicated", "pool": "", "quem": "cliente Padaria"}]}
+        with mock.patch.object(cr, "build", return_value=fake) as b:
+            r = self.c.get("/relatorio?alvo=187.87.201.40&inicio=2026-10-30+09:00&fim=2026-10-31+09:00&tz=America/Bahia")
+            self.assertIn(b"OUT SSH", r.data)
+            self.assertIn("originado · OUT SSH · 3 evento(s)".encode(), r.data)
+            self.assertIn(b"cliente Padaria", r.data)
+            self.assertEqual(b.call_args[0][2], datetime(2026, 10, 30, 12))          # 09h Bahia -> 12h UTC
+            t = self.c.get("/relatorio?alvo=187.87.201.40&formato=txt")
+        self.assertEqual(t.mimetype, "text/plain")
+        self.assertIn("attachment; filename=relatorio-187.87.201.40_32.txt", t.headers["Content-Disposition"])
+        self.assertEqual(self.db.audits[-1][1], "relatorio")
+        r = self.c.get("/relatorio?alvo=10.0.0.0/8")
+        self.assertIn("amplo demais".encode(), r.data)
+
+
 class CliTests(unittest.TestCase):
     def test_create_user(self):
         from fmn_filters.admin import cli

@@ -1,0 +1,45 @@
+{% extends "base.html" %}{% block title %}Relatório{% endblock %}
+{% block body %}
+<h1>Relatório por cliente ou IP</h1>
+<p class="muted">Ataques recebidos e originados, alarmes por filtro, tráfego, listas de reputação e (CGNAT) IPs públicos usados num
+período — com texto pronto para anexar na resposta a uma denúncia. O tráfego agregado só existe dentro da retenção do rollup;
+eventos, incidentes e listas ficam guardados.</p>
+<form method="get" class="card" autocomplete="off">
+  <div class="grid">
+    <label>Cliente <select name="cliente"><option value="">— por IP/prefixo —</option>{% for c in customers %}<option value="{{ c.id }}" {{ 'selected' if form.cliente==c.id|string }}>{{ c.name }}</option>{% endfor %}</select></label>
+    <label>ou IPs/prefixos <input name="alvo" value="{{ form.alvo }}" placeholder="187.87.201.40, 100.64.70.12, 45.238.170.64/29"></label>
+    <label>Início <input name="inicio" value="{{ form.inicio }}" placeholder="padrão: 24 h antes do fim"></label>
+    <label>Fim <input name="fim" value="{{ form.fim }}" placeholder="padrão: agora"></label>
+    <label>Fuso <select name="tz">{% for z in tz_choices %}<option {{ 'selected' if form.tz==z }}>{{ z }}</option>{% endfor %}</select></label>
+  </div>
+  <button>Gerar</button>
+</form>
+{% if error %}<p class="flash">{{ error }}</p>{% endif %}
+{% if report %}
+<section class="card">
+  <h2>{{ title or report.alvos|join(', ') }} · {{ ts(report.inicio, tz) }} a {{ ts(report.fim, tz) }}</h2>
+  {% for i in report.identificacao %}<p><code>{{ i.ip }}</code> {{ SCOPE_PT.get(i.escopo, i.escopo) }}{% if i.pool %} ({{ i.pool }}){% endif %}{% if i.quem %} — <b>{{ i.quem }}</b>{% endif %}</p>{% endfor %}
+  <h3>Ataques ({{ report.eventos|sum(attribute='quantidade') }})</h3>
+  {% if report.eventos %}<div class="scroll"><table><tr><th>Sentido</th><th>Regra</th><th class="num">Eventos</th><th>Primeiro</th><th>Último</th><th class="num">Pico</th></tr>
+    {% for e in report.eventos %}<tr><td>{{ 'recebido' if e.sentido=='in' else 'originado' }}</td><td>{{ e.regra }}</td><td class="num">{{ e.quantidade }}</td><td>{{ ts(e.primeiro, tz) }}</td><td>{{ ts(e.ultimo, tz) }}</td><td class="num">{{ '%.0f'|format(e.pps) }} pps · {{ '%.1f'|format(e.mbps) }} Mbps</td></tr>{% endfor %}
+  </table></div>{% else %}<p class="muted">Nenhum ataque detectado no período.</p>{% endif %}
+  {% if report.incidentes %}<h3>Alarmes por filtro ({{ report.incidentes|length }})</h3><div class="scroll"><table><tr><th>Alarme</th><th>Início</th><th>Fim</th><th>Itens</th></tr>
+    {% for i in report.incidentes %}<tr><td>{{ i.alarme }}</td><td>{{ ts(i.inicio, tz) }}</td><td>{{ ts(i.fim, tz) if i.fim else 'em aberto' }}</td><td><small>{% for t in i.itens %}<code>{{ t.key }}</code> {% endfor %}</small></td></tr>{% endfor %}
+  </table></div>{% endif %}
+  <h3>Tráfego</h3>
+  {% if report.trafego %}
+    <p class="muted">Amostrado, desde {{ ts([report.inicio, report.trafego_desde]|max, tz) }}.</p>
+    <table>{% for d, t in report.trafego|dictsort %}<tr><td>{{ 'recebido' if d=='in' else 'originado' }}</td><td>{{ human_bytes(t.bytes) }}</td><td>{{ t.fluxos }} fluxos</td><td>{{ t.remotos }} IPs remotos</td></tr>{% endfor %}</table>
+    {% if report.portas_saida %}<p><b>Saída por porta</b> (destinos distintos): {% for p in report.portas_saida %}{{ p.protocolo }}/{{ p.porta or 'efêmera' }} <b>{{ p.destinos }}</b>{{ ', ' if not loop.last }}{% endfor %}</p>{% endif %}
+    {% if report.remotos %}<p><b>Maiores IPs remotos:</b> {% for x in report.remotos[:10] %}<code>{{ x.ip }}</code> {{ human_bytes(x.bytes) }} ({{ 'in' if x.sentido=='in' else 'out' }}){{ ', ' if not loop.last }}{% endfor %}</p>{% endif %}
+  {% else %}<p class="muted">Sem tráfego agregado no período (fora da retenção do rollup ou sem tráfego).</p>{% endif %}
+  {% if report.ips_publicos %}<p><b>IPs públicos usados (CGNAT):</b> {% for p in report.ips_publicos %}<code>{{ p.ip }}</code> {% endfor %}</p>{% endif %}
+  {% if report.listas %}<h3>Listas de reputação</h3><ul>{% for x in report.listas %}<li><code>{{ x.ip }}</code> em {{ x.lista }} ({{ x.categoria }}) desde {{ ts(x.desde, tz) }}{% if x.saiu %}, saiu {{ ts(x.saiu, tz) }}{% endif %}</li>{% endfor %}</ul>{% endif %}
+</section>
+<section class="card">
+  <h2>Texto para a resposta</h2>
+  <pre class="detail">{{ text }}</pre>
+  <p><a href="{{ request.full_path }}&amp;formato=txt">Baixar .txt</a></p>
+</section>
+{% endif %}
+{% endblock %}
