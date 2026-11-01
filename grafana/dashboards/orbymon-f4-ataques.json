@@ -1,0 +1,816 @@
+{
+  "id": null,
+  "uid": "orbymon-f4-ataques",
+  "title": "OrbyMon | F4 - Ataques e investigação por IP",
+  "timezone": "browser",
+  "schemaVersion": 40,
+  "version": 1,
+  "refresh": "1m",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "tags": [
+    "orbymon",
+    "f4",
+    "ataques"
+  ],
+  "description": "Ataques recebidos e originados, com filtro por IP público, IP privado CGNAT, IP remoto, porta, protocolo e sentido.",
+  "templating": {
+    "list": [
+      {
+        "name": "ip",
+        "label": "IP (público ou 100.64.x)",
+        "type": "textbox",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        }
+      },
+      {
+        "name": "remoto",
+        "label": "IP remoto",
+        "type": "textbox",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        }
+      },
+      {
+        "name": "porta",
+        "label": "Porta",
+        "type": "textbox",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        }
+      },
+      {
+        "name": "direcao",
+        "label": "Sentido",
+        "type": "custom",
+        "query": "Todos : all,Recebido : in,Originado : out",
+        "current": {
+          "text": "Todos",
+          "value": "all"
+        },
+        "options": [
+          {
+            "text": "Todos",
+            "value": "all",
+            "selected": true
+          },
+          {
+            "text": "Recebido",
+            "value": "in",
+            "selected": false
+          },
+          {
+            "text": "Originado",
+            "value": "out",
+            "selected": false
+          }
+        ]
+      },
+      {
+        "name": "proto",
+        "label": "Protocolo",
+        "type": "custom",
+        "query": "Todos : all,tcp : tcp,udp : udp,icmp : icmp,gre : gre,esp : esp",
+        "current": {
+          "text": "Todos",
+          "value": "all"
+        },
+        "options": [
+          {
+            "text": "Todos",
+            "value": "all",
+            "selected": true
+          },
+          {
+            "text": "tcp",
+            "value": "tcp",
+            "selected": false
+          },
+          {
+            "text": "udp",
+            "value": "udp",
+            "selected": false
+          },
+          {
+            "text": "icmp",
+            "value": "icmp",
+            "selected": false
+          },
+          {
+            "text": "gre",
+            "value": "gre",
+            "selected": false
+          },
+          {
+            "text": "esp",
+            "value": "esp",
+            "selected": false
+          }
+        ]
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "Como usar",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 4
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "**Filtros no topo:** *IP* = IP público (dedicado ou pool CGNAT) **ou** IP privado 100.64.x do assinante; *IP remoto* = quem está do outro lado; *Porta* = porta de serviço (portas efêmeras são gravadas como 0); *Sentido* = recebido (internet → rede) ou originado (rede → internet). Período no relógio do canto superior. Fluxos detalhados ficam **2 dias**; eventos de ataque ficam guardados. Valores são estimativas de NetFlow amostrado 1:2048."
+      }
+    },
+    {
+      "id": 2,
+      "title": "Eventos de ataque RECEBIDOS no período",
+      "type": "stat",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT COUNT(*) AS value FROM orby_attack_events WHERE $__timeFilter(event_time) AND (${ip:sqlstring}='' OR local_ip=${ip:sqlstring} OR subscriber_ip=${ip:sqlstring}) AND (${direcao:sqlstring}='all' OR direction=${direcao:sqlstring}) AND (${proto:sqlstring}='all' OR protocol=${proto:sqlstring}) AND (${porta:sqlstring}='' OR local_port=${porta:sqlstring} OR remote_port=${porta:sqlstring}) AND direction='in'",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 3,
+      "title": "Eventos de ataque ORIGINADOS no período",
+      "type": "stat",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "description": "",
+      "gridPos": {
+        "x": 6,
+        "y": 4,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT COUNT(*) AS value FROM orby_attack_events WHERE $__timeFilter(event_time) AND (${ip:sqlstring}='' OR local_ip=${ip:sqlstring} OR subscriber_ip=${ip:sqlstring}) AND (${direcao:sqlstring}='all' OR direction=${direcao:sqlstring}) AND (${proto:sqlstring}='all' OR protocol=${proto:sqlstring}) AND (${porta:sqlstring}='' OR local_port=${porta:sqlstring} OR remote_port=${porta:sqlstring}) AND direction='out'",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 4,
+      "title": "Pico de taxa no filtro (1 min)",
+      "type": "stat",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "description": "",
+      "gridPos": {
+        "x": 12,
+        "y": 4,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT COALESCE(MAX(v),0) AS value FROM (SELECT SUM(bytes)*8/60 AS v FROM orby_flow_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND (${ip:sqlstring}='' OR local_ip=${ip:sqlstring} OR subscriber_ip=${ip:sqlstring}) AND (${remoto:sqlstring}='' OR remote_ip=${remoto:sqlstring}) AND (${porta:sqlstring}='' OR local_port=${porta:sqlstring} OR remote_port=${porta:sqlstring}) AND (${direcao:sqlstring}='all' OR direction=${direcao:sqlstring}) AND (${proto:sqlstring}='all' OR protocol=${proto:sqlstring}) GROUP BY bucket_utc) t",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "bps"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 5,
+      "title": "Pico de pacotes/s no filtro (1 min)",
+      "type": "stat",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "description": "",
+      "gridPos": {
+        "x": 18,
+        "y": 4,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT COALESCE(MAX(v),0) AS value FROM (SELECT SUM(packets)/60 AS v FROM orby_flow_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND (${ip:sqlstring}='' OR local_ip=${ip:sqlstring} OR subscriber_ip=${ip:sqlstring}) AND (${remoto:sqlstring}='' OR remote_ip=${remoto:sqlstring}) AND (${porta:sqlstring}='' OR local_port=${porta:sqlstring} OR remote_port=${porta:sqlstring}) AND (${direcao:sqlstring}='all' OR direction=${direcao:sqlstring}) AND (${proto:sqlstring}='all' OR protocol=${proto:sqlstring}) GROUP BY bucket_utc) t",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "pps"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 6,
+      "title": "Taxa por sentido e tipo de IP",
+      "type": "timeseries",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),CONCAT(CASE direction WHEN 'in' THEN 'recebido' ELSE 'originado' END,' / ',scope) AS metric,SUM(bytes)*8/60 AS value FROM orby_flow_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND (${ip:sqlstring}='' OR local_ip=${ip:sqlstring} OR subscriber_ip=${ip:sqlstring}) AND (${remoto:sqlstring}='' OR remote_ip=${remoto:sqlstring}) AND (${porta:sqlstring}='' OR local_port=${porta:sqlstring} OR remote_port=${porta:sqlstring}) AND (${direcao:sqlstring}='all' OR direction=${direcao:sqlstring}) AND (${proto:sqlstring}='all' OR protocol=${proto:sqlstring}) GROUP BY 1,direction,scope ORDER BY 1",
+          "format": "time_series",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "bps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "title": "Pacotes/s por sentido, com SYN e porta 0",
+      "type": "timeseries",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "description": "SYN alto em relação ao total sugere SYN flood/varredura; porta 0/fragmentos alto sugere amplificação UDP fragmentada.",
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),CASE direction WHEN 'in' THEN 'recebido' ELSE 'originado' END AS metric,SUM(packets)/60 AS value FROM orby_flow_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND (${ip:sqlstring}='' OR local_ip=${ip:sqlstring} OR subscriber_ip=${ip:sqlstring}) AND (${remoto:sqlstring}='' OR remote_ip=${remoto:sqlstring}) AND (${porta:sqlstring}='' OR local_port=${porta:sqlstring} OR remote_port=${porta:sqlstring}) AND (${direcao:sqlstring}='all' OR direction=${direcao:sqlstring}) AND (${proto:sqlstring}='all' OR protocol=${proto:sqlstring}) GROUP BY 1,direction UNION ALL SELECT $__timeGroupAlias(bucket_utc,'1m'),CONCAT(CASE direction WHEN 'in' THEN 'recebido' ELSE 'originado' END,' SYN'),SUM(syn_packets)/60 FROM orby_flow_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND (${ip:sqlstring}='' OR local_ip=${ip:sqlstring} OR subscriber_ip=${ip:sqlstring}) AND (${remoto:sqlstring}='' OR remote_ip=${remoto:sqlstring}) AND (${porta:sqlstring}='' OR local_port=${porta:sqlstring} OR remote_port=${porta:sqlstring}) AND (${direcao:sqlstring}='all' OR direction=${direcao:sqlstring}) AND (${proto:sqlstring}='all' OR protocol=${proto:sqlstring}) GROUP BY 1,direction UNION ALL SELECT $__timeGroupAlias(bucket_utc,'1m'),CONCAT(CASE direction WHEN 'in' THEN 'recebido' ELSE 'originado' END,' porta 0/fragmentos'),SUM(zero_port_packets)/60 FROM orby_flow_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND (${ip:sqlstring}='' OR local_ip=${ip:sqlstring} OR subscriber_ip=${ip:sqlstring}) AND (${remoto:sqlstring}='' OR remote_ip=${remoto:sqlstring}) AND (${porta:sqlstring}='' OR local_port=${porta:sqlstring} OR remote_port=${porta:sqlstring}) AND (${direcao:sqlstring}='all' OR direction=${direcao:sqlstring}) AND (${proto:sqlstring}='all' OR protocol=${proto:sqlstring}) GROUP BY 1,direction ORDER BY 1",
+          "format": "time_series",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "pps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "title": "Eventos de ataque detectados",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 17,
+        "w": 24,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT event_time AS 'Hora',rule_name AS 'Regra',severity AS 'Severidade',CASE direction WHEN 'in' THEN 'recebido' ELSE 'originado' END AS 'Sentido',scope AS 'Tipo',pool AS 'Pool',local_ip AS 'IP público/local',subscriber_ip AS 'IP assinante',protocol AS 'Proto',local_port AS 'Porta local',remote_port AS 'Porta remota',pps AS 'Pacotes/s',mbps*1000000 AS 'Taxa',remote_ips AS 'IPs remotos',syn_ratio AS 'SYN' FROM orby_attack_events WHERE $__timeFilter(event_time) AND (${ip:sqlstring}='' OR local_ip=${ip:sqlstring} OR subscriber_ip=${ip:sqlstring}) AND (${direcao:sqlstring}='all' OR direction=${direcao:sqlstring}) AND (${proto:sqlstring}='all' OR protocol=${proto:sqlstring}) AND (${porta:sqlstring}='' OR local_port=${porta:sqlstring} OR remote_port=${porta:sqlstring}) ORDER BY event_time DESC LIMIT 200",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Taxa"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bps"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Pacotes/s"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "pps"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "SYN"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          }
+        ]
+      },
+      "options": {}
+    },
+    {
+      "id": 9,
+      "title": "IPs da rede com maior pico (público, pool ou assinante)",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 26,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT CASE direction WHEN 'in' THEN 'recebido' ELSE 'originado' END AS 'Sentido',scope AS 'Tipo',pool AS 'Pool',local_ip AS 'IP público/local',subscriber_ip AS 'IP assinante',MAX(bps) AS 'Pico',MAX(pps) AS 'Pico pacotes/s',SUM(vol) AS 'Volume',MAX(remotos) AS 'IPs remotos (pico)' FROM (SELECT direction,scope,pool,local_ip,subscriber_ip,bucket_utc,SUM(bytes)*8/60 AS bps,SUM(packets)/60 AS pps,SUM(bytes) AS vol,COUNT(DISTINCT remote_ip) AS remotos FROM orby_flow_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND (${ip:sqlstring}='' OR local_ip=${ip:sqlstring} OR subscriber_ip=${ip:sqlstring}) AND (${remoto:sqlstring}='' OR remote_ip=${remoto:sqlstring}) AND (${porta:sqlstring}='' OR local_port=${porta:sqlstring} OR remote_port=${porta:sqlstring}) AND (${direcao:sqlstring}='all' OR direction=${direcao:sqlstring}) AND (${proto:sqlstring}='all' OR protocol=${proto:sqlstring}) GROUP BY direction,scope,pool,local_ip,subscriber_ip,bucket_utc) t GROUP BY direction,scope,pool,local_ip,subscriber_ip ORDER BY MAX(bps) DESC LIMIT 50",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Pico"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bps"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Pico pacotes/s"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "pps"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Volume"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "decbytes"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      },
+      "options": {}
+    },
+    {
+      "id": 10,
+      "title": "IPs remotos (quem ataca ou é atacado)",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 36,
+        "w": 12,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT remote_ip AS 'IP remoto',CASE direction WHEN 'in' THEN 'recebido' ELSE 'originado' END AS 'Sentido',protocol AS 'Proto',COUNT(DISTINCT local_ip) AS 'IPs nossos envolvidos',SUM(bytes) AS 'Volume',SUM(packets)/GREATEST(1,$__unixEpochTo()-$__unixEpochFrom()) AS 'Pacotes/s médio' FROM orby_flow_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND (${ip:sqlstring}='' OR local_ip=${ip:sqlstring} OR subscriber_ip=${ip:sqlstring}) AND (${remoto:sqlstring}='' OR remote_ip=${remoto:sqlstring}) AND (${porta:sqlstring}='' OR local_port=${porta:sqlstring} OR remote_port=${porta:sqlstring}) AND (${direcao:sqlstring}='all' OR direction=${direcao:sqlstring}) AND (${proto:sqlstring}='all' OR protocol=${proto:sqlstring}) GROUP BY remote_ip,direction,protocol ORDER BY SUM(bytes) DESC LIMIT 50",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Volume"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "decbytes"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Pacotes/s médio"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "pps"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      },
+      "options": {}
+    },
+    {
+      "id": 11,
+      "title": "Protocolos e portas de serviço",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "description": "Porta 0 = efêmera (não guardada) ou porta 0 real; a coluna 'Porta 0/frag.' mostra só porta 0 real e fragmentos.",
+      "gridPos": {
+        "x": 12,
+        "y": 36,
+        "w": 12,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT CASE direction WHEN 'in' THEN 'recebido' ELSE 'originado' END AS 'Sentido',protocol AS 'Proto',local_port AS 'Porta local',remote_port AS 'Porta remota',SUM(bytes) AS 'Volume',SUM(packets)/GREATEST(1,$__unixEpochTo()-$__unixEpochFrom()) AS 'Pacotes/s médio',SUM(zero_port_packets)/GREATEST(1,SUM(packets)) AS 'Porta 0/frag.' FROM orby_flow_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND (${ip:sqlstring}='' OR local_ip=${ip:sqlstring} OR subscriber_ip=${ip:sqlstring}) AND (${remoto:sqlstring}='' OR remote_ip=${remoto:sqlstring}) AND (${porta:sqlstring}='' OR local_port=${porta:sqlstring} OR remote_port=${porta:sqlstring}) AND (${direcao:sqlstring}='all' OR direction=${direcao:sqlstring}) AND (${proto:sqlstring}='all' OR protocol=${proto:sqlstring}) GROUP BY direction,protocol,local_port,remote_port ORDER BY SUM(bytes) DESC LIMIT 50",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Volume"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "decbytes"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Pacotes/s médio"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "pps"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Porta 0/frag."
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          }
+        ]
+      },
+      "options": {}
+    },
+    {
+      "id": 12,
+      "title": "CGNAT: assinantes por trás de cada IP público do pool",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "description": "Depende do log NAT do A10. Fluxos sem mapeamento aparecem sem assinante.",
+      "gridPos": {
+        "x": 0,
+        "y": 46,
+        "w": 12,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT local_ip AS 'IP público (pool)',pool AS 'Pool',subscriber_ip AS 'IP assinante',CASE direction WHEN 'in' THEN 'recebido' ELSE 'originado' END AS 'Sentido',SUM(bytes) AS 'Volume',SUM(packets) AS 'Pacotes' FROM orby_flow_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND (${ip:sqlstring}='' OR local_ip=${ip:sqlstring} OR subscriber_ip=${ip:sqlstring}) AND (${remoto:sqlstring}='' OR remote_ip=${remoto:sqlstring}) AND (${porta:sqlstring}='' OR local_port=${porta:sqlstring} OR remote_port=${porta:sqlstring}) AND (${direcao:sqlstring}='all' OR direction=${direcao:sqlstring}) AND (${proto:sqlstring}='all' OR protocol=${proto:sqlstring}) AND scope='cgnat_pool' AND subscriber_ip<>'' GROUP BY local_ip,pool,subscriber_ip,direction ORDER BY SUM(bytes) DESC LIMIT 50",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Volume"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "decbytes"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Pacotes"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          }
+        ]
+      },
+      "options": {}
+    },
+    {
+      "id": 13,
+      "title": "CGNAT: alocações de porta do assinante (log A10, sem amostragem)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "description": "Sem IP no filtro: os 10 assinantes com mais alocações. Muitas alocações por minuto indicam varredura, flood ou malware.",
+      "gridPos": {
+        "x": 12,
+        "y": 46,
+        "w": 12,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),inside_ip AS metric,allocs AS value FROM orby_nat_user_minute WHERE $__timeFilter(bucket_utc) AND (${ip:sqlstring}='' OR inside_ip=${ip:sqlstring}) AND (${ip:sqlstring}<>'' OR inside_ip IN (SELECT inside_ip FROM (SELECT inside_ip FROM orby_nat_user_minute WHERE $__timeFilter(bucket_utc) GROUP BY inside_ip ORDER BY SUM(allocs) DESC LIMIT 10) top)) ORDER BY 1",
+          "format": "time_series",
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    }
+  ]
+}

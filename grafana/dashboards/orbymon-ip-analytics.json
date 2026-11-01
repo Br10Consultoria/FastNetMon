@@ -421,7 +421,9 @@
         "defaults": {
           "color": {
             "mode": "palette-classic"
-          }
+          },
+          "unit": "bps",
+          "decimals": 2
         },
         "overrides": []
       },
