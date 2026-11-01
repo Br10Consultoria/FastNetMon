@@ -829,6 +829,26 @@ class PanelTests(unittest.TestCase):
         self.assertEqual(self.db.custs, {})
 
 
+    def test_tools_page(self):
+        from fmn_filters import tools as tl
+        self.login()
+        self.assertEqual(self.c.get("/ferramentas").status_code, 200)
+        with mock.patch.object(tl, "rdap_ip", return_value={"ip": "203.0.113.9", "nome": "EXEMPLO-NET", "handle": "",
+                                                            "pais": "US", "faixa": "a - b", "cidrs": [],
+                                                            "abuse": ["abuse@exemplo.net"], "contatos": []}):
+            r = self.post("/ferramentas", tool="rdap", q="203.0.113.9")
+        self.assertIn(b"abuse@exemplo.net", r.data)
+        self.assertEqual(self.db.audits[-1][1:], ("ferramenta", "rdap 203.0.113.9"))
+        with mock.patch.object(tl, "_run", return_value="64 bytes from 203.0.113.9"):
+            r = self.post("/ferramentas", tool="ping", q="203.0.113.9")
+        self.assertIn(b"64 bytes from", r.data)
+        r = self.post("/ferramentas", tool="ping", q="-f 1.1.1.1")
+        self.assertIn("válido".encode(), r.data)
+        with mock.patch.object(tl, "asn_info", side_effect=OSError("sem rede")):
+            r = self.post("/ferramentas", tool="asn", q="AS262687")
+        self.assertIn(b"consulta falhou: sem rede", r.data)
+
+
 class CliTests(unittest.TestCase):
     def test_create_user(self):
         from fmn_filters.admin import cli

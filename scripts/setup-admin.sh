@@ -41,6 +41,10 @@ echo "livre (ou ja usada pelo proprio painel)"
 echo "=== Pacotes ==="
 command -v setfacl >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y -q acl >/dev/null
 command -v openssl >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y -q openssl >/dev/null
+# ferramentas de diagnostico da pagina Ferramentas (opcionais)
+for pair in ping:iputils-ping traceroute:traceroute dig:dnsutils; do
+  command -v "${pair%%:*}" >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y -q "${pair#*:}" >/dev/null || true
+done
 "$BASE/.venv/bin/pip" install -q "flask==3.1.3" "gunicorn==23.0.0" "segno==1.6.6" "PyMySQL>=1.1,<2"
 
 echo "=== Usuario de sistema ==="

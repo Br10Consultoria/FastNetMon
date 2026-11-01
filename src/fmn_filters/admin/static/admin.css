@@ -82,3 +82,4 @@ svg.hours .base{stroke:var(--bad);stroke-width:2}
 .legend .sw{display:inline-block;width:12px;height:10px;margin:0 4px 0 12px;vertical-align:-1px}
 .legend .sw.static{border:1px dashed var(--muted)}.legend .sw.dyn{background:var(--accent)}.legend .sw.base{border-top:2px solid var(--bad);height:0}
 svg.hours .lbl{font-size:10px}
+pre.detail{background:var(--bg);border-radius:6px;padding:10px;font-size:12px;max-height:480px;overflow:auto;white-space:pre-wrap;word-break:break-word}

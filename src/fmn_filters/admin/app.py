@@ -782,6 +782,35 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
                                radius=radius_view, has_password=bool(current.get("RADIUS_DB_PASSWORD")),
                                lookup=lookup, tz_choices=TZ_CHOICES)
 
+    # ---------------------------------------------------------------- ferramentas
+    @app.route("/ferramentas", methods=["GET", "POST"])
+    def tools_page():
+        from .. import tools as tl
+        f = request.form if request.method == "POST" else request.args
+        form = {"tool": f.get("tool", "rdap"), "q": f.get("q", "").strip()[:255], "rtype": f.get("rtype", "A")}
+        result, error = None, None
+        if form["q"]:
+            try:
+                tool = form["tool"]
+                if tool == "rdap":
+                    result = tl.rdap_ip(form["q"])
+                elif tool == "asn":
+                    result = tl.asn_info(form["q"])
+                elif tool == "dns":
+                    result = tl.dns(form["q"], form["rtype"])
+                elif tool == "ping":
+                    result = tl.ping(form["q"])
+                elif tool == "traceroute":
+                    result = tl.traceroute(form["q"])
+                else:
+                    raise tl.ToolError("ferramenta desconhecida")
+                audit("ferramenta", "%s %s" % (tool, form["q"]))
+            except tl.ToolError as exc:
+                error = str(exc)
+            except Exception as exc:                        # rede, RDAP fora do ar, JSON inesperado
+                error = "consulta falhou: %s" % (str(exc)[:200] or type(exc).__name__)
+        return render_template("tools.html", form=form, result=result, error=error, dns_types=tl.DNS_TYPES)
+
     # ---------------------------------------------------------------- saude
     @app.route("/saude")
     def health_page():

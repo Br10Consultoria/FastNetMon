@@ -1,0 +1,33 @@
+{% extends "base.html" %}{% block title %}Ferramentas{% endblock %}
+{% block body %}
+<h1>Ferramentas</h1>
+<form method="post" class="card inline" autocomplete="off">{% include "_csrf.html" %}
+  <label>Ferramenta <select name="tool">{% for k, l in (('rdap','Dono e abuse de um IP (RDAP)'),('asn','AS: dono e prefixos anunciados'),('dns','DNS'),('ping','Ping'),('traceroute','Traceroute')) %}<option value="{{ k }}" {{ 'selected' if form.tool==k }}>{{ l }}</option>{% endfor %}</select></label>
+  <label>IP, nome ou AS <input name="q" value="{{ form.q }}" required placeholder="203.0.113.9, exemplo.com.br ou AS262687"></label>
+  <label>Registro DNS <select name="rtype">{% for t in dns_types %}<option {{ 'selected' if form.rtype==t }}>{{ t }}</option>{% endfor %}</select></label>
+  <button>Executar</button>
+  <p class="muted">Ping e traceroute saem deste servidor. RDAP e AS consultam rdap.org e RIPEstat. Tudo fica na auditoria.</p>
+</form>
+{% if error %}<p class="flash">{{ error }}</p>{% endif %}
+{% if result is not none %}
+<section class="card">
+  {% if form.tool == 'rdap' %}
+    <h2>{{ result.ip }} — {{ result.nome or result.handle }}</h2>
+    <table>
+      <tr><td>Faixa</td><td>{{ result.faixa }}{% if result.cidrs %} ({{ result.cidrs|join(', ') }}){% endif %}</td></tr>
+      <tr><td>País</td><td>{{ result.pais or '—' }}</td></tr>
+      <tr><td>Contato de abuso</td><td>{% for e in result.abuse %}<code>{{ e }}</code> {% else %}não informado{% endfor %}</td></tr>
+    </table>
+    {% if result.contatos %}<h3>Contatos</h3><div class="scroll"><table><tr><th>Papel</th><th>Nome</th><th>E-mail</th><th>Handle</th></tr>
+      {% for c in result.contatos %}<tr><td>{{ c.papel }}</td><td>{{ c.nome }}</td><td>{{ c.email }}</td><td>{{ c.handle }}</td></tr>{% endfor %}</table></div>{% endif %}
+  {% elif form.tool == 'asn' %}
+    <h2>AS{{ result.asn }} — {{ result.nome or 'sem nome' }}</h2>
+    <p>{{ 'Anunciado' if result.anunciado else 'Não anunciado' }} · {{ result.total }} prefixo(s): {{ result.v4 }} IPv4, {{ result.v6 }} IPv6{% if result.total > result.prefixos|length %} (mostrando {{ result.prefixos|length }}){% endif %}</p>
+    <pre class="detail">{{ result.prefixos|join('\n') }}</pre>
+  {% else %}
+    <h2>{{ form.tool }} {{ form.q }}</h2>
+    <pre class="detail">{{ result }}</pre>
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}
