@@ -28,7 +28,8 @@ class DeployTests(unittest.TestCase):
         text = script.read_text()
         for name in ("orbymon-a10-nat.service", "orbymon-flow-rollup-huawei.timer",
                      "orbymon-bidir-huawei.timer", "orbymon-retention.timer",
-                     "orbymon-retention.service"):
+                     "orbymon-retention.service", "orbymon-calibrate.timer",
+                     "orbymon-calibrate.service"):
             self.assertIn(name, text)
             self.assertTrue((ROOT / "deploy/systemd" / name).exists())
 
@@ -37,7 +38,7 @@ class DeployTests(unittest.TestCase):
         self.assertIn("--allow 10.100.10.10", text)
 
     def test_operational_scripts_are_valid_bash(self):
-        for name in ("orbymon-retention.sh", "a10-receiver-cutover.sh", "tune-mariadb.sh"):
+        for name in ("orbymon-retention.sh", "a10-receiver-cutover.sh", "tune-mariadb.sh", "calibrate.sh"):
             subprocess.run(["bash", "-n", str(ROOT / "scripts" / name)], check=True)
         cut = (ROOT / "scripts/a10-receiver-cutover.sh").read_text()
         self.assertIn("--rollback", cut)
@@ -53,6 +54,12 @@ class DeployTests(unittest.TestCase):
         text = (ROOT / "scripts/setup-bidir.sh").read_text()
         self.assertIn("GRANT DELETE ON orbymon.$table", text)
         self.assertNotIn("GRANT ALL", text)
+
+    def test_daily_calibration_never_applies(self):
+        unit = (ROOT / "deploy/systemd/orbymon-calibrate.service").read_text()
+        self.assertNotIn("--apply", unit)
+        self.assertIn("User=orbymon", unit)
+        self.assertIn("ReadWritePaths=/var/lib/orbymon/calibration", unit)
 
 
 if __name__ == "__main__":

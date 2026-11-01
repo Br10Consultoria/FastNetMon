@@ -54,6 +54,7 @@ fi
 
 echo "=== Diretorio de logs NAT (retencao em /etc/orbymon/retention.env, padrao 15 dias) ==="
 install -d -o orbymon -g orbymon -m 0750 /var/log/orbymon/a10nat
+install -d -o orbymon -g orbymon -m 0750 /var/lib/orbymon/calibration
 
 echo "=== Units systemd ==="
 # Compactacao diaria antiga substituida pela retencao horaria.
@@ -64,7 +65,7 @@ fi
 for unit in orbymon-a10-nat.service orbymon-flow-rollup-huawei.service \
             orbymon-flow-rollup-huawei.timer orbymon-bidir-huawei.service \
             orbymon-bidir-huawei.timer orbymon-retention.service \
-            orbymon-retention.timer; do
+            orbymon-retention.timer orbymon-calibrate.service orbymon-calibrate.timer; do
   install -m 0644 "$BASE/deploy/systemd/$unit" /etc/systemd/system/
 done
 chmod 0755 "$BASE/scripts/orbymon-retention.sh"
@@ -92,6 +93,7 @@ if [[ $START -eq 1 ]]; then
   systemctl enable --now orbymon-flow-rollup-huawei.timer
   systemctl enable --now orbymon-bidir-huawei.timer
   systemctl enable --now orbymon-retention.timer
+  systemctl enable --now orbymon-calibrate.timer
   sleep 2
   systemctl is-active orbymon-a10-nat.service orbymon-flow-rollup-huawei.timer orbymon-bidir-huawei.timer
 fi
@@ -105,7 +107,7 @@ F4 instalada (apenas alertas). Proximos passos MANUAIS:
  3. Confirme recepcao:   journalctl -u orbymon-a10-nat -n 20 --no-pager
  4. Simulacao sem gravar: sudo -u orbymon env $(cat /etc/orbymon/pipeline.env | xargs) \
       /opt/orbymon/.venv/bin/python -m fmn_filters.bidir_detector --config /etc/orbymon/bidir.json --dry-run
- 5. Calibrar limites:     python -m fmn_filters.attack_report --top-talkers 60
-                          python -m fmn_filters.attack_report --nat-top 60
+ 5. Calibrar limites (apos 24 h de dados): sudo bash scripts/calibrate.sh
+                          revisar e aplicar:      sudo bash scripts/calibrate.sh --apply
 Veja docs/BIDIRECTIONAL.md.
 MSG

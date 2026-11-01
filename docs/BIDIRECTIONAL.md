@@ -167,6 +167,26 @@ sudo -u orbymon env $(cat /etc/orbymon/pipeline.env | xargs) python3 -m fmn_filt
 sudo -u orbymon env $(cat /etc/orbymon/pipeline.env | xargs) python3 -m fmn_filters.bidir_detector --config /etc/orbymon/bidir.json --dry-run
 ```
 
+## Calibração dos limites
+
+Depois de **pelo menos 24 h** de dados no rollup (o rollup guarda 2 dias):
+
+```bash
+sudo bash scripts/calibrate.sh            # relatório + proposta; não altera nada
+sudo bash scripts/calibrate.sh --apply    # backup de /etc/orbymon/bidir.json e aplica
+```
+
+Para cada regra e tipo de IP (dedicado, pool CGNAT, IP privado, assinante) a ferramenta mede, por entidade e
+minuto, o mesmo sinal que o detector avalia (pacotes/s e Mbps; SYN/s nas regras de SYN; porta 0/s nas de
+porta 0), ignorando minutos com evento de ataque, e propõe `p99,9 × 2` com piso (1000 pps, 10 Mbps).
+Cada rodada move um limite no máximo para **metade** ou **4×** do atual (marcado com `*`): a calibração
+converge rodando por alguns dias, sem que um dia atípico desregule tudo. Critérios estruturais (IPs remotos,
+proporção de SYN e de porta 0) não são alterados. A coluna `alarm/dia` mostra quantos alarmes os limites
+atuais teriam gerado no período (teto: não considera o número de IPs remotos).
+
+Um timer diário (`orbymon-calibrate.timer`, 05:17) grava só o relatório e a proposta em
+`/var/lib/orbymon/calibration/`; **nunca aplica sozinho**. Para desfazer uma aplicação, copie o `.bak` de volta.
+
 ## Consultas (base da etapa 2)
 
 ```bash

@@ -1,0 +1,10 @@
+[Unit]
+Description=OrbyMon F4 - calibracao diaria (madrugada, so relatorio)
+
+[Timer]
+OnCalendar=*-*-* 05:17:00
+Persistent=true
+Unit=orbymon-calibrate.service
+
+[Install]
+WantedBy=timers.target
