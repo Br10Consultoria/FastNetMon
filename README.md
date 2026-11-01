@@ -62,6 +62,8 @@ O instalador configura HTTPS autofirmado na porta 3000, datasource somente leitu
 
 **Fase 4 bidirecional (ataque recebido e originado, CGNAT-aware):** [receptor NAT do A10, rollup com IP privado do assinante e detector nos dois sentidos](docs/BIDIRECTIONAL.md). Instalar com `sudo bash scripts/setup-bidir.sh` apos o perfil CGNAT. Substitui a F3 para deteccao; mantenha a F3 apenas durante a validacao.
 
+**Alertas no Telegram (F4):** início, lembrete e encerramento de cada ataque, com assinante CGNAT e link para o painel: `sudo bash scripts/setup-telegram.sh`. Veja [docs/BIDIRECTIONAL.md](docs/BIDIRECTIONAL.md).
+
 **A10 CGNAT Syslog:** [recepcao TCP/5514 exclusiva, spool bruto e inspecao sem correlacao prematura](docs/A10_SYSLOG.md). Instalar com sudo bash scripts/setup-a10-syslog.sh --a10-source-ip IP_REAL_DO_A10.
 
 **A10 Syslog framing:** [auditoria read-only de mensagens RFC 5424 e integridade antes de correlacao NAT](docs/A10_SYSLOG_AUDIT.md). Use `python3 -m fmn_filters.a10_syslog_audit` com usuario orbymon.

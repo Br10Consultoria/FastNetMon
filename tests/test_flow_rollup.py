@@ -126,6 +126,22 @@ class RollupTests(unittest.TestCase):
         self.assertEqual(zero, {"1.2.3.4": 100.0, "1.2.3.5": 50.0, "1.2.3.6": 0.0, "1.2.3.7": 0.0})
         self.assertEqual(sum(r["packets"] for r in rows), 250.0)
 
+    def test_ipv6_of_the_provider_is_protected_and_detected_both_ways(self):
+        rows, stats = run([flow("2001:4860::8888", "2804:4fa8:10::5", 53, 40000),      # recebido
+                           flow("2804:4fa8:10::5", "2a03:2880::1", 40000, 443, "tcp"),  # originado
+                           flow("2001:db8::1", "2a03:2880::1", 1, 2)])                  # fora: transito
+        d = {r["direction"]: r for r in as_dicts(rows)}
+        self.assertEqual((d["in"]["scope"], d["in"]["local_ip"], d["in"]["remote_port"]), ("dedicated", "2804:4fa8:10::5", 53))
+        self.assertEqual((d["out"]["scope"], d["out"]["subscriber_ip"]), ("dedicated", "2804:4fa8:10::5"))
+        self.assertEqual(stats["transito_descartado"], 1)
+
+    def test_infrastructure_cidr_makes_callcenter_traffic_internal(self):
+        cfg = config(extra_infrastructure_cidrs=["187.87.201.193/32", "10.20.0.0/16"])
+        rows, stats = run([flow("10.20.1.5", "100.64.80.10", 50000, 80, "tcp"),
+                           flow("100.64.80.10", "10.20.1.5", 80, 50000, "tcp")], cfg)
+        self.assertEqual(rows, [])
+        self.assertEqual(stats["internos_descartados"], 2)
+
     def test_same_key_sums_and_multiplier_applies(self):
         cfg = config(counter_multiplier=2.0)
         rows = as_dicts(run([flow("8.8.8.8", "45.238.170.10", 53, 40000, packets=10, nbytes=100),

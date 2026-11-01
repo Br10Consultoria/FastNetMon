@@ -2,6 +2,7 @@
   "enabled": true,
   "source": "huawei",
   "cgnat_profile_path": "/etc/orbymon/cgnat-profiles.json",
+  "ipv6_protected_cidrs": ["2804:4fa8::/32"],
   "extra_infrastructure_cidrs": ["187.87.201.193/32", "187.87.201.198/32"],
   "nat_socket": "/run/orbymon/nat.sock",
   "observation_ifindexes": {"in": [334, 336, 369, 368, 348, 86, 85], "out": [334, 336, 369, 368, 348, 86, 85]},

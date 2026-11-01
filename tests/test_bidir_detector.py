@@ -181,6 +181,11 @@ class ConfigTests(unittest.TestCase):
     def cfg(self):
         return json.loads((ROOT / "rules/bidir.example.json").read_text())
 
+    def test_ipv6_key_is_optional_for_existing_installations(self):
+        cfg = self.cfg()
+        cfg.pop("ipv6_protected_cidrs")
+        self.assertEqual(validate_config(cfg)["ipv6_protected_cidrs"], [])
+
     def test_example_is_valid_and_covers_both_directions(self):
         self.assertEqual({r["direction"] for r in CFG["rules"]}, {"in", "out"})
         self.assertEqual(CFG["extra_infrastructure_cidrs"], ["187.87.201.193/32", "187.87.201.198/32"])
@@ -197,7 +202,9 @@ class ConfigTests(unittest.TestCase):
                        lambda c: c["rules"][2]["limits"]["dedicated"].update(min_syn_ratio=1.5),
                        lambda c: c["rules"][0]["limits"]["dedicated"].update(min_zero_port_ratio=2),
                        lambda c: c.update(nat_socket="relativo.sock"),
-                       lambda c: c["nat_rules"][0].pop("min_allocs_per_min")):
+                       lambda c: c["nat_rules"][0].pop("min_allocs_per_min"),
+                       lambda c: c.update(ipv6_protected_cidrs=["10.0.0.0/8"]),
+                       lambda c: c.update(ipv6_protected_cidrs=["2001:db8::/32"])):
             cfg = self.cfg()
             mutate(cfg)
             with self.assertRaises(ValueError):

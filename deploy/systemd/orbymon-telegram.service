@@ -1,0 +1,20 @@
+[Unit]
+Description=OrbyMon - alertas de ataque no Telegram
+After=network-online.target mariadb.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=orbymon
+Group=orbymon
+WorkingDirectory=/opt/orbymon
+EnvironmentFile=/etc/orbymon/pipeline.env
+EnvironmentFile=/etc/orbymon/telegram.env
+Environment=PYTHONPATH=/opt/orbymon/src
+ExecStart=/opt/orbymon/.venv/bin/python -m fmn_filters.notify_telegram
+TimeoutStartSec=120
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX

@@ -21,6 +21,7 @@ CONFIG_KEYS = frozenset({
     "nat_socket", "observation_ifindexes", "keep_ports", "counter_multiplier",
     "settle_minutes", "cooldown_minutes", "max_query_rows", "retention_days",
     "rules", "nat_rules"})
+OPTIONAL_CONFIG_KEYS = frozenset({"ipv6_protected_cidrs"})
 RULE_KEYS = frozenset({"name", "enabled", "severity", "direction", "protocols",
                        "local_ports", "remote_ports", "split_by",
                        "consecutive_minutes", "limits"})
@@ -104,9 +105,19 @@ def _validate_nat_rule(rule, names):
 
 
 def validate_config(obj):
-    if not isinstance(obj, dict) or set(obj) != CONFIG_KEYS:
+    if (not isinstance(obj, dict) or not CONFIG_KEYS <= set(obj)
+            or set(obj) - CONFIG_KEYS - OPTIONAL_CONFIG_KEYS):
         raise ValueError("configuracao F4 com campos faltantes ou desconhecidos: esperado "
-                         + ",".join(sorted(CONFIG_KEYS)))
+                         + ",".join(sorted(CONFIG_KEYS)) + " (opcional: "
+                         + ",".join(sorted(OPTIONAL_CONFIG_KEYS)) + ")")
+    obj.setdefault("ipv6_protected_cidrs", [])
+    v6 = obj["ipv6_protected_cidrs"]
+    if not isinstance(v6, list):
+        raise ValueError("ipv6_protected_cidrs deve ser lista")
+    for cidr in v6:
+        net = ip_network(cidr, strict=True)
+        if net.version != 6 or not net.is_global:
+            raise ValueError("ipv6_protected_cidrs aceita apenas prefixos IPv6 publicos: " + str(cidr))
     if type(obj["enabled"]) is not bool or obj["source"] != "huawei":
         raise ValueError("enabled booleano e source huawei obrigatorios")
     for key in ("cgnat_profile_path", "nat_socket"):
@@ -157,7 +168,8 @@ def load_profile(cfg):
 
 def build_scopes(cfg, profile=None):
     profile = profile if profile is not None else load_profile(cfg)
-    return ScopeMap(validate_profile(profile), cfg["extra_infrastructure_cidrs"])
+    return ScopeMap(validate_profile(profile), cfg["extra_infrastructure_cidrs"],
+                    cfg.get("ipv6_protected_cidrs", []))
 
 
 def keep_port_set(cfg):

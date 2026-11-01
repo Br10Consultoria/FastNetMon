@@ -1,0 +1,11 @@
+[Unit]
+Description=OrbyMon - verificacao de alertas para o Telegram a cada 30 segundos
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=30s
+AccuracySec=5s
+Unit=orbymon-telegram.service
+
+[Install]
+WantedBy=timers.target

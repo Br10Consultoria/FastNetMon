@@ -107,3 +107,26 @@ CREATE TABLE IF NOT EXISTS orby_bidir_checks (
  signals INT UNSIGNED NOT NULL DEFAULT 0,
  alerts INT UNSIGNED NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Notificacoes (Telegram): marca de evento ja processado e incidentes abertos/encerrados.
+ALTER TABLE orby_attack_events ADD COLUMN IF NOT EXISTS notified_at DATETIME NULL;
+ALTER TABLE orby_attack_events ADD INDEX IF NOT EXISTS ix_attack_notify (notified_at, event_time);
+CREATE TABLE IF NOT EXISTS orby_notify_incidents (
+ incident_key CHAR(64) NOT NULL PRIMARY KEY,
+ rule_name VARCHAR(100) NOT NULL,
+ severity VARCHAR(16) NOT NULL,
+ direction VARCHAR(3) NOT NULL,
+ scope VARCHAR(16) NOT NULL,
+ pool VARCHAR(64) NOT NULL DEFAULT '',
+ local_ip VARCHAR(45) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+ subscriber_ip VARCHAR(45) CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT '',
+ protocol VARCHAR(12) NOT NULL DEFAULT '',
+ first_seen DATETIME NOT NULL,
+ last_seen DATETIME NOT NULL,
+ events INT UNSIGNED NOT NULL DEFAULT 0,
+ peak_bps DOUBLE NOT NULL DEFAULT 0,
+ peak_pps DOUBLE NOT NULL DEFAULT 0,
+ last_sent DATETIME NULL,
+ closed_at DATETIME NULL,
+ INDEX ix_notify_open (closed_at, last_seen)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

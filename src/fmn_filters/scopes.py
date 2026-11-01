@@ -24,7 +24,7 @@ class ScopeMap:
     protegidos nao listados em nenhum papel contam como ``dedicated``.
     """
 
-    def __init__(self, profile: dict, extra_infrastructure=()):
+    def __init__(self, profile: dict, extra_infrastructure=(), ipv6_protected=()):
         meta = profile.get("cgnat_pool_metadata", {})
         self._private = [ip_network(c) for c in profile.get("inside_private_cidrs", [])]
         self._pools = [(ip_network(c), meta.get(c, {}).get("name", c),
@@ -34,6 +34,8 @@ class ScopeMap:
                        list(profile.get("infrastructure_public_cidrs", [])) + list(extra_infrastructure)]
         self._dedicated = [ip_network(c) for c in profile.get("dedicated_public_cidrs", [])]
         self._protected = [ip_network(c) for c in profile["protected_cidrs"]]
+        # IPv6 publico do provedor: sem CGNAT, cada prefixo e do proprio cliente (dedicado).
+        self._v6 = [ip_network(c, strict=False) for c in ipv6_protected]
         self.classify = lru_cache(maxsize=262144)(self._classify)
 
     def _classify(self, ip: str) -> tuple:
@@ -43,8 +45,11 @@ class ScopeMap:
         except ValueError:
             return external
         if addr.version != 4:
-            # IPv6 de assinantes ainda nao e classificado: nunca presumir escopo.
-            return external
+            if any(addr in n for n in self._infra):
+                return (SCOPE_INFRA, "", 0)
+            if any(addr in n for n in self._v6):
+                return (SCOPE_DEDICATED, "", 0)
+            return external                      # IPv6 fora dos prefixos declarados: nunca presumir
         if any(addr in n for n in self._private):
             return (SCOPE_PRIVATE, "", 0)
         if any(addr in n for n in self._infra):

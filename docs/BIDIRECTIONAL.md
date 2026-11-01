@@ -167,6 +167,34 @@ sudo -u orbymon env $(cat /etc/orbymon/pipeline.env | xargs) python3 -m fmn_filt
 sudo -u orbymon env $(cat /etc/orbymon/pipeline.env | xargs) python3 -m fmn_filters.bidir_detector --config /etc/orbymon/bidir.json --dry-run
 ```
 
+## Alertas no Telegram
+
+1. No Telegram, fale com **@BotFather** → `/newbot` → copie o token.
+2. Mande uma mensagem ao bot, ou adicione o bot ao grupo da equipe e escreva algo no grupo.
+3. No servidor:
+
+```bash
+sudo bash scripts/setup-telegram.sh                 # pede o token (sem eco) e lista os chats encontrados
+sudo bash scripts/setup-telegram.sh --chat -100XXXX # grava, manda mensagem de teste e ativa o timer
+```
+
+Opções: `--min-severity warning|high|critical` (padrão `high`), `--site "POP Salvador"`, `--grafana-url`.
+Configuração em `/etc/orbymon/telegram.env` (0640, contém o token). Cada ataque vira um incidente
+(regra + sentido + tipo + IP) com três mensagens: **início**, **lembrete** a cada 30 min enquanto continua e
+**encerrado** após 20 min sem detecção. Mensagens trazem IP público, pool, assinante CGNAT, protocolo/porta,
+pico (bits/s e pps), IPs remotos, interface de entrada/saída e link para o painel F4 filtrado no IP.
+Máximo de 15 mensagens por rodada (o excedente vai num resumo e recebe o lembrete depois). Falha de rede
+não perde alerta: o evento só é marcado como enviado depois do envio.
+
+## IPv6 e redes internas
+
+- `ipv6_protected_cidrs` (opcional) em `/etc/orbymon/bidir.json`, ex.: `["2804:4fa8::/32"]`: o IPv6 do
+  provedor é tratado como IP dedicado nos dois sentidos. O Huawei precisa exportar o NetStream IPv6 para o
+  OrbyMon (`ipv6 netstream export host 187.87.201.198 2056`).
+- `extra_infrastructure_cidrs`: redes próprias que conversam com assinantes sem passar pelo A10 (ex.:
+  callcenter que acessa CPEs em 100.64.x pela borda). Tráfego entre elas e a rede do provedor é interno e
+  não gera alerta.
+
 ## Calibração dos limites
 
 Depois de **pelo menos 24 h** de dados no rollup (o rollup guarda 2 dias):
