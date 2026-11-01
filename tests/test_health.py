@@ -61,6 +61,45 @@ class SystemdChecks(unittest.TestCase):
         self.assertEqual(len(out), 2)
 
 
+class DecimalTests(unittest.TestCase):
+    def test_mariadb_decimal_sums_and_broken_check(self):
+        from decimal import Decimal
+
+        class Cur:
+            def __init__(self):
+                self.sql = ""
+
+            def execute(self, sql, params=()):
+                self.sql = sql
+
+            def fetchone(self):
+                if "SUM(nat_resolved)" in self.sql:
+                    return (Decimal("900"), Decimal("100"))
+                if "COUNT(*)" in self.sql:
+                    return (Decimal("0"),)
+                if "SUM(DATA_LENGTH" in self.sql:
+                    return (Decimal("2500000000"),)
+                return (None,)
+
+            def fetchall(self):
+                if "information_schema" in self.sql:
+                    return [("orby_flow_minute", Decimal("2000000000"), Decimal("12345678"))]
+                return []
+        out = {i["key"]: i for i in h.check_db(Cur(), CFG, datetime(2026, 11, 1, 12), telegram_on=True)}
+        self.assertEqual(out["nat_resolve"]["value"], "90%")
+        self.assertEqual(out["telegram"]["status"], h.OK)
+        self.assertEqual(out["db_size"]["value"], "2.5 GB")
+
+        class BrokenDb:
+            def cursor(self):
+                raise RuntimeError("conexao caiu")
+        with tempfile.TemporaryDirectory() as d:
+            items = h.collect(BrokenDb(), CFG, d, datetime(2026, 11, 1, 12), run=lambda a: "", disks=("/",))
+        keys = {i["key"]: i["status"] for i in items}
+        self.assertEqual(keys["db"], h.UNKNOWN)
+        self.assertIn("disk:/", keys)
+
+
 class MessageTests(unittest.TestCase):
     def test_message(self):
         a = h.item("nfcapd", "Coleta <NetStream>", h.CRIT, "último arquivo há 10 min", "parou")

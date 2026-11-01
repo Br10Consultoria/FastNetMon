@@ -196,8 +196,9 @@ def check_db(cur, cfg, now, telegram_on=False, a10_on=True):
             res = cur.fetchone()
         except Exception:
             pass
-        if res and res[0] is not None and (res[0] + res[1]) > 0:
-            pct = 100.0 * res[0] / (res[0] + res[1])
+        ok_n, bad_n = (float(res[0] or 0), float(res[1] or 0)) if res else (0.0, 0.0)   # SUM vem como Decimal
+        if ok_n + bad_n > 0:
+            pct = 100.0 * ok_n / (ok_n + bad_n)
             st = WARN if pct < 50 else OK
             out.append(item("nat_resolve", "Fluxos de pool com assinante identificado (1 h)", st, "%.0f%%" % pct,
                             "" if st == OK else "o log NAT está incompleto ou atrasado em relação aos fluxos"))
@@ -218,6 +219,7 @@ def check_db(cur, cfg, now, telegram_on=False, a10_on=True):
         stuck = _one(cur, "SELECT COUNT(*) FROM orby_attack_events WHERE notified_at IS NULL AND "
                           "event_time < %s - INTERVAL 10 MINUTE AND event_time >= %s - INTERVAL 1 DAY", (now, now))
         if stuck is not None:
+            stuck = int(stuck)
             st = WARN if stuck else OK
             out.append(item("telegram", "Avisos pendentes no Telegram", st, "%d evento(s) sem aviso" % stuck,
                             "" if st == OK else "orbymon-telegram parado ou sem acesso à API do Telegram"))
@@ -301,13 +303,25 @@ def message(alerts, recovered, reminders, site=""):
     return "\n".join(lines)
 
 
+def _guard(key, label, fn):
+    """Uma verificacao com defeito vira 'sem dados' em vez de derrubar todas as outras."""
+    try:
+        got = fn()
+        return got if isinstance(got, list) else [got]
+    except Exception as exc:
+        return [item(key, label, UNKNOWN, "verificação falhou", "%s: %s" % (type(exc).__name__, str(exc)[:200]))]
+
+
 def collect(db, cfg, flow_root, now, telegram_on=False, run=_systemctl, now_ts=None, disks=DISK_PATHS):
-    items = [check_nfcapd(Path(flow_root) / cfg["source"], now_ts)]
-    with db.cursor() as cur:
-        items += check_db(cur, cfg, now, telegram_on, a10_on=bool(cfg.get("a10_sources") or cfg.get("nat_rules")))
-    items += check_disks(disks)
-    items.append(check_failed_units(run))
-    items += check_runtimes(run=run)
+    items = _guard("nfcapd", "Coleta NetStream (nfcapd)", lambda: check_nfcapd(Path(flow_root) / cfg["source"], now_ts))
+
+    def db_checks():
+        with db.cursor() as cur:
+            return check_db(cur, cfg, now, telegram_on, a10_on=bool(cfg.get("a10_sources") or cfg.get("nat_rules")))
+    items += _guard("db", "Verificações no banco", db_checks)
+    items += _guard("disk", "Disco", lambda: check_disks(disks))
+    items += _guard("services", "Serviços", lambda: check_failed_units(run))
+    items += _guard("runtime", "Tempo de execução", lambda: check_runtimes(run=run))
     return items
 
 
