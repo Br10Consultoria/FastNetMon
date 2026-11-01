@@ -156,8 +156,10 @@ def render_text(r, fmt_ts, title=""):
     L = ["Relatório OrbyFlow%s" % (" — " + title if title else ""),
          "Alvos: %s" % ", ".join(r["alvos"]),
          "Período: %s a %s" % (fmt_ts(r["inicio"]), fmt_ts(r["fim"])), ""]
+    nomes = {"dedicated": "IP dedicado", "cgnat_pool": "IP de pool CGNAT", "cgnat_private": "assinante CGNAT (privado)",
+             "infra": "infraestrutura", "external": "fora dos blocos do provedor"}
     for i in r["identificacao"]:
-        L.append("IP %s: %s%s%s" % (i["ip"], i["escopo"] or "?", " (%s)" % i["pool"] if i["pool"] else "",
+        L.append("IP %s: %s%s%s" % (i["ip"], nomes.get(i["escopo"], i["escopo"] or "?"), " (%s)" % i["pool"] if i["pool"] else "",
                                      " — " + i["quem"] if i["quem"] else ""))
     if r["identificacao"]:
         L.append("")
