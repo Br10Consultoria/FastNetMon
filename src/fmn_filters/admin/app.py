@@ -714,21 +714,50 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
         current = config.radius()
         edit = None
         lookup = None
+        form_source = None
         if request.method == "POST":
             action = f.get("action", "")
             try:
-                if action == "radius":
+                if action in ("radius", "testar_fonte"):
                     values = {k: f.get(k, "").strip() for k in cu.RADIUS_KEYS}
-                    if not values["RADIUS_DB_PASSWORD"]:
-                        values["RADIUS_DB_PASSWORD"] = current.get("RADIUS_DB_PASSWORD", "")   # vazio = manter
+                    values["RADIUS_SQL_B64"] = cu.b64e(f.get("sql_text", "").strip())
+                    values["RADIUS_HTTP_BODY_B64"] = cu.b64e(f.get("http_body", "").strip())
+                    values["RADIUS_HTTP_HEADERS_B64"] = cu.b64e(f.get("http_headers", "").strip())
+                    values["RADIUS_HTTP_INSECURE"] = "1" if f.get("RADIUS_HTTP_INSECURE") == "1" else ""
+                    for secret in cu.SECRET_KEYS:                     # vazio = manter o atual
+                        if not values[secret]:
+                            values[secret] = current.get(secret, "")
                     clean = cu.validate_radius(values)
-                    config.save_radius(clean)
-                    audit("radius_salvo", "%s@%s:%s/%s.%s" % (clean["RADIUS_DB_USER"], clean["RADIUS_DB_HOST"],
-                                                             clean["RADIUS_DB_PORT"], clean["RADIUS_DB_NAME"],
-                                                             clean["RADIUS_TABLE"]) if clean["RADIUS_DB_HOST"]
-                          else "desativado")
-                    flash("RADIUS salvo. Os avisos passam a mostrar o login na próxima execução.")
-                    return redirect(url_for("customers_page"))
+                    for secret in cu.SECRET_KEYS:
+                        clean[secret] = values[secret] if clean["RADIUS_MODE"] else ""
+                    if action == "testar_fonte":
+                        tz = ZoneInfo(clean["RADIUS_TZ"] or "America/Sao_Paulo")
+                        ip = str(parse_ips(f.get("test_ip", ""))[0])
+                        when = parse_time(f.get("test_when", ""), tz) if f.get("test_when", "").strip() else dt_now_utc()
+                        if when is None:
+                            raise ValueError("horário não reconhecido (use 2026-10-30 14:05)")
+                        src = cu.Radius(clean)
+                        lookup = {"ip": ip, "when": fmt_ts(when, tz), "customer": None, "sessions": [], "error": "",
+                                  "raw": "", "test": True}
+                        try:
+                            lookup["sessions"] = [dict(x, inicio=fmt_ts(x["inicio"], tz), fim=fmt_ts(x["fim"], tz))
+                                                  for x in src.sessions(ip, when)]
+                        except cu.RadiusError as exc:
+                            lookup["error"] = str(exc)
+                        finally:
+                            lookup["raw"] = src.last_raw
+                            src.close()
+                        audit("identificacao_teste", "%s %s %s" % (clean["RADIUS_MODE"], ip, lookup["when"]))
+                        form_source = clean
+                    else:
+                        config.save_radius(clean)
+                        where = (clean["RADIUS_HTTP_URL"].split("?")[0] if clean["RADIUS_MODE"] == "http" else
+                                 "%s@%s:%s/%s" % (clean["RADIUS_DB_USER"], clean["RADIUS_DB_HOST"], clean["RADIUS_DB_PORT"],
+                                                  clean["RADIUS_DB_NAME"]))
+                        audit("identificacao_salva", "%s %s" % (clean["RADIUS_MODE"], where) if clean["RADIUS_MODE"]
+                              else "desativada")
+                        flash("Identificação salva. Os avisos passam a usar na próxima execução.")
+                        return redirect(url_for("customers_page"))
                 if action == "excluir":
                     cid = int(f.get("id", 0))
                     item = next((c for c in store.customers() or [] if c["id"] == cid), None)
@@ -777,10 +806,17 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
             got = next((c for c in items or [] if str(c["id"]) == request.args.get("edit")), None)
             if got:
                 edit = dict(got, prefixes="\n".join(got["prefixes"]))
-        radius_view = {k: current.get(k, "") for k in cu.RADIUS_KEYS if k != "RADIUS_DB_PASSWORD"}
+        shown = dict(current, RADIUS_MODE=cu._mode(current)) if form_source is None else form_source
+        if form_source is None and request.method == "POST" and f.get("action") in ("radius", "testar_fonte"):
+            shown = {k: f.get(k, "") for k in cu.RADIUS_KEYS}             # erro de validacao: mantem o digitado
+            shown.update(RADIUS_SQL_B64=cu.b64e(f.get("sql_text", "")), RADIUS_HTTP_BODY_B64=cu.b64e(f.get("http_body", "")))
+        radius_view = {k: shown.get(k, "") for k in cu.RADIUS_KEYS if k not in cu.SECRET_KEYS}
+        radius_view.update(sql_text=cu.b64d(shown.get("RADIUS_SQL_B64", "")),
+                           http_body=cu.b64d(shown.get("RADIUS_HTTP_BODY_B64", "")))
         return render_template("customers.html", items=items or [], installed=items is not None, edit=edit or {},
                                radius=radius_view, has_password=bool(current.get("RADIUS_DB_PASSWORD")),
-                               lookup=lookup, tz_choices=TZ_CHOICES)
+                               has_headers=bool(cu.b64d(current.get("RADIUS_HTTP_HEADERS_B64", ""))),
+                               modes=cu.MODES, lookup=lookup, tz_choices=TZ_CHOICES)
 
     # ---------------------------------------------------------------- ferramentas
     @app.route("/ferramentas", methods=["GET", "POST"])

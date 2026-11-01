@@ -323,7 +323,7 @@ def ip_history(cur, ip, scope, source="huawei", days=7):
 # ------------------------------------------------------------------ extracao de denuncias
 IPV4 = r"(?<![\d.])(\d{1,3}(?:\.\d{1,3}){3})(?![\d.])"
 TS_PATTERNS = (
-    ("iso", re.compile(r"(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:[.,]\d+)?\s*(Z|UTC|GMT|[+-]\d{2}:?\d{2})?")),
+    ("iso", re.compile(r"(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?(?:[.,]\d+)?\s*(Z|UTC|GMT|[+-]\d{2}:?\d{2})?")),
     ("apache", re.compile(r"(\d{1,2})/([A-Za-z]{3})/(\d{4}):(\d{2}):(\d{2}):(\d{2})\s*([+-]\d{4})?")),
     ("rfc2822", re.compile(r"(?:[A-Za-z]{3},\s*)?(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})\s+(\d{2}):(\d{2}):(\d{2})\s*([+-]\d{4}|UTC|GMT)?")),
     ("br", re.compile(r"(\d{2})/(\d{2})/(\d{4})\s+(\d{2}):(\d{2})(?::(\d{2}))?")),
@@ -348,7 +348,8 @@ def parse_time(text, default_tz, year=None):
         g = m.groups()
         try:
             if kind == "iso":
-                dt = datetime(int(g[0]), int(g[1]), int(g[2]), int(g[3]), int(g[4]), int(g[5]), tzinfo=_tz(g[6], default_tz))
+                dt = datetime(int(g[0]), int(g[1]), int(g[2]), int(g[3]), int(g[4]), int(g[5] or 0),
+                              tzinfo=_tz(g[6], default_tz))
             elif kind in ("apache", "rfc2822"):
                 mon = MONTHS.get(g[1].lower())
                 if not mon:

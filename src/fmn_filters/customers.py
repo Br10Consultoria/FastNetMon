@@ -1,11 +1,12 @@
-"""Clientes: cadastro de clientes com prefixos dedicados e consulta ao RADIUS (login PPPoE por IP e horario).
+"""Clientes: cadastro com prefixos dedicados e identificacao do assinante (login por IP e horario).
 
-RADIUS: tabela de contabilidade padrao do FreeRADIUS (radacct) em MySQL/MariaDB, somente leitura. Usado por
-IXC, MK-Auth, SGP e outros. Configuracao em /etc/orbymon/radius.env (editavel no painel, lido como dados):
-    RADIUS_DB_HOST, RADIUS_DB_PORT, RADIUS_DB_NAME, RADIUS_DB_USER, RADIUS_DB_PASSWORD,
-    RADIUS_TABLE (padrao radacct), RADIUS_TZ (fuso das datas gravadas no radacct; padrao America/Sao_Paulo)
-Colunas usadas: username, framedipaddress, acctstarttime, acctstoptime, callingstationid, nasipaddress.
-
+Fonte das sessoes (qualquer ERP), em /etc/orbymon/radius.env (editavel no painel, lido como dados):
+  http          API HTTP/JSON do ERP (recomendado): URL/corpo com {ip}, {quando}, {data}, {quando_iso}, {epoch};
+                cabecalho de autenticacao; caminhos dos campos de login, inicio, fim e MAC na resposta
+  radacct_mysql radacct do FreeRADIUS em MySQL/MariaDB (username, framedipaddress, acctstarttime, ...)
+  radacct_pg    radacct do FreeRADIUS em PostgreSQL
+  sql_mysql/pg  SELECT proprio com {ip} e {quando}, colunas: login, inicio, fim[, mac[, nas]]
+Sempre somente leitura; falha da fonte nunca bloqueia um aviso.
 Quem usa: avisos do Telegram (detector, alarmes por filtro), pagina Investigar e pagina Clientes.
 """
 from __future__ import annotations
@@ -15,8 +16,12 @@ from ipaddress import ip_address, ip_network
 import re
 from zoneinfo import ZoneInfo
 
-RADIUS_KEYS = ("RADIUS_DB_HOST", "RADIUS_DB_PORT", "RADIUS_DB_NAME", "RADIUS_DB_USER", "RADIUS_DB_PASSWORD",
-               "RADIUS_TABLE", "RADIUS_TZ")
+RADIUS_KEYS = ("RADIUS_MODE", "RADIUS_TZ",
+               "RADIUS_HTTP_URL", "RADIUS_HTTP_METHOD", "RADIUS_HTTP_BODY_B64", "RADIUS_HTTP_HEADERS_B64",
+               "RADIUS_HTTP_LIST", "RADIUS_HTTP_LOGIN", "RADIUS_HTTP_START", "RADIUS_HTTP_STOP", "RADIUS_HTTP_MAC",
+               "RADIUS_HTTP_INSECURE",
+               "RADIUS_DB_HOST", "RADIUS_DB_PORT", "RADIUS_DB_NAME", "RADIUS_DB_USER", "RADIUS_DB_PASSWORD",
+               "RADIUS_TABLE", "RADIUS_SQL_B64")
 NAME_RE = re.compile(r"^[A-Za-z0-9_]{1,64}$")
 HOST_RE = re.compile(r"^[A-Za-z0-9.:_-]{1,253}$")
 
@@ -100,61 +105,277 @@ def load_index(cur):
         raise
 
 
-# ------------------------------------------------------------------ RADIUS
+# ------------------------------------------------------------------ fonte de sessoes (login por IP e horario)
 class RadiusError(RuntimeError):
     pass
 
 
+MODES = {
+    "http": "API HTTP/JSON do ERP (recomendado)",
+    "radacct_mysql": "radacct do FreeRADIUS em MySQL/MariaDB",
+    "radacct_pg": "radacct do FreeRADIUS em PostgreSQL",
+    "sql_mysql": "consulta SQL própria (MySQL/MariaDB)",
+    "sql_pg": "consulta SQL própria (PostgreSQL)",
+}
+SECRET_KEYS = ("RADIUS_DB_PASSWORD", "RADIUS_HTTP_HEADERS_B64")
+TABLE_RE = re.compile(r"^[A-Za-z0-9_]{1,64}(\.[A-Za-z0-9_]{1,64})?$")
+FIELD_RE = re.compile(r"^[A-Za-z0-9_.\-]{0,120}$")
+HEADER_RE = re.compile(r"^[A-Za-z0-9-]{1,64}:[^\r\n]{0,2000}$")
+
+
+def b64e(text):
+    import base64
+    return base64.b64encode((text or "").encode("utf-8")).decode("ascii")
+
+
+def b64d(text):
+    import base64
+    try:
+        return base64.b64decode((text or "").encode("ascii"), validate=True).decode("utf-8")
+    except Exception:
+        return ""
+
+
+def _mode(env):
+    mode = (env.get("RADIUS_MODE") or "").strip()
+    if not mode and (env.get("RADIUS_DB_HOST") or "").strip():
+        mode = "radacct_mysql"                         # configuracao anterior (so radacct MySQL)
+    return mode
+
+
 def validate_radius(env):
-    """Normaliza a configuracao (para gravar pelo painel). Senha vazia = manter a atual (tratado no painel)."""
+    """Normaliza a configuracao gravada pelo painel. Segredos vazios = manter (tratado no painel)."""
     out = {k: (env.get(k) or "").strip() for k in RADIUS_KEYS}
-    if not out["RADIUS_DB_HOST"]:
+    out["RADIUS_MODE"] = _mode(out)
+    if not out["RADIUS_MODE"]:
         return dict.fromkeys(RADIUS_KEYS, "")              # desativado
-    if not HOST_RE.match(out["RADIUS_DB_HOST"]):
-        raise CustomerError("servidor do RADIUS inválido")
-    port = out["RADIUS_DB_PORT"] or "3306"
-    if not port.isdigit() or not 1 <= int(port) <= 65535:
-        raise CustomerError("porta inválida")
-    out["RADIUS_DB_PORT"] = port
-    out["RADIUS_TABLE"] = out["RADIUS_TABLE"] or "radacct"
-    for key in ("RADIUS_DB_NAME", "RADIUS_DB_USER", "RADIUS_TABLE"):
-        if not NAME_RE.match(out[key]):
-            raise CustomerError("%s: letras, números e _" % key.replace("RADIUS_", "").lower())
+    if out["RADIUS_MODE"] not in MODES:
+        raise CustomerError("modo de identificação inválido")
     out["RADIUS_TZ"] = out["RADIUS_TZ"] or "America/Sao_Paulo"
     try:
         ZoneInfo(out["RADIUS_TZ"])
     except Exception:
         raise CustomerError("fuso inválido")
+    if out["RADIUS_MODE"] == "http":
+        url = out["RADIUS_HTTP_URL"]
+        if not re.match(r"^https?://[^\s'\\]{3,1000}$", url) or "{ip}" not in url + b64d(out["RADIUS_HTTP_BODY_B64"]):
+            raise CustomerError("URL da API: http(s)://... com {ip} na URL ou no corpo")
+        out["RADIUS_HTTP_METHOD"] = (out["RADIUS_HTTP_METHOD"] or "GET").upper()
+        if out["RADIUS_HTTP_METHOD"] not in ("GET", "POST"):
+            raise CustomerError("método GET ou POST")
+        for line in b64d(out["RADIUS_HTTP_HEADERS_B64"]).splitlines():
+            if line.strip() and not HEADER_RE.match(line.strip()):
+                raise CustomerError("cabeçalho inválido (use Nome: valor, um por linha)")
+        body = b64d(out["RADIUS_HTTP_BODY_B64"])
+        if len(body) > 4000:
+            raise CustomerError("corpo longo demais")
+        out["RADIUS_HTTP_LOGIN"] = out["RADIUS_HTTP_LOGIN"] or "login"
+        for key in ("RADIUS_HTTP_LIST", "RADIUS_HTTP_LOGIN", "RADIUS_HTTP_START", "RADIUS_HTTP_STOP",
+                    "RADIUS_HTTP_MAC"):
+            if not FIELD_RE.match(out[key]):
+                raise CustomerError("caminho de campo inválido: %s" % out[key][:60])
+        out["RADIUS_HTTP_INSECURE"] = "1" if out["RADIUS_HTTP_INSECURE"] in ("1", "on", "true") else ""
+        for key in ("RADIUS_DB_HOST", "RADIUS_DB_PORT", "RADIUS_DB_NAME", "RADIUS_DB_USER", "RADIUS_DB_PASSWORD",
+                    "RADIUS_TABLE", "RADIUS_SQL_B64"):
+            out[key] = ""
+        return out
+    if not HOST_RE.match(out["RADIUS_DB_HOST"]):
+        raise CustomerError("servidor do banco inválido")
+    pg = out["RADIUS_MODE"].endswith("_pg")
+    port = out["RADIUS_DB_PORT"] or ("5432" if pg else "3306")
+    if not port.isdigit() or not 1 <= int(port) <= 65535:
+        raise CustomerError("porta inválida")
+    out["RADIUS_DB_PORT"] = port
+    for key in ("RADIUS_DB_NAME", "RADIUS_DB_USER"):
+        if not NAME_RE.match(out[key]):
+            raise CustomerError("%s: letras, números e _" % key.replace("RADIUS_DB_", "").lower())
+    if out["RADIUS_MODE"].startswith("radacct"):
+        out["RADIUS_TABLE"] = out["RADIUS_TABLE"] or "radacct"
+        if not TABLE_RE.match(out["RADIUS_TABLE"]):
+            raise CustomerError("tabela: letras, números e _ (pode ter esquema.tabela)")
+        out["RADIUS_SQL_B64"] = ""
+    else:
+        sql = b64d(out["RADIUS_SQL_B64"]).strip().rstrip(";").strip()
+        if not re.match(r"(?is)^(select|with)\b", sql) or ";" in sql or "{ip}" not in sql or len(sql) > 4000:
+            raise CustomerError("SQL: um único SELECT com {ip} (e {quando}) e sem ';'")
+        out["RADIUS_SQL_B64"] = b64e(sql)
+        out["RADIUS_TABLE"] = ""
+    for key in ("RADIUS_HTTP_URL", "RADIUS_HTTP_METHOD", "RADIUS_HTTP_BODY_B64", "RADIUS_HTTP_HEADERS_B64",
+                "RADIUS_HTTP_LIST", "RADIUS_HTTP_LOGIN", "RADIUS_HTTP_START", "RADIUS_HTTP_STOP", "RADIUS_HTTP_MAC",
+                "RADIUS_HTTP_INSECURE"):
+        out[key] = ""
     return out
 
 
+def parse_when(value, tz):
+    """Data/hora vinda do ERP -> UTC ingenuo. Aceita datetime, epoch, ISO (com ou sem fuso) e dd/mm/aaaa hh:mm."""
+    from datetime import datetime as dt
+    if value is None or value == "":
+        return None
+    if isinstance(value, dt):
+        aware = value if value.tzinfo else value.replace(tzinfo=tz)
+        return aware.astimezone(timezone.utc).replace(tzinfo=None)
+    text = str(value).strip()
+    if not text or text.startswith("0000-00-00"):
+        return None
+    if re.fullmatch(r"\d{9,13}(\.\d+)?", text):
+        n = float(text)
+        n = n / 1000 if n > 1e11 else n
+        return dt.fromtimestamp(n, timezone.utc).replace(tzinfo=None)
+    try:
+        got = dt.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        got = None
+        for fmt in ("%d/%m/%Y %H:%M:%S", "%d/%m/%Y %H:%M", "%d/%m/%Y"):
+            try:
+                got = dt.strptime(text, fmt)
+                break
+            except ValueError:
+                continue
+        if got is None:
+            return None
+    return parse_when(got, tz)
+
+
+def _path(obj, path):
+    if not path:
+        return obj
+    for part in path.split("."):
+        if isinstance(obj, list):
+            if not part.isdigit() or int(part) >= len(obj):
+                return None
+            obj = obj[int(part)]
+        elif isinstance(obj, dict):
+            obj = obj.get(part)
+        else:
+            return None
+    return obj
+
+
 class Radius:
-    def __init__(self, env, connect=None):
+    """Sessoes por IP e horario, de uma fonte configuravel (API do ERP, radacct ou SQL propria)."""
+
+    def __init__(self, env, connect=None, opener=None):
         self.env = {k: (env.get(k) or "").strip() for k in RADIUS_KEYS}
-        self.enabled = bool(self.env["RADIUS_DB_HOST"] and self.env["RADIUS_DB_USER"])
-        self._connect = connect
+        self.mode = _mode(self.env)
+        self.enabled = self.mode in MODES
+        self._connect, self._opener = connect, opener
         self._db = None
         self._cache = {}
         self.failed = False
+        self.last_raw = ""                             # resposta crua da ultima consulta HTTP (botao Testar)
         if self.enabled:
-            v = validate_radius(self.env)
-            self.table, self.tz = v["RADIUS_TABLE"], ZoneInfo(v["RADIUS_TZ"])
+            self.cfg = validate_radius(dict(self.env, RADIUS_MODE=self.mode))
+            self.tz = ZoneInfo(self.cfg["RADIUS_TZ"])
 
+    # ---------- banco
     def _conn(self):
         if self._db is None:
+            pg = self.mode.endswith("_pg")
             connect = self._connect
-            if connect is None:
-                import pymysql
-                connect = pymysql.connect
             try:
-                self._db = connect(host=self.env["RADIUS_DB_HOST"], port=int(self.env["RADIUS_DB_PORT"] or 3306),
-                                   user=self.env["RADIUS_DB_USER"], password=self.env["RADIUS_DB_PASSWORD"],
-                                   database=self.env["RADIUS_DB_NAME"], connect_timeout=3, read_timeout=5,
-                                   charset="utf8mb4")
+                if connect is None and pg:
+                    try:
+                        import pg8000.dbapi as pgdb
+                    except ImportError:
+                        raise RadiusError("driver PostgreSQL ausente: rode sudo bash scripts/setup-customers.sh")
+                    connect = lambda **kw: pgdb.connect(host=kw["host"], port=kw["port"], user=kw["user"],
+                                                        password=kw["password"], database=kw["database"], timeout=5)
+                elif connect is None:
+                    import pymysql
+                    connect = lambda **kw: pymysql.connect(connect_timeout=3, read_timeout=5, charset="utf8mb4", **kw)
+                self._db = connect(host=self.cfg["RADIUS_DB_HOST"], port=int(self.cfg["RADIUS_DB_PORT"]),
+                                   user=self.cfg["RADIUS_DB_USER"], password=self.env["RADIUS_DB_PASSWORD"],
+                                   database=self.cfg["RADIUS_DB_NAME"])
+            except RadiusError:
+                self.failed = True
+                raise
             except Exception as exc:
                 self.failed = True
-                raise RadiusError("RADIUS inacessível: %s" % type(exc).__name__)
+                raise RadiusError("banco de sessões inacessível: %s" % type(exc).__name__)
         return self._db
+
+    def _sql(self):
+        if self.mode.startswith("radacct"):
+            return ("SELECT username,acctstarttime,acctstoptime,callingstationid,nasipaddress FROM %s "
+                    "WHERE framedipaddress=%%s AND acctstarttime<=%%s AND (acctstoptime IS NULL OR "
+                    "acctstoptime>=%%s) ORDER BY acctstarttime DESC LIMIT 5" % self.cfg["RADIUS_TABLE"], ("ip", "q", "q"))
+        sql = b64d(self.cfg["RADIUS_SQL_B64"]).replace("%", "%%")
+        order = [m.group(1) for m in re.finditer(r"\{(ip|quando)\}", sql)]
+        return re.sub(r"\{(ip|quando)\}", "%s", sql), tuple("ip" if o == "ip" else "q" for o in order)
+
+    def _from_db(self, ip, local):
+        sql, order = self._sql()
+        db = self._conn()
+        cur = db.cursor()
+        try:
+            if self.mode.endswith("_pg"):
+                cur.execute("SET TRANSACTION READ ONLY")
+            cur.execute(sql, tuple(ip if o == "ip" else local for o in order))
+            rows = cur.fetchmany(5) if hasattr(cur, "fetchmany") else cur.fetchall()[:5]
+        finally:
+            try:
+                db.rollback()                          # nunca grava nada
+            except Exception:
+                pass
+        out = []
+        for r in rows:
+            r = list(r) + [None] * 5
+            out.append({"login": str(r[0] or ""), "inicio": parse_when(r[1], self.tz), "fim": parse_when(r[2], self.tz),
+                        "mac": str(r[3] or ""), "nas": str(r[4] or "")})
+        return out
+
+    # ---------- API HTTP
+    def _from_http(self, ip, when_utc, local):
+        import json
+        import ssl
+        import urllib.parse
+        import urllib.request
+        values = {"ip": ip, "quando": local.strftime("%Y-%m-%d %H:%M:%S"), "data": local.strftime("%Y-%m-%d"),
+                  "quando_iso": when_utc.replace(tzinfo=timezone.utc).isoformat(),
+                  "epoch": str(int(when_utc.replace(tzinfo=timezone.utc).timestamp()))}
+        fill = lambda text, enc: re.sub(r"\{(ip|quando|data|quando_iso|epoch)\}", lambda m: enc(values[m.group(1)]), text)
+        url = fill(self.cfg["RADIUS_HTTP_URL"], lambda v: urllib.parse.quote(v, safe=""))
+        body = b64d(self.cfg["RADIUS_HTTP_BODY_B64"])
+        data = fill(body, lambda v: json.dumps(v)[1:-1]).encode("utf-8") if body else None
+        req = urllib.request.Request(url, data=data if self.cfg["RADIUS_HTTP_METHOD"] == "POST" else None,
+                                     method=self.cfg["RADIUS_HTTP_METHOD"],
+                                     headers={"User-Agent": "OrbyMon/1.0", "Accept": "application/json"})
+        if data is not None:
+            req.add_header("Content-Type", "application/json")
+        for line in b64d(self.env["RADIUS_HTTP_HEADERS_B64"]).splitlines():
+            if ":" in line:
+                k, v = line.split(":", 1)
+                req.add_header(k.strip(), v.strip())
+        opener = self._opener
+        if opener is None:
+            ctx = ssl.create_default_context()
+            if self.cfg["RADIUS_HTTP_INSECURE"]:
+                ctx.check_hostname, ctx.verify_mode = False, ssl.CERT_NONE
+            opener = lambda r, timeout: urllib.request.urlopen(r, timeout=timeout, context=ctx)
+        with opener(req, timeout=8) as resp:
+            raw = resp.read(4 * 1024 * 1024).decode("utf-8", "replace")
+        self.last_raw = raw[:4000]
+        try:
+            doc = json.loads(raw)
+        except ValueError:
+            raise RadiusError("a API não respondeu JSON")
+        items = _path(doc, self.cfg["RADIUS_HTTP_LIST"])
+        items = items if isinstance(items, list) else ([items] if isinstance(items, dict) else [])
+        out = []
+        for it in items:
+            login = _path(it, self.cfg["RADIUS_HTTP_LOGIN"])
+            if login in (None, ""):
+                continue
+            start = parse_when(_path(it, self.cfg["RADIUS_HTTP_START"]), self.tz) if self.cfg["RADIUS_HTTP_START"] else None
+            stop = parse_when(_path(it, self.cfg["RADIUS_HTTP_STOP"]), self.tz) if self.cfg["RADIUS_HTTP_STOP"] else None
+            if start and start > when_utc or stop and stop < when_utc:
+                continue                                # sessao fora do horario pedido
+            out.append({"login": str(login), "inicio": start, "fim": stop,
+                        "mac": str(_path(it, self.cfg["RADIUS_HTTP_MAC"]) or "") if self.cfg["RADIUS_HTTP_MAC"] else "",
+                        "nas": ""})
+        out.sort(key=lambda x: x["inicio"] or when_utc.replace(year=1), reverse=True)
+        return out[:5]
 
     def sessions(self, ip, when_utc, limit=3):
         """Sessoes que tinham o IP no horario (UTC ingenuo). Mais recente primeiro; horarios devolvidos em UTC."""
@@ -162,25 +383,18 @@ class Radius:
             return []
         key = (ip, when_utc.replace(second=0, microsecond=0))
         if key in self._cache:
-            return self._cache[key]
+            return self._cache[key][:limit]
         local = when_utc.replace(tzinfo=timezone.utc).astimezone(self.tz).replace(tzinfo=None)
         try:
-            cur = self._conn().cursor()
-            cur.execute("SELECT username,acctstarttime,acctstoptime,callingstationid,nasipaddress FROM `%s` "
-                        "WHERE framedipaddress=%%s AND acctstarttime<=%%s AND (acctstoptime IS NULL OR "
-                        "acctstoptime>=%%s) ORDER BY acctstarttime DESC LIMIT %d" % (self.table, int(limit)),
-                        (ip, local, local))
-            rows = cur.fetchall()
+            out = self._from_http(ip, when_utc, local) if self.mode == "http" else self._from_db(ip, local)
         except RadiusError:
+            self.failed = True
             raise
         except Exception as exc:
             self.failed = True
-            raise RadiusError("consulta ao RADIUS falhou: %s" % str(exc)[:160])
-        to_utc = lambda t: t.replace(tzinfo=self.tz).astimezone(timezone.utc).replace(tzinfo=None) if t else None
-        out = [{"login": r[0], "inicio": to_utc(r[1]), "fim": to_utc(r[2]), "mac": r[3] or "", "nas": r[4] or ""}
-               for r in rows]
+            raise RadiusError("consulta de sessões falhou: %s" % (str(exc)[:160] or type(exc).__name__))
         self._cache[key] = out
-        return out
+        return out[:limit]
 
     def close(self):
         if self._db is not None:

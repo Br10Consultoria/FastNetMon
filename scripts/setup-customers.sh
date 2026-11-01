@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
-# Clientes (prefixos dedicados) e RADIUS (login PPPoE) nos avisos e na investigacao.
+# Clientes (prefixos dedicados) e identificacao do assinante (login por IP e horario: API do ERP, radacct ou SQL).
 #   sudo bash scripts/setup-customers.sh
-# Depois, no painel (pagina Clientes): cadastre os clientes dedicados e o acesso ao radacct.
+# Depois, no painel (pagina Clientes): cadastre os clientes dedicados e a fonte de identificacao (recomendado: API).
 set -euo pipefail
 [[ $EUID -eq 0 ]] || { echo "Execute com sudo" >&2; exit 1; }
 BASE="$(cd "$(dirname "$0")/.." && pwd)"
+
+echo "=== Driver PostgreSQL (fontes radacct/SQL em PostgreSQL) ==="
+"$BASE/.venv/bin/pip" install -q "pg8000>=1.30,<2" || echo "AVISO: pg8000 nao instalado (so afeta fontes PostgreSQL)"
 
 echo "=== Tabelas ==="
 mariadb orbymon < "$BASE/sql/customers.sql"
@@ -26,8 +29,8 @@ fi
 echo "=== Configuracao do RADIUS (editavel no painel; contem senha) ==="
 RAD=/etc/orbymon/radius.env
 if [[ ! -e "$RAD" ]]; then
-  CONTENT="# RADIUS (radacct) para mostrar o login PPPoE. Editavel no painel, pagina Clientes. Nunca executado.
-RADIUS_DB_HOST=''"
+  CONTENT="# Identificacao do assinante (API do ERP, radacct ou SQL). Editavel no painel, pagina Clientes. Nunca executado.
+RADIUS_MODE=''"
   if [[ -d /etc/orbymon/managed ]] && id orbymon-admin >/dev/null 2>&1; then
     printf '%s\n' "$CONTENT" > /etc/orbymon/managed/radius.env
     chown orbymon-admin:orbymon /etc/orbymon/managed/radius.env

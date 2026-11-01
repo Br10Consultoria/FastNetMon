@@ -21,8 +21,18 @@ class ValidateTests(unittest.TestCase):
         self.assertEqual(cu.validate_radius({})["RADIUS_DB_HOST"], "")
         v = cu.validate_radius({"RADIUS_DB_HOST": "10.0.0.5", "RADIUS_DB_NAME": "radius", "RADIUS_DB_USER": "orby"})
         self.assertEqual((v["RADIUS_DB_PORT"], v["RADIUS_TABLE"], v["RADIUS_TZ"]), ("3306", "radacct", "America/Sao_Paulo"))
+        self.assertEqual(cu.validate_radius({"RADIUS_MODE": "radacct_pg", "RADIUS_DB_HOST": "h", "RADIUS_DB_NAME": "r",
+                                             "RADIUS_DB_USER": "u", "RADIUS_TABLE": "public.radacct"})["RADIUS_DB_PORT"],
+                         "5432")
         for bad in ({"RADIUS_TABLE": "radacct; drop"}, {"RADIUS_DB_PORT": "99999"}, {"RADIUS_DB_HOST": "a b"},
-                    {"RADIUS_TZ": "Lua/Base"}):
+                    {"RADIUS_TZ": "Lua/Base"}, {"RADIUS_MODE": "ldap"},
+                    {"RADIUS_MODE": "sql_mysql", "RADIUS_SQL_B64": cu.b64e("DELETE FROM radacct WHERE ip={ip}")},
+                    {"RADIUS_MODE": "sql_mysql", "RADIUS_SQL_B64": cu.b64e("SELECT 1; DROP TABLE x")},
+                    {"RADIUS_MODE": "sql_mysql", "RADIUS_SQL_B64": cu.b64e("SELECT login FROM t")},
+                    {"RADIUS_MODE": "http", "RADIUS_HTTP_URL": "ftp://erp/x?ip={ip}"},
+                    {"RADIUS_MODE": "http", "RADIUS_HTTP_URL": "https://erp/x"},
+                    {"RADIUS_MODE": "http", "RADIUS_HTTP_URL": "https://erp/x?ip={ip}",
+                     "RADIUS_HTTP_HEADERS_B64": cu.b64e("Authorization Bearer x")}):
             with self.assertRaises(cu.CustomerError):
                 cu.validate_radius(dict({"RADIUS_DB_HOST": "h", "RADIUS_DB_NAME": "r", "RADIUS_DB_USER": "u"}, **bad))
 
@@ -72,7 +82,7 @@ class RadiusTests(unittest.TestCase):
         self.assertEqual(got[0]["login"], "joao123")
         self.assertEqual(got[0]["inicio"], datetime(2026, 11, 1, 12, 0))          # 09h Bahia = 12h UTC
         self.assertEqual(log[0][1], ("100.64.70.12", datetime(2026, 11, 1, 12, 0), datetime(2026, 11, 1, 12, 0)))
-        self.assertIn("FROM `radacct`", log[0][0])
+        self.assertIn("FROM radacct WHERE framedipaddress=%s", log[0][0])
         r.sessions("100.64.70.12", datetime(2026, 11, 1, 15, 0, 30))
         self.assertEqual(len(log), 1)                                             # cache por minuto
 
@@ -105,6 +115,75 @@ class RadiusTests(unittest.TestCase):
                       "x", "alta", subscribers=[{"ip": "100.64.70.12", "portas": 1}])
         al.identify_result(r, ident)
         self.assertIn("assinante 100.64.70.12: login joao123", al.render_text(r))
+
+
+class Resp:
+    def __init__(self, data):
+        self.data = data
+
+    def read(self, n=-1):
+        return self.data
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+class SourceTests(unittest.TestCase):
+    def test_parse_when(self):
+        from zoneinfo import ZoneInfo
+        tz = ZoneInfo("America/Bahia")
+        for raw, want in (("2026-11-01 09:00:00", datetime(2026, 11, 1, 12)), ("2026-11-01T12:00:00Z", datetime(2026, 11, 1, 12)),
+                          ("01/11/2026 09:00", datetime(2026, 11, 1, 12)), ("1793534400", datetime(2026, 11, 1, 12)),
+                          ("1793534400000", datetime(2026, 11, 1, 12)), (datetime(2026, 11, 1, 9), datetime(2026, 11, 1, 12)),
+                          ("0000-00-00 00:00:00", None), ("", None), (None, None), ("lixo", None)):
+            self.assertEqual(cu.parse_when(raw, tz), want, raw)
+
+    def test_http_api(self):
+        env = {"RADIUS_MODE": "http", "RADIUS_TZ": "America/Bahia",
+               "RADIUS_HTTP_URL": "https://erp.exemplo/api/conexoes?ip={ip}&data={data}", "RADIUS_HTTP_METHOD": "POST",
+               "RADIUS_HTTP_BODY_B64": cu.b64e('{"filtro": "{ip}", "quando": "{quando}"}'),
+               "RADIUS_HTTP_HEADERS_B64": cu.b64e("Authorization: Basic c2VncmVkbw=="),
+               "RADIUS_HTTP_LIST": "registros", "RADIUS_HTTP_LOGIN": "login", "RADIUS_HTTP_START": "inicio",
+               "RADIUS_HTTP_STOP": "fim", "RADIUS_HTTP_MAC": "equip.mac"}
+        payload = {"registros": [
+            {"login": "antigo", "inicio": "2026-10-31 08:00:00", "fim": "2026-11-01 08:00:00", "equip": {"mac": "M1"}},
+            {"login": "joao123", "inicio": "2026-11-01 08:30:00", "fim": "", "equip": {"mac": "M2"}},
+            {"login": "", "inicio": "2026-11-01 08:30:00"}]}
+        seen = []
+
+        def opener(req, timeout):
+            seen.append(req)
+            return Resp(__import__("json").dumps(payload).encode())
+        r = cu.Radius(env, opener=opener)
+        got = r.sessions("100.64.70.12", datetime(2026, 11, 1, 15))
+        self.assertEqual([(s["login"], s["mac"]) for s in got], [("joao123", "M2")])
+        self.assertEqual(got[0]["inicio"], datetime(2026, 11, 1, 11, 30))
+        req = seen[0]
+        self.assertEqual(req.full_url, "https://erp.exemplo/api/conexoes?ip=100.64.70.12&data=2026-11-01")
+        self.assertEqual(req.get_method(), "POST")
+        self.assertEqual(__import__("json").loads(req.data), {"filtro": "100.64.70.12", "quando": "2026-11-01 12:00:00"})
+        self.assertEqual(req.get_header("Authorization"), "Basic c2VncmVkbw==")
+        self.assertIn("joao123", r.last_raw)
+        old = cu.Radius(env, opener=opener).sessions("100.64.70.12", datetime(2026, 10, 31, 15))
+        self.assertEqual([s["login"] for s in old], ["antigo"])
+        bad = cu.Radius(env, opener=lambda req, timeout: Resp(b"<html>erro</html>"))
+        with self.assertRaises(cu.RadiusError):
+            bad.sessions("100.64.70.12", datetime(2026, 11, 1, 15))
+
+    def test_custom_sql_placeholders(self):
+        log = []
+        sql = "SELECT c.login, s.inicio, s.fim, s.mac FROM sessoes s JOIN clientes c ON c.id=s.cliente " \
+              "WHERE s.ip = {ip} AND s.inicio <= {quando} AND (s.fim IS NULL OR s.fim >= {quando}) AND c.obs LIKE '%x%'"
+        env = dict(ENV, RADIUS_MODE="sql_mysql", RADIUS_SQL_B64=cu.b64e(sql))
+        r = cu.Radius(env, connect=lambda **kw: FakeConn([("maria", datetime(2026, 11, 1, 8), None, "M9")], log))
+        self.assertEqual(r.sessions("100.64.70.12", datetime(2026, 11, 1, 15))[0]["login"], "maria")
+        q, params = log[0]
+        self.assertIn("s.ip = %s AND s.inicio <= %s", q)
+        self.assertIn("LIKE '%%x%%'", q)
+        self.assertEqual(params, ("100.64.70.12", datetime(2026, 11, 1, 12), datetime(2026, 11, 1, 12)))
 
 
 @unittest.skipUnless(DB_ENABLED, "defina ORBYMON_TEST_DB=1 e ORBYMON_DB_*")

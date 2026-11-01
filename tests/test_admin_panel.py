@@ -849,6 +849,47 @@ class PanelTests(unittest.TestCase):
         self.assertIn(b"consulta falhou: sem rede", r.data)
 
 
+    def test_identification_via_api(self):
+        from fmn_filters import customers as cu
+        from fmn_filters.admin.config_store import read_env
+        self.login()
+        form = dict(action="radius", RADIUS_MODE="http", RADIUS_TZ="America/Bahia",
+                    RADIUS_HTTP_URL="https://erp.exemplo/api/conexoes?ip={ip}", RADIUS_HTTP_METHOD="GET",
+                    http_headers="Authorization: Bearer token-secreto-123", http_body="",
+                    RADIUS_HTTP_LIST="registros", RADIUS_HTTP_LOGIN="login", RADIUS_HTTP_START="inicio",
+                    RADIUS_HTTP_STOP="fim", RADIUS_HTTP_MAC="", sql_text="")
+        self.assertEqual(self.post("/clientes", **form).status_code, 302)
+        env = read_env(Path(self.env["ORBYMON_RADIUS_ENV"]))
+        self.assertEqual(cu.b64d(env["RADIUS_HTTP_HEADERS_B64"]), "Authorization: Bearer token-secreto-123")
+        page = self.c.get("/clientes")
+        self.assertNotIn(b"token-secreto-123", page.data)
+        self.assertIn("configurados; vazio = manter".encode(), page.data)
+        self.assertNotIn(b"token-secreto", self.db.audits[-1][2].encode())
+        self.post("/clientes", **dict(form, http_headers="", RADIUS_HTTP_LOGIN="usuario"))
+        env = read_env(Path(self.env["ORBYMON_RADIUS_ENV"]))
+        self.assertEqual(cu.b64d(env["RADIUS_HTTP_HEADERS_B64"]), "Authorization: Bearer token-secreto-123")
+        self.assertEqual(env["RADIUS_HTTP_LOGIN"], "usuario")
+
+        class Resp:
+            def read(self, n=-1):
+                return b'{"registros": [{"usuario": "joao123", "inicio": "2026-11-01 08:30:00", "fim": null}]}'
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+        with mock.patch("urllib.request.urlopen", return_value=Resp()) as op:
+            r = self.post("/clientes", **dict(form, action="testar_fonte", http_headers="", RADIUS_HTTP_LOGIN="usuario",
+                                              test_ip="100.64.70.12", test_when="2026-11-01 12:00"))
+        self.assertIn(b"joao123", r.data)
+        self.assertIn("Resposta crua".encode(), r.data)
+        self.assertEqual(op.call_args[0][0].get_header("Authorization"), "Bearer token-secreto-123")
+        self.assertEqual(self.db.audits[-1][1], "identificacao_teste")
+        r = self.post("/clientes", **dict(form, RADIUS_HTTP_URL="https://erp.exemplo/sem-ip"))
+        self.assertIn(b"https://erp.exemplo/sem-ip", r.data)                # formulario mantido no erro
+
+
 class CliTests(unittest.TestCase):
     def test_create_user(self):
         from fmn_filters.admin import cli

@@ -1,9 +1,9 @@
 {% extends "base.html" %}{% block title %}Clientes{% endblock %}
 {% block body %}
-<h1>Clientes e RADIUS</h1>
+<h1>Clientes e identificação</h1>
 <p class="muted">Usados para identificar quem está por trás de um IP nos avisos do Telegram e na página Investigar:
-clientes com IP/prefixo dedicado pelo cadastro abaixo; assinantes PPPoE (inclusive 100.64.x do CGNAT) pelo login no RADIUS
-no horário do evento. Os dados ficam só no servidor e nos chats privados configurados.</p>
+clientes com IP/prefixo dedicado pelo cadastro abaixo; assinantes PPPoE (inclusive 100.64.x do CGNAT) pelo login no horário do evento, consultado na API do ERP
+ou no RADIUS. Os dados ficam só no servidor e nos chats privados configurados.</p>
 {% if not installed %}<p class="flash">Tabelas de clientes não instaladas: rode <code>sudo bash scripts/setup-customers.sh</code>.</p>{% endif %}
 
 <section class="card">
@@ -13,13 +13,13 @@ no horário do evento. Os dados ficam só no servidor e nos chats privados confi
     <label>Horário ({{ radius.RADIUS_TZ or 'America/Sao_Paulo' }}) <input name="when" placeholder="agora, ou 2026-10-30 14:05"></label>
     <button>Consultar</button>
   </form>
-  {% if lookup %}
+  {% if lookup and not lookup.test %}
     <p><code>{{ lookup.ip }}</code> em {{ lookup.when }}:
       {% if lookup.customer %}cliente <b>{{ lookup.customer.name }}</b>{% if lookup.customer.code %} ({{ lookup.customer.code }}){% endif %} · prefixo {{ lookup.customer.cidr }}{% else %}nenhum cliente cadastrado{% endif %}</p>
     {% if lookup.error %}<p class="warn">{{ lookup.error }}</p>{% endif %}
     {% if lookup.sessions %}<div class="scroll"><table><tr><th>Login</th><th>Início</th><th>Fim</th><th>MAC</th><th>NAS</th></tr>
       {% for s in lookup.sessions %}<tr><td><b>{{ s.login }}</b></td><td>{{ s.inicio }}</td><td>{{ s.fim }}</td><td>{{ s.mac }}</td><td>{{ s.nas }}</td></tr>{% endfor %}
-    </table></div>{% elif radius.RADIUS_DB_HOST and not lookup.error %}<p class="muted">Nenhuma sessão RADIUS com esse IP no horário.</p>{% endif %}
+    </table></div>{% elif radius.RADIUS_MODE and not lookup.error %}<p class="muted">Nenhuma sessão RADIUS com esse IP no horário.</p>{% endif %}
   {% endif %}
 </section>
 
@@ -51,21 +51,64 @@ no horário do evento. Os dados ficam só no servidor e nos chats privados confi
 </section>
 
 <section class="card">
-  <h2>RADIUS (somente leitura)</h2>
-  <p class="muted">Banco MySQL/MariaDB com a tabela de contabilidade do FreeRADIUS (<code>radacct</code>: username, framedipaddress,
-  acctstarttime, acctstoptime, callingstationid, nasipaddress). Crie um usuário só com <code>SELECT</code> nessa tabela e
-  libere o acesso a partir deste servidor. Deixe o servidor vazio para desativar.</p>
-  <form method="post" autocomplete="off">{% include "_csrf.html" %}<input type="hidden" name="action" value="radius">
+  <h2>Identificação do assinante (login por IP e horário)</h2>
+  <p class="muted">Escolha de onde vem o login de quem tinha um IP num horário — funciona com qualquer ERP. O recomendado é a
+  <b>API do ERP</b> com um token só de consulta; o acesso direto ao banco (radacct ou SQL própria) fica como alternativa,
+  sempre com usuário somente leitura. O endpoint precisa responder o <b>histórico</b> de conexões do IP (não só quem está
+  conectado agora), para servir também às denúncias que chegam dias depois. Segredos (senha e cabeçalhos) nunca voltam
+  para a página: campo vazio mantém o atual.</p>
+  <form method="post" autocomplete="off">{% include "_csrf.html" %}
+    <div class="grid">
+      <label>Fonte <select name="RADIUS_MODE"><option value="">desativada</option>{% for k, l in modes.items() %}<option value="{{ k }}" {{ 'selected' if radius.RADIUS_MODE==k }}>{{ l }}</option>{% endfor %}</select></label>
+      <label>Fuso das datas da fonte <select name="RADIUS_TZ">{% for z in tz_choices %}<option {{ 'selected' if (radius.RADIUS_TZ or 'America/Sao_Paulo')==z }}>{{ z }}</option>{% endfor %}</select><small>Usado quando a data vem sem fuso.</small></label>
+    </div>
+
+    <h3>API HTTP/JSON</h3>
+    <div class="grid">
+      <label>URL <input name="RADIUS_HTTP_URL" value="{{ radius.RADIUS_HTTP_URL }}" placeholder="https://erp.exemplo.com.br/api/conexoes?ip={ip}&amp;data={data}"></label>
+      <label>Método <select name="RADIUS_HTTP_METHOD">{% for m in ('GET','POST') %}<option {{ 'selected' if (radius.RADIUS_HTTP_METHOD or 'GET')==m }}>{{ m }}</option>{% endfor %}</select></label>
+    </div>
+    <p class="muted">Marcadores na URL e no corpo: <code>{ip}</code>, <code>{quando}</code> (data e hora local), <code>{data}</code>,
+      <code>{quando_iso}</code> (UTC), <code>{epoch}</code>.</p>
+    <label>Corpo JSON (só POST) <textarea name="http_body" rows="3" class="mono" placeholder='{"ip": "{ip}", "data_hora": "{quando}"}'>{{ radius.http_body }}</textarea></label>
+    <label>Cabeçalhos de autenticação (um por linha){% if has_headers %} — <small>configurados; vazio = manter</small>{% endif %}
+      <textarea name="http_headers" rows="2" class="mono" placeholder="Authorization: Bearer seu-token"></textarea></label>
+    <div class="grid">
+      <label>Lista na resposta <input name="RADIUS_HTTP_LIST" value="{{ radius.RADIUS_HTTP_LIST }}" placeholder="registros (vazio = raiz)"></label>
+      <label>Campo do login <input name="RADIUS_HTTP_LOGIN" value="{{ radius.RADIUS_HTTP_LOGIN or 'login' }}"></label>
+      <label>Campo de início <input name="RADIUS_HTTP_START" value="{{ radius.RADIUS_HTTP_START }}" placeholder="data_inicio"></label>
+      <label>Campo de fim <input name="RADIUS_HTTP_STOP" value="{{ radius.RADIUS_HTTP_STOP }}" placeholder="data_fim"></label>
+      <label>Campo do MAC <input name="RADIUS_HTTP_MAC" value="{{ radius.RADIUS_HTTP_MAC }}" placeholder="mac (opcional)"></label>
+    </div>
+    <p class="muted">Campos aninhados com ponto: <code>dados.cliente.login</code>; posição de lista com número: <code>itens.0</code>.</p>
+    <label class="check"><input type="checkbox" name="RADIUS_HTTP_INSECURE" value="1" {{ 'checked' if radius.RADIUS_HTTP_INSECURE }}> Aceitar certificado autoassinado do ERP</label>
+
+    <h3>Banco de dados (radacct ou SQL própria)</h3>
     <div class="grid">
       <label>Servidor <input name="RADIUS_DB_HOST" value="{{ radius.RADIUS_DB_HOST }}" placeholder="10.0.0.5"></label>
-      <label>Porta <input name="RADIUS_DB_PORT" value="{{ radius.RADIUS_DB_PORT or '3306' }}"></label>
+      <label>Porta <input name="RADIUS_DB_PORT" value="{{ radius.RADIUS_DB_PORT }}" placeholder="3306 / 5432"></label>
       <label>Banco <input name="RADIUS_DB_NAME" value="{{ radius.RADIUS_DB_NAME }}" placeholder="radius"></label>
-      <label>Tabela <input name="RADIUS_TABLE" value="{{ radius.RADIUS_TABLE or 'radacct' }}"></label>
+      <label>Tabela (radacct) <input name="RADIUS_TABLE" value="{{ radius.RADIUS_TABLE or 'radacct' }}"></label>
       <label>Usuário <input name="RADIUS_DB_USER" value="{{ radius.RADIUS_DB_USER }}"></label>
       <label>Senha <input name="RADIUS_DB_PASSWORD" type="password" placeholder="{{ 'mantida (preencha para trocar)' if has_password else '' }}" autocomplete="new-password"></label>
-      <label>Fuso das datas no radacct <select name="RADIUS_TZ">{% for z in tz_choices %}<option {{ 'selected' if (radius.RADIUS_TZ or 'America/Sao_Paulo')==z }}>{{ z }}</option>{% endfor %}</select></label>
     </div>
-    <button>Salvar RADIUS</button>
+    <label>SQL própria (modos “consulta SQL própria”): colunas login, início, fim[, mac[, nas]]
+      <textarea name="sql_text" rows="4" class="mono" placeholder="SELECT login, inicio, fim, mac FROM conexoes WHERE ip = {ip} AND inicio &lt;= {quando} AND (fim IS NULL OR fim &gt;= {quando}) ORDER BY inicio DESC">{{ radius.sql_text }}</textarea></label>
+
+    <div class="inline">
+      <label>Testar com IP <input name="test_ip" placeholder="100.64.70.12"></label>
+      <label>Horário <input name="test_when" placeholder="agora, ou 2026-10-30 14:05"></label>
+      <button name="action" value="testar_fonte" class="secondary">Testar sem salvar</button>
+      <button name="action" value="radius">Salvar</button>
+    </div>
   </form>
+  {% if lookup and lookup.test %}
+    <h3>Resultado do teste: {{ lookup.ip }} em {{ lookup.when }}</h3>
+    {% if lookup.error %}<p class="warn">{{ lookup.error }}</p>{% endif %}
+    {% if lookup.sessions %}<div class="scroll"><table><tr><th>Login</th><th>Início</th><th>Fim</th><th>MAC</th></tr>
+      {% for s in lookup.sessions %}<tr><td><b>{{ s.login }}</b></td><td>{{ s.inicio }}</td><td>{{ s.fim }}</td><td>{{ s.mac }}</td></tr>{% endfor %}
+    </table></div>{% elif not lookup.error %}<p class="muted">Nenhuma sessão no horário (confira os campos e o fuso).</p>{% endif %}
+    {% if lookup.raw %}<p class="muted">Resposta crua da API (primeiros 4000 caracteres), para conferir os nomes dos campos:</p><pre class="detail">{{ lookup.raw }}</pre>{% endif %}
+  {% endif %}
 </section>
 {% endblock %}
