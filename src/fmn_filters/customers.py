@@ -396,7 +396,7 @@ class Radius:
         url = fill(self.cfg["RADIUS_HTTP_URL"], lambda v: urllib.parse.quote(v, safe=""))
         body = b64d(self.cfg["RADIUS_HTTP_BODY_B64"])
         data = fill(body, lambda v: json.dumps(v)[1:-1]).encode("utf-8") if body else None
-        req = urllib.request.Request(url, data=data if self.cfg["RADIUS_HTTP_METHOD"] == "POST" else None,
+        req = urllib.request.Request(url, data=data,                    # IXC aceita corpo ate em GET
                                      method=self.cfg["RADIUS_HTTP_METHOD"],
                                      headers={"User-Agent": "OrbyMon/1.0", "Accept": "application/json"})
         if data is not None:

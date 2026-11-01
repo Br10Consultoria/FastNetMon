@@ -226,6 +226,9 @@ class SourceTests(unittest.TestCase):
         body = __import__("json").loads(req.data)
         self.assertEqual((body["qtype"], body["query"]), ("radacct.framedipaddress", "100.64.70.12"))
         self.assertEqual(__import__("json").loads(body["grid_param"])[0]["P"], "2026-11-01 12:00:00")
+        env["RADIUS_HTTP_METHOD"] = "GET"                                     # exemplo da documentacao do IXC
+        cu.Radius(env, opener=opener).sessions("100.64.70.12", datetime(2026, 11, 1, 15))
+        self.assertEqual((seen[-1].get_method(), __import__("json").loads(seen[-1].data)["query"]), ("GET", "100.64.70.12"))
 
     def test_custom_sql_placeholders(self):
         log = []
