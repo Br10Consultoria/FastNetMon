@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import json
 import os
 
 USER_FIELDS = ("id", "username", "pw_hash", "totp_secret", "totp_enabled", "totp_last_step",
@@ -192,3 +193,69 @@ description=IF(builtin=0,VALUES(description),description)""", (name, expr, descr
             return sync(db, cfg, profile)
         finally:
             db.close()
+
+    # ---------- alarmes por filtro
+    def filter_rules(self):
+        try:
+            rows = self._q("""SELECT r.id,r.name,r.enabled,r.severity,r.direction,r.expr,r.definition,r.builtin,
+ s.status,s.last_bucket,s.last_bps,s.last_pps,s.last_flows,s.last_error,
+ (SELECT COUNT(*) FROM orby_filter_incidents i WHERE i.rule_id=r.id AND i.started_at>=UTC_TIMESTAMP()-INTERVAL 7 DAY)
+ FROM orby_filter_rules r LEFT JOIN orby_filter_rule_state s ON s.rule_id=r.id ORDER BY r.enabled DESC,r.name""")
+        except Exception:
+            return []
+        keys = ("id", "name", "enabled", "severity", "direction", "expr", "definition", "builtin", "status",
+                "last_bucket", "last_bps", "last_pps", "last_flows", "last_error", "incidents_7d")
+        out = []
+        for r in rows:
+            item = dict(zip(keys, r))
+            d = item["definition"]
+            item["definition"] = json.loads(d) if isinstance(d, (str, bytes)) else d
+            out.append(item)
+        return out
+
+    def filter_rule(self, rid):
+        return next((r for r in self.filter_rules() if r["id"] == rid), None)
+
+    def save_filter_rule(self, rid, name, enabled, severity, direction, expr, definition, user):
+        data = json.dumps(definition, ensure_ascii=False)
+        if rid:
+            self._q("""UPDATE orby_filter_rules SET name=%s,enabled=%s,severity=%s,direction=%s,expr=%s,definition=%s,
+ updated_by=%s WHERE id=%s""", (name, int(enabled), severity, direction, expr, data, user, rid), fetch=False)
+            return rid
+        db = self.conn_factory()
+        try:
+            with db.cursor() as cur:
+                cur.execute("""INSERT INTO orby_filter_rules (name,enabled,severity,direction,expr,definition,updated_by)
+ VALUES (%s,%s,%s,%s,%s,%s,%s)""", (name, int(enabled), severity, direction, expr, data, user))
+                return cur.lastrowid
+        finally:
+            db.close()
+
+    def set_filter_rule_enabled(self, rid, enabled):
+        self._q("UPDATE orby_filter_rules SET enabled=%s WHERE id=%s", (int(enabled), rid), fetch=False)
+
+    def delete_filter_rule(self, rid):
+        return self._q("DELETE FROM orby_filter_rules WHERE id=%s", (rid,), fetch=False)
+
+    def filter_rule_samples(self, rid, hours=6):
+        rows = self._q("SELECT bucket_utc,bps,pps,flows,bpp,matched FROM orby_filter_rule_samples WHERE rule_id=%s "
+                       "AND bucket_utc>=UTC_TIMESTAMP()-INTERVAL %s HOUR ORDER BY bucket_utc", (rid, hours))
+        return [{"t": r[0], "bps": r[1], "pps": r[2], "flows": r[3], "bpp": r[4], "matched": bool(r[5])} for r in rows]
+
+    def filter_incidents(self, rid=None, limit=50):
+        try:
+            rows = self._q("SELECT id,rule_id,rule_name,severity,status,started_at,last_match_at,resolved_at,peak_bps,"
+                           "peak_pps,peak_flows,matches,top FROM orby_filter_incidents" +
+                           (" WHERE rule_id=%s" if rid else "") +
+                           " ORDER BY status='resolved',started_at DESC LIMIT %s", ((rid, limit) if rid else (limit,)))
+        except Exception:
+            return []
+        keys = ("id", "rule_id", "rule_name", "severity", "status", "started_at", "last_match_at", "resolved_at",
+                "peak_bps", "peak_pps", "peak_flows", "matches", "top")
+        out = []
+        for r in rows:
+            item = dict(zip(keys, r))
+            t = item["top"]
+            item["top"] = json.loads(t) if isinstance(t, (str, bytes)) else (t or [])
+            out.append(item)
+        return out

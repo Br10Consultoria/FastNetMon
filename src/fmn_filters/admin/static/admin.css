@@ -69,3 +69,9 @@ svg.chart .lbl{fill:var(--muted);font-size:12px}
 .tag{display:inline-block;font-size:11px;padding:0 6px;border-radius:99px;background:var(--bg);color:var(--muted);border:1px solid var(--line)}
 td.num{white-space:nowrap}
 .inline > input{flex:1 1 220px;width:auto}
+.titlebar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+a.button{display:inline-block;padding:8px 16px;border-radius:6px;background:var(--accent);color:var(--accent-fg);font-weight:600;text-decoration:none}
+select.auto,input.auto{display:inline-block;width:auto;margin:0 6px}
+table.conds td{min-width:140px}
+svg.chart .hit{fill:var(--bad);opacity:.18}
+tr.hitrow td{background:color-mix(in srgb,var(--bad) 12%,transparent)}

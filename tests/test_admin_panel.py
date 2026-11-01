@@ -126,6 +126,53 @@ class FakeStore:
         self.saved = [x for x in self.saved if not (x["id"] == fid and not x["builtin"])]
         return before - len(self.saved)
 
+    alarm_rules = None
+
+    def filter_rules(self):
+        if self.alarm_rules is None:
+            self.alarm_rules = {1: {"id": 1, "name": "SYN flood recebido", "enabled": True, "severity": "high",
+                                    "direction": "in", "expr": "@dst_rede and proto tcp and flags S and not flags A",
+                                    "definition": {"logic": "and", "conditions": [
+                                        {"metric": "pps", "op": "gt", "value": 20000}], "consecutive": 2,
+                                        "resolve_after": 5, "report": {"agg": "dstip", "top": 5}, "notify": True,
+                                        "retention_days": 7},
+                                    "builtin": 1, "status": "open", "last_bucket": datetime(2026, 11, 1, 12),
+                                    "last_bps": 8e6, "last_pps": 30000.0, "last_flows": 900.0, "last_error": None,
+                                    "incidents_7d": 1}}
+        return [dict(r) for r in self.alarm_rules.values()]
+
+    def filter_rule(self, rid):
+        self.filter_rules()
+        r = self.alarm_rules.get(rid)
+        return dict(r) if r else None
+
+    def save_filter_rule(self, rid, name, enabled, severity, direction, expr, definition, user):
+        self.filter_rules()
+        rid = rid or max(self.alarm_rules) + 1
+        base = self.alarm_rules.get(rid, {"builtin": 0, "status": None, "last_bucket": None, "last_bps": 0,
+                                          "last_pps": 0, "last_flows": 0, "last_error": None, "incidents_7d": 0})
+        base.update(id=rid, name=name, enabled=bool(enabled), severity=severity, direction=direction, expr=expr,
+                    definition=definition, updated_by=user)
+        self.alarm_rules[rid] = base
+        return rid
+
+    def set_filter_rule_enabled(self, rid, enabled):
+        self.alarm_rules[rid]["enabled"] = bool(enabled)
+
+    def delete_filter_rule(self, rid):
+        self.alarm_rules.pop(rid, None)
+
+    def filter_rule_samples(self, rid, hours=6):
+        return [{"t": datetime(2026, 11, 1, 12, i), "bps": 1e6 * i, "pps": 100.0 * i, "flows": 10.0 * i,
+                 "bpp": 500.0, "matched": i > 3} for i in range(6)]
+
+    def filter_incidents(self, rid=None, limit=50):
+        return [{"id": 1, "rule_id": 1, "rule_name": "SYN flood recebido", "severity": "high", "status": "open",
+                 "started_at": datetime(2026, 11, 1, 12, 4), "last_match_at": datetime(2026, 11, 1, 12, 5),
+                 "resolved_at": None, "peak_bps": 8e6, "peak_pps": 30000.0, "peak_flows": 900.0, "matches": 2,
+                 "top": [{"key": "45.238.170.70", "bps": 7e6, "pps": 20000.0, "scope": "cgnat_pool",
+                          "pool": "NAT-POOL-08", "assinantes": ["100.64.65.10"]}]}]
+
     synced = None
 
     def sync_prefixes(self, cfg, profile):
@@ -588,6 +635,46 @@ class PanelTests(unittest.TestCase):
         self.assertFalse([x for x in self.db.saved if x["name"] == "Spam dos pools"])
         self.post("/analise", fid="1", action="excluir")                 # modelo pronto nao se exclui
         self.assertTrue([x for x in self.db.saved if x["id"] == 1])
+
+
+    def test_alarm_pages(self):
+        self.login()
+        page = self.c.get("/alarmes")
+        self.assertEqual(page.status_code, 200)
+        for text in (b"SYN flood recebido", b"Incidente", b"NAT-POOL-08", b"100.64.65.10", b"pacotes/s &gt; 20000"):
+            self.assertIn(text, page.data)
+        page = self.c.get("/alarmes/1")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn(b'class="hit"', page.data)                       # historico com minutos que casaram
+        self.assertEqual(self.c.get("/alarmes/99").status_code, 404)
+        form = dict(name="Flood no pool", severity="critical", direction="in", expr="@dst_rede", logic="and",
+                    c0_metric="mbps", c0_op="gt", c0_value="5", c0_window="15",
+                    c1_metric="flows", c1_op="above_avg", c1_value="", c1_window="15",
+                    consecutive="2", resolve_after="3", agg="dstip", top="3", retention_days="7", notify="1")
+        r = self.post("/alarmes/nova", action="testar", test_minutes="30", **form)
+        self.assertEqual(r.status_code, 200, r.data[:300])
+        self.assertIn("Teste com o tráfego real".encode(), r.data)
+        self.assertEqual(len(self.db.alarm_rules), 1)                  # testar nao grava
+        r = self.post("/alarmes/nova", action="usar_filtro", saved_id="1", **form)
+        self.assertIn(b"flags S", r.data)
+        bad = dict(form, c0_op="below_avg", c0_value="150")
+        r = self.post("/alarmes/nova", action="salvar", **bad)
+        self.assertIn(b'class="flash"', r.data)
+        self.assertEqual(len(self.db.alarm_rules), 1)
+        r = self.post("/alarmes/nova", action="salvar", **form)
+        self.assertEqual(r.status_code, 302)
+        new = self.db.alarm_rules[2]
+        self.assertEqual((new["name"], new["enabled"], new["definition"]["conditions"][0]["value"]),
+                         ("Flood no pool", False, 5.0))
+        self.assertEqual(len(new["definition"]["conditions"]), 1)
+        self.assertEqual(self.db.audits[-1][1], "alarme_salvo")
+        self.post("/alarmes/2", action="ligar")
+        self.assertTrue(self.db.alarm_rules[2]["enabled"])
+        self.post("/alarmes/2", action="excluir")
+        self.assertNotIn(2, self.db.alarm_rules)
+        self.assertEqual(self.db.audits[-1][1], "alarme_excluido")
+        r = self.post("/alarmes/nova", action="salvar", **dict(form, expr="any; reboot"))
+        self.assertNotIn(3, self.db.alarm_rules)
 
 
 class CliTests(unittest.TestCase):

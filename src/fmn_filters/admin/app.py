@@ -594,6 +594,104 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
                                modes=fq.MODES, orders=fq.ORDERS, tz=tz, tz_choices=TZ_CHOICES, ts=fmt_ts,
                                human=fq.human, macro_names=macro_names)
 
+    # ---------------------------------------------------------------- alarmes por filtro
+    @app.route("/alarmes")
+    def alarms():
+        from .. import filter_rules as fr
+        from .. import flow_query as fq
+        rules = store.filter_rules()
+        for r in rules:
+            r["desc"] = fr.describe(r["definition"]) if r["definition"].get("conditions") else ""
+        return render_template("alarms.html", rules=rules, incidents=store.filter_incidents(limit=30),
+                               human=fq.human, aggs=fr.AGGS)
+
+    @app.route("/alarmes/nova", methods=["GET", "POST"], defaults={"rid": 0})
+    @app.route("/alarmes/<int:rid>", methods=["GET", "POST"])
+    def alarm_edit(rid):
+        from datetime import datetime as dt, timezone as dt_timezone
+        from .. import filter_rules as fr
+        from .. import flow_query as fq
+        rule = store.filter_rule(rid) if rid else None
+        if rid and not rule:
+            abort(404)
+        f = request.form
+        saved = store.saved_filters()
+        if request.method == "POST":
+            conds = []
+            for i in range(4):
+                if f.get("c%d_value" % i, "").strip():
+                    conds.append({"metric": f.get("c%d_metric" % i), "op": f.get("c%d_op" % i),
+                                  "value": f.get("c%d_value" % i).replace(",", "."),
+                                  "window": f.get("c%d_window" % i) or 15})
+            definition = {"logic": f.get("logic"), "conditions": conds, "consecutive": f.get("consecutive") or 1,
+                          "resolve_after": f.get("resolve_after") or 5,
+                          "report": {"agg": f.get("agg"), "top": f.get("top") or 5}, "notify": f.get("notify") == "1",
+                          "retention_days": f.get("retention_days") or 7}
+            form_rule = {"id": rid, "name": f.get("name", ""), "enabled": f.get("enabled") == "1",
+                         "severity": f.get("severity", "high"), "direction": f.get("direction", "in"),
+                         "expr": f.get("expr", ""), "definition": definition, "builtin": rule["builtin"] if rule else 0}
+        else:
+            form_rule = rule or {"id": 0, "name": "", "enabled": False, "severity": "high", "direction": "in",
+                                 "expr": next((x["expr"] for x in saved if str(x["id"]) == request.args.get("f")), ""),
+                                 "definition": {"logic": "and", "conditions": [{"metric": "mbps", "op": "gt", "value": 100}],
+                                                "consecutive": 2, "resolve_after": 5,
+                                                "report": {"agg": "dstip", "top": 5}, "notify": True,
+                                                "retention_days": 7}, "builtin": 0}
+        action = f.get("action", "")
+        simulation, chart, error = None, "", None
+        if request.method == "POST":
+            if action == "usar_filtro":
+                chosen = next((x for x in saved if str(x["id"]) == f.get("saved_id")), None)
+                if chosen:
+                    form_rule["expr"] = chosen["expr"]
+            elif action == "excluir" and rid:
+                store.delete_filter_rule(rid)
+                audit("alarme_excluido", rule["name"])
+                flash("Alarme excluído.")
+                return redirect(url_for("alarms"))
+            elif action == "ligar" and rid:
+                store.set_filter_rule_enabled(rid, not rule["enabled"])
+                audit("alarme_" + ("desligado" if rule["enabled"] else "ligado"), rule["name"])
+                flash("Alarme %s." % ("desligado" if rule["enabled"] else "ligado"))
+                return redirect(url_for("alarm_edit", rid=rid))
+            else:
+                try:
+                    cfg = config.bidir()
+                    table = fq.macros(cfg, config.profile(cfg))
+                    name, expr, definition = fr.validate(form_rule["name"], form_rule["expr"], definition,
+                                                         form_rule["severity"], form_rule["direction"], table)
+                    form_rule.update(name=name, expr=expr, definition=definition)
+                    if action == "testar":
+                        now = dt.now(dt_timezone.utc).replace(tzinfo=None, microsecond=0)
+                        minutes = min(120, max(5, int(f.get("test_minutes") or 30)))
+                        simulation = fr.simulate(config.p.flow_root / cfg["source"], expr, definition, table, now,
+                                                 minutes)
+                        key = {"mbps": "bps"}.get(definition["conditions"][0]["metric"],
+                                                  definition["conditions"][0]["metric"])
+                        chart = fq.svg_series(simulation, key, marks=[p["matched"] for p in simulation])
+                    else:
+                        new_id = store.save_filter_rule(rid, name, form_rule["enabled"], form_rule["severity"],
+                                                        form_rule["direction"], expr, definition, g.user["username"])
+                        audit("alarme_salvo", json.dumps({"nome": name, "filtro": expr, "regra": definition,
+                                                          "ligado": form_rule["enabled"]}, ensure_ascii=False))
+                        flash("Alarme salvo. %s" % ("Avaliado a cada minuto." if form_rule["enabled"]
+                                                    else "Está desligado: ligue quando o teste estiver bom."))
+                        return redirect(url_for("alarm_edit", rid=new_id))
+                except (fr.RuleError, fq.QueryError, ValueError) as exc:
+                    error = str(exc)
+                except Exception as exc:                       # ex.: nome repetido
+                    error = "não foi possível salvar: %s" % str(exc)[:200]
+        history, incidents, hist_chart = [], [], ""
+        if rid:
+            history = store.filter_rule_samples(rid, 6)
+            incidents = store.filter_incidents(rid, 20)
+            d0 = form_rule["definition"]["conditions"][0]["metric"] if form_rule["definition"]["conditions"] else "mbps"
+            hist_chart = fq.svg_series(history, {"mbps": "bps"}.get(d0, d0), marks=[h["matched"] for h in history])
+        return render_template("alarm_edit.html", rule=form_rule, saved=saved, simulation=simulation, chart=chart,
+                               error=error, history=history, hist_chart=hist_chart, incidents=incidents,
+                               metrics=fr.METRICS, ops=fr.OPS, aggs=fr.AGGS, human=fq.human,
+                               describe=fr.describe)
+
     return app
 
 

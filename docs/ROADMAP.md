@@ -7,14 +7,11 @@ Ordem pensada para deixar **detecção e alarmes certeiros antes da mitigação*
 - Investigação de denúncias (log NAT do A10), reputação (listas, DNSBL, AbuseIPDB).
 - Análise avançada com filtros nfdump e filtros salvos; dashboards padronizados a partir do export
   validado em produção (`grafana/exports`) e sem blocos fixos do provedor (`orby_net_prefixes`).
+- **Alarmes por filtro** ([ALARMES.md](ALARMES.md)): filtro nfdump + condições fixas ou relativas à média,
+  incidente aberto → resfriando → encerrado, histórico por alarme, teste com o tráfego real e Telegram com
+  top alvos/origens e assinante CGNAT.
 
-## 1. Regras de detecção por filtro (próxima)
-- Regra = filtro nfdump salvo + condições (bps, pps, fluxos, bytes/pacote) + sentido + interfaces.
-- Gatilho fixo **ou relativo à média recente** (ex.: 300% acima dos últimos 15 min do mesmo filtro).
-- Incidente com estados aberto → resfriamento → resolvido, histórico/gráfico por regra.
-- No aviso do Telegram: top alvos e top origens do incidente (agregação), já com o assinante CGNAT.
-
-## 2. Base de comportamento (menos falso positivo)
+## 2. Base de comportamento (menos falso positivo) — próxima
 - Linha de base por IP/pool/porta por hora do dia e dia da semana; limites dinâmicos que substituem a
   calibração diária fixa.
 - Lista de exceções (CDNs, DNS próprios, Google/Meta, servidores do provedor) por grupo.

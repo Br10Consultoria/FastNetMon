@@ -1,0 +1,81 @@
+{% extends "base.html" %}{% block title %}{{ rule.name or 'Novo alarme' }}{% endblock %}
+{% block body %}
+<p><a href="{{ url_for('alarms') }}">← Alarmes</a></p>
+<h1>{{ rule.name or 'Novo alarme' }}</h1>
+{% if error %}<p class="flash">{{ error }}</p>{% endif %}
+{% set d = rule.definition %}
+<form method="post" class="card" autocomplete="off">
+  {% include "_csrf.html" %}
+  <div class="grid">
+    <label>Nome <input name="name" value="{{ rule.name }}" maxlength="80" required></label>
+    <label>Severidade <select name="severity">{% for s, l in (('warning','aviso'),('high','alta'),('critical','crítica')) %}<option value="{{ s }}" {{ 'selected' if rule.severity==s }}>{{ l }}</option>{% endfor %}</select></label>
+    <label>Sentido <select name="direction">{% for s, l in (('in','recebido'),('out','originado'),('any','ambos')) %}<option value="{{ s }}" {{ 'selected' if rule.direction==s }}>{{ l }}</option>{% endfor %}</select>
+      <small>Só classifica o alarme; quem define o tráfego é o filtro.</small></label>
+  </div>
+  <label>Filtro (sintaxe nfdump, com @rede, @src_pools…)
+    <textarea name="expr" rows="2" class="mono">{{ rule.expr }}</textarea></label>
+  <div class="inline">
+    <select name="saved_id">{% for x in saved %}<option value="{{ x.id }}">{{ x.category }} · {{ x.name }}</option>{% endfor %}</select>
+    <button name="action" value="usar_filtro" class="secondary small">Usar filtro salvo</button>
+  </div>
+
+  <h2>Condições</h2>
+  <label class="check"><select name="logic" class="auto"><option value="and" {{ 'selected' if d.logic=='and' }}>todas (E)</option><option value="or" {{ 'selected' if d.logic=='or' }}>qualquer uma (OU)</option></select> precisam ser verdadeiras no minuto</label>
+  <div class="scroll"><table class="conds">
+    <tr><th>Medida</th><th>Comparação</th><th>Valor</th><th>Janela da média (min)</th></tr>
+    {% for i in range(4) %}{% set c = d.conditions[i] if i < d.conditions|length else {} %}
+    <tr><td><select name="c{{ i }}_metric">{% for k, v in metrics.items() %}<option value="{{ k }}" {{ 'selected' if c.metric==k }}>{{ v }}</option>{% endfor %}</select></td>
+      <td><select name="c{{ i }}_op">{% for k, v in ops.items() %}<option value="{{ k }}" {{ 'selected' if c.op==k }}>{{ v }}{{ ' (%)' if 'avg' in k }}</option>{% endfor %}</select></td>
+      <td><input name="c{{ i }}_value" value="{{ '' if c.value is not defined else (c.value if c.value is string else '%g'|format(c.value)) }}" inputmode="decimal" placeholder="{{ 'vazio = sem condição' if i else '' }}"></td>
+      <td><input name="c{{ i }}_window" type="number" min="2" max="120" value="{{ c.window or 15 }}"></td></tr>
+    {% endfor %}
+  </table></div>
+  <p class="muted">“Acima da média” usa porcentagem: 200 = três vezes a média dos minutos anteriores. Combine com um limite fixo (E) para não disparar em tráfego quase zero.</p>
+  <div class="grid">
+    <label>Minutos seguidos para abrir <input name="consecutive" type="number" min="1" max="30" value="{{ d.consecutive }}"></label>
+    <label>Encerrar após (min sem casar) <input name="resolve_after" type="number" min="1" max="240" value="{{ d.resolve_after }}"></label>
+    <label>Relatório no aviso <select name="agg">{% for k, v in aggs.items() %}<option value="{{ k }}" {{ 'selected' if d.report.agg==k }}>top {{ v }}</option>{% endfor %}</select></label>
+    <label>Quantos no top <input name="top" type="number" min="1" max="20" value="{{ d.report.top }}"></label>
+    <label>Histórico (dias) <input name="retention_days" type="number" min="1" max="90" value="{{ d.retention_days }}"></label>
+  </div>
+  <label class="check"><input type="checkbox" name="notify" value="1" {{ 'checked' if d.notify }}> Avisar no Telegram</label>
+  <label class="check"><input type="checkbox" name="enabled" value="1" {{ 'checked' if rule.enabled }}> Ligado (avaliar a cada minuto)</label>
+  <div class="inline">
+    <button name="action" value="salvar">Salvar</button>
+    <button name="action" value="testar" class="secondary">Testar</button>
+    <label class="check">nos últimos <input name="test_minutes" type="number" min="5" max="120" value="30" class="auto"> min</label>
+  </div>
+</form>
+
+{% if simulation is not none %}
+<section class="card">
+  <h2>Teste com o tráfego real</h2>
+  {% set opened = simulation|selectattr('opens')|list %}
+  <p><b>{{ simulation|selectattr('matched')|list|length }}</b> de {{ simulation|length }} minutos casaram as condições ·
+     <b>{{ opened|length }}</b> incidente(s) seria(m) aberto(s). {{ describe(d) }}</p>
+  {% if chart %}<div class="chartbox">{{ chart|safe }}</div><p class="muted">Faixas destacadas = minutos que casaram.</p>{% endif %}
+  <div class="scroll"><table>
+    <tr><th>Minuto (UTC)</th><th class="num">Taxa</th><th class="num">pps</th><th class="num">Fluxos/min</th><th class="num">Bytes/pacote</th><th></th></tr>
+    {% for p in simulation|reverse %}<tr class="{{ 'hitrow' if p.matched }}"><td>{{ p.t.strftime('%H:%M') }}</td><td class="num">{{ human(p.bps, 'bps') }}</td><td class="num">{{ human(p.pps, 'pps') }}</td><td class="num">{{ '%.0f'|format(p.flows) }}</td><td class="num">{{ '%.0f'|format(p.bpp) }}</td><td>{{ 'abriria' if p.opens else ('casou' if p.matched else '') }}</td></tr>{% endfor %}
+  </table></div>
+</section>
+{% endif %}
+
+{% if rule.id %}
+<section class="card">
+  <h2>Últimas 6 horas</h2>
+  {% if hist_chart %}<div class="chartbox">{{ hist_chart|safe }}</div>{% else %}<p class="muted">Sem amostras ainda{{ ' (alarme desligado)' if not rule.enabled }}.</p>{% endif %}
+  <h3>Incidentes</h3>
+  {% if incidents %}<div class="scroll"><table>
+    <tr><th>Início (UTC)</th><th>Fim</th><th>Situação</th><th class="num">Pico</th><th>Top</th></tr>
+    {% for i in incidents %}<tr><td class="nowrap">{{ i.started_at }}</td><td class="nowrap">{{ i.resolved_at or '—' }}</td>
+      <td>{{ {'open':'aberto','cooling':'resfriando','resolved':'encerrado'}[i.status] }}</td>
+      <td class="num">{{ human(i.peak_bps, 'bps') }}<br><small>{{ human(i.peak_pps, 'pps') }}</small></td>
+      <td><small>{% for t in i.top %}<code>{{ t.key }}</code>{% if t.pool %} ({{ t.pool }}){% endif %}{% if t.assinantes %} → {{ t.assinantes|join(', ') }}{% endif %} {{ human(t.bps, 'bps') }}<br>{% endfor %}</small></td></tr>{% endfor %}
+  </table></div>{% else %}<p class="muted">Nenhum incidente.</p>{% endif %}
+  <form method="post" class="inline">{% include "_csrf.html" %}
+    <button name="action" value="ligar" class="secondary">{{ 'Desligar' if rule.enabled else 'Ligar' }}</button>
+    <button name="action" value="excluir" class="secondary">Excluir</button></form>
+</section>
+{% endif %}
+{% endblock %}

@@ -293,7 +293,7 @@ def annotate(res, scopes=None, ifnames=None):
     return res
 
 
-def svg_series(series, key="bps", width=900, height=180):
+def svg_series(series, key="bps", width=900, height=180, marks=None):
     """Grafico de linha em SVG (sem JavaScript) para a pagina."""
     pts = [s[key] for s in series]
     if len(pts) < 2:
@@ -302,9 +302,11 @@ def svg_series(series, key="bps", width=900, height=180):
     step = width / (len(pts) - 1)
     coords = " ".join("%.1f,%.1f" % (i * step, height - 10 - (v / top) * (height - 30)) for i, v in enumerate(pts))
     area = "0,%d %s %.1f,%d" % (height - 10, coords, (len(pts) - 1) * step, height - 10)
-    label = human(top, "bps" if key == "bps" else "pps")
+    label = human(top, {"bps": "bps", "pps": "pps", "flows": "fluxos/min", "bpp": "B/pacote"}.get(key, key))
     first, last = series[0]["t"].strftime("%H:%M"), series[-1]["t"].strftime("%H:%M")
-    return ('<svg class="chart" viewBox="0 0 %d %d" role="img" aria-label="Tráfego do filtro no período">'
+    dots = "".join('<rect x="%.1f" y="0" width="%.1f" height="%d" class="hit"/>' % (i * step - step / 2, step, height - 10)
+                   for i, m in enumerate(marks or []) if m)
+    return ('<svg class="chart" viewBox="0 0 %d %d" role="img" aria-label="Tráfego do filtro no período">' + dots +
             '<polygon points="%s" class="area"/><polyline points="%s" class="line"/>'
             '<text x="4" y="14" class="lbl">pico %s</text>'
             '<text x="4" y="%d" class="lbl">%s UTC</text><text x="%d" y="%d" class="lbl" text-anchor="end">%s UTC</text>'

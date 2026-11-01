@@ -34,6 +34,26 @@ class AdminStoreTests(unittest.TestCase):
         self.s.set_password(self.u["id"], security.hash_password("outra-senha-boa"))
         self.assertFalse(self.s.user(uid=self.u["id"])["must_change_password"])
 
+    def test_filter_rules_crud(self):
+        rules = self.s.filter_rules()
+        self.assertTrue(any(r["builtin"] for r in rules))
+        d = {"logic": "and", "conditions": [{"metric": "mbps", "op": "gt", "value": 5.0}], "consecutive": 2,
+             "resolve_after": 3, "report": {"agg": "dstip", "top": 3}, "notify": True, "retention_days": 7}
+        rid = self.s.save_filter_rule(0, "teste " + self.name, False, "high", "in", "dst net 10.0.0.0/8", d, self.name)
+        try:
+            r = self.s.filter_rule(rid)
+            self.assertEqual((r["name"], r["enabled"], r["definition"]), ("teste " + self.name, False, d))
+            self.s.set_filter_rule_enabled(rid, True)
+            self.assertTrue(self.s.filter_rule(rid)["enabled"])
+            self.assertEqual(self.s.save_filter_rule(rid, "teste2 " + self.name, False, "critical", "out", "any", d,
+                                                     self.name), rid)
+            self.assertEqual(self.s.filter_rule(rid)["severity"], "critical")
+            self.assertEqual(self.s.filter_rule_samples(rid), [])
+            self.assertIsInstance(self.s.filter_incidents(rid), list)
+        finally:
+            self.s.delete_filter_rule(rid)
+        self.assertIsNone(self.s.filter_rule(rid))
+
     def test_fails_audit_interfaces_health(self):
         for _ in range(3):
             self.s.fail("192.0.2.77", self.name)

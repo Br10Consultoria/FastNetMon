@@ -1,0 +1,11 @@
+[Unit]
+Description=OrbyMon - avaliacao dos alarmes por filtro a cada minuto
+
+[Timer]
+OnBootSec=2min
+OnCalendar=*-*-* *:*:20
+AccuracySec=5s
+Unit=orbymon-filter-rules.service
+
+[Install]
+WantedBy=timers.target
