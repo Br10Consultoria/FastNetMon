@@ -54,3 +54,18 @@ h3{font-size:15px;margin:14px 0 6px}
 pre.report{white-space:pre-wrap;font-size:12px;background:var(--bg);padding:10px;border-radius:6px;overflow-x:auto}
 details summary{cursor:pointer;color:var(--accent);margin-top:10px}
 .checks label.check{display:block}.checks label.check input{margin-right:6px;vertical-align:-1px}
+.split{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;align-items:start}
+@media (max-width:1000px){.split{grid-template-columns:1fr}}
+.mono,code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.filters ul{list-style:none;padding:0;margin:0 0 8px}.filters li{margin:0 0 8px}.filters small{display:block}
+.inlineform{display:inline;margin:0}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:10px}
+.stats div{background:var(--bg);border-radius:8px;padding:8px 10px}.stats span{display:block;font-size:12px;color:var(--muted)}
+.stats b{font-size:18px;font-variant-numeric:tabular-nums}
+.chartbox{background:var(--bg);border-radius:8px;padding:6px;margin-bottom:8px}
+svg.chart{width:100%;height:auto;display:block}
+svg.chart .line{fill:none;stroke:var(--accent);stroke-width:2}svg.chart .area{fill:var(--accent);opacity:.15}
+svg.chart .lbl{fill:var(--muted);font-size:12px}
+.tag{display:inline-block;font-size:11px;padding:0 6px;border-radius:99px;background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+td.num{white-space:nowrap}
+.inline > input{flex:1 1 220px;width:auto}

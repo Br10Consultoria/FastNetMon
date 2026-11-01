@@ -165,3 +165,30 @@ FROM orby_attack_events ORDER BY event_time DESC LIMIT %s""", (limit,))
             return fn(db)
         finally:
             db.close()
+
+    # ---------- filtros salvos (Analise avancada)
+    def saved_filters(self):
+        try:
+            rows = self._q("SELECT id,name,expr,description,category,builtin,created_by FROM orby_saved_filters "
+                           "ORDER BY builtin DESC,category,name")
+        except Exception:
+            return []
+        keys = ("id", "name", "expr", "description", "category", "builtin", "created_by")
+        return [dict(zip(keys, r)) for r in rows]
+
+    def save_filter(self, name, expr, description, user):
+        self._q("""INSERT INTO orby_saved_filters (name,expr,description,category,builtin,created_by)
+VALUES (%s,%s,%s,'Meus filtros',0,%s) ON DUPLICATE KEY UPDATE expr=IF(builtin=0,VALUES(expr),expr),
+description=IF(builtin=0,VALUES(description),description)""", (name, expr, description, user), fetch=False)
+
+    def delete_filter(self, fid):
+        return self._q("DELETE FROM orby_saved_filters WHERE id=%s AND builtin=0", (fid,), fetch=False)
+
+    # ---------- blocos do provedor para os dashboards
+    def sync_prefixes(self, cfg, profile):
+        from ..net_prefixes import sync
+        db = self.conn_factory()
+        try:
+            return sync(db, cfg, profile)
+        finally:
+            db.close()

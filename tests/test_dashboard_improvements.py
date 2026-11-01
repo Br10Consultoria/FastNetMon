@@ -39,8 +39,7 @@ class DashboardImprovementsTests(unittest.TestCase):
             for fixed in ('"Mbps"','"suffix: MB"',"60000000","300000000","'MB estimados'"):
                 self.assertNotIn(fixed,text,name)
     def test_recency_does_not_depend_on_selected_time_range(self):
-        for name in ("orbymon-overview.json","orbymon-ip-analytics.json",
-                     "orbymon-cgnat.json"):
+        for name in ("orbymon-ip-analytics.json","orbymon-cgnat.json"):   # overview: removido no padrão atual
             d=dash(name)
             recency=[p for p in d["panels"] if "Atraso da última coleta Huawei" in p["title"]]
             self.assertEqual(len(recency),1,name)

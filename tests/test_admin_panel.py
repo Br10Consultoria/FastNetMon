@@ -107,6 +107,32 @@ class FakeStore:
     def reputation_sources(self):
         return [("blocklist_de_ssh", None, datetime(2026, 11, 1), 4911, 1, "ok", "")]
 
+    saved = None
+
+    def saved_filters(self):
+        if self.saved is None:
+            self.saved = [{"id": 1, "name": "Recebido: SYN", "expr": "@dst_rede and proto tcp and flags S",
+                           "description": "", "category": "Recebido", "builtin": 1, "created_by": ""}]
+        return list(self.saved)
+
+    def save_filter(self, name, expr, description, user):
+        self.saved_filters()
+        self.saved.append({"id": len(self.saved) + 1, "name": name, "expr": expr, "description": description,
+                           "category": "Meus filtros", "builtin": 0, "created_by": user})
+
+    def delete_filter(self, fid):
+        self.saved_filters()
+        before = len(self.saved)
+        self.saved = [x for x in self.saved if not (x["id"] == fid and not x["builtin"])]
+        return before - len(self.saved)
+
+    synced = None
+
+    def sync_prefixes(self, cfg, profile):
+        from fmn_filters.net_prefixes import rows
+        self.synced = rows(cfg, profile)
+        return len(self.synced)
+
     def with_connection(self, fn):
         class Cur:
             def execute(self, sql, params=()):
@@ -139,13 +165,19 @@ def make_tree(tmp: Path):
     (managed / "reputation.env").write_text("ORBYMON_REP_DISABLED=''\nABUSEIPDB_API_KEY=''\n")
     (etc / "reputation.env").symlink_to(managed / "reputation.env")
     (tmp / "nat").mkdir()
+    fixture = ROOT / "tests" / "fixtures" / "nfcapd.20261101120000"
+    (tmp / "flows" / "huawei").mkdir(parents=True)
+    import shutil as _sh, time as _t
+    _sh.copy(fixture, tmp / "flows" / "huawei" / fixture.name)
+    os.utime(tmp / "flows" / "huawei" / fixture.name, (_t.time() - 60, _t.time() - 60))
     for name in ("bidir.json", "cgnat-profiles.json", "telegram.env", "retention.env"):
         (etc / name).symlink_to(managed / name)
         os.chmod(managed / name, 0o640)
     return {"ORBYMON_ADMIN_TESTING": "1", "ORBYMON_CONFIG": str(etc / "bidir.json"),
             "ORBYMON_TELEGRAM_ENV": str(etc / "telegram.env"), "ORBYMON_RETENTION_ENV": str(etc / "retention.env"),
             "ORBYMON_CALIBRATION_DIR": str(calib), "ORBYMON_ADMIN_BACKUP_DIR": str(tmp / "backups"),
-            "ORBYMON_REPUTATION_ENV": str(etc / "reputation.env"), "ORBYMON_NAT_DIR": str(tmp / "nat")}
+            "ORBYMON_REPUTATION_ENV": str(etc / "reputation.env"), "ORBYMON_NAT_DIR": str(tmp / "nat"),
+            "ORBYMON_FLOW_ROOT": str(tmp / "flows"), "ORBYMON_QUERY_LOCK": str(tmp / "query.lock")}
 
 
 class EnvFileTests(unittest.TestCase):
@@ -378,6 +410,7 @@ class PanelTests(unittest.TestCase):
         self.assertEqual(prof["cgnat_pools"], ["45.238.170.64/26", "45.238.171.192/26"])
         self.assertEqual(prof["cgnat_pool_metadata"]["45.238.171.192/26"]["max_users_per_ip"], 16)
         self.assertEqual(self.db.audits[-1][1], "rede_alterada")
+        self.assertIn(("pool", "45.238.171.192/26", "NAT-POOL-12"), [r[:3] for r in self.db.synced])
         self.assertEqual(self.c.get("/rede").status_code, 200)
 
     def test_network_invalid_is_rejected(self):
@@ -526,6 +559,35 @@ class PanelTests(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertIn("Histórico de 100.64.65.10".encode(), r.data)
         self.assertEqual(self.c.get("/investigar?ip=nao-e-ip").status_code, 200)
+
+
+    @unittest.skipUnless(os.path.exists("/usr/bin/nfdump"), "nfdump ausente")
+    def test_analysis_page(self):
+        self.login()
+        page = self.c.get("/analise")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn(b"Recebido: SYN", page.data)
+        r = self.post("/analise", expr="@dst_rede", mode="dstip", order="bytes", limit="10", period="60",
+                      tz="UTC", action="executar")
+        self.assertEqual(r.status_code, 200, r.data[:300])
+        self.assertIn(b"45.238.170.70", r.data)
+        self.assertIn(b"pool NAT-POOL-08", r.data)
+        self.assertIn(b"Filtro executado", r.data)                   # atalho @dst_rede expandido
+        self.assertEqual(self.db.audits[-1][1], "analise")
+        r = self.post("/analise", expr="proto udp and dst port 0", mode="flows", order="bytes", limit="3",
+                      period="60", tz="UTC", action="executar")
+        self.assertIn("quem é?".encode(), r.data)
+        r = self.post("/analise", expr="dst ip 1.2.3", mode="ip", period="60", action="executar")
+        self.assertIn(b"incomplete IP", r.data)
+        self.post("/analise", expr="@src_pools and dst port 25", name="Spam dos pools", action="salvar")
+        mine = [x for x in self.db.saved if x["name"] == "Spam dos pools"][0]
+        self.assertEqual(mine["created_by"], "admin")
+        page = self.c.get("/analise?f=%d&run=1&period=60" % mine["id"])
+        self.assertIn(b"@src_pools and dst port 25", page.data)
+        self.post("/analise", fid=str(mine["id"]), action="excluir")
+        self.assertFalse([x for x in self.db.saved if x["name"] == "Spam dos pools"])
+        self.post("/analise", fid="1", action="excluir")                 # modelo pronto nao se exclui
+        self.assertTrue([x for x in self.db.saved if x["id"] == 1])
 
 
 class CliTests(unittest.TestCase):

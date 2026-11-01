@@ -1,0 +1,84 @@
+{% extends "base.html" %}{% block title %}Análise avançada{% endblock %}
+{% block body %}
+<h1>Análise avançada</h1>
+<div class="split">
+<div>
+<form method="post" class="card" autocomplete="off">
+  {% include "_csrf.html" %}
+  <label>Filtro (sintaxe nfdump)
+    <textarea name="expr" rows="3" class="mono" placeholder="@dst_rede and proto udp and src port 53">{{ form.expr }}</textarea>
+    <small>Atalhos da sua rede: {% for m in macro_names %}<code>{{ m }}</code>{{ ', ' if not loop.last }}{% endfor %}. Exemplos:
+      <code>dst ip 45.238.170.70 and dst port in [53 123]</code>, <code>@src_pools and proto tcp and dst port 22 and flags S and not flags A</code>,
+      <code>bytes &gt; 1M</code>, <code>in if 334</code>, <code>src as 15169</code>. Use <code>any</code> para tudo.</small></label>
+  <div class="grid">
+    <label>Mostrar <select name="mode">{% for k, v in modes.items() %}<option value="{{ k }}" {{ 'selected' if k==form.mode }}>{{ v[0] }}</option>{% endfor %}</select></label>
+    <label>Ordenar por <select name="order">{% for o in orders %}<option {{ 'selected' if o==form.order }}>{{ o }}</option>{% endfor %}</select></label>
+    <label>Quantidade <input name="limit" type="number" min="1" max="500" value="{{ form.limit }}"></label>
+    <label>Período <select name="period">{% for v, l in (('15','15 min'),('60','1 hora'),('180','3 horas'),('360','6 horas'),('1440','24 horas'),('custom','personalizado')) %}<option value="{{ v }}" {{ 'selected' if v==form.period }}>{{ l }}</option>{% endfor %}</select></label>
+  </div>
+  <div class="grid">
+    <label>Início (personalizado) <input name="start" value="{{ form.start }}" placeholder="2026-11-01 10:00"></label>
+    <label>Fim (personalizado) <input name="end" value="{{ form.end }}" placeholder="2026-11-01 11:00"></label>
+    <label>Fuso <select name="tz">{% for z in tz_choices %}<option {{ 'selected' if z==form.tz }}>{{ z }}</option>{% endfor %}</select></label>
+  </div>
+  <div class="inline">
+    <button name="action" value="executar">Executar</button>
+    <input name="name" placeholder="nome para salvar este filtro" maxlength="80" value="{{ form.name }}">
+    <input name="description" placeholder="descrição (opcional)" maxlength="300" value="{{ form.description }}">
+    <button name="action" value="salvar" class="secondary">Salvar filtro</button>
+  </div>
+  <p class="muted">Lê os arquivos de fluxo guardados (até 15 dias). Máximo de 24 h por consulta (6 h em “fluxos individuais”). Valores com a amostragem já expandida pelo nfdump.</p>
+</form>
+
+{% if error %}<p class="flash">{{ error }}</p>{% endif %}
+
+{% if result %}
+<section class="card">
+  {% set s = result.summary %}
+  <div class="stats">
+    <div><span>Fluxos</span><b>{{ '{:,.0f}'.format((s.get('flows') or 0)|float).replace(',', '.') }}</b></div>
+    <div><span>Volume</span><b>{{ human((s.get('bytes') or 0)|float, 'B') }}</b></div>
+    <div><span>Pacotes</span><b>{{ human((s.get('packets') or 0)|float, '') }}</b></div>
+    <div><span>Taxa média</span><b>{{ human((s.get('avg_bps') or 0)|float, 'bps') }}</b></div>
+    <div><span>Média pps</span><b>{{ human((s.get('avg_pps') or 0)|float, 'pps') }}</b></div>
+  </div>
+  {% if chart %}<div class="chartbox">{{ chart|safe }}</div>{% endif %}
+  <p class="muted">{{ ts(result.start, tz) }} a {{ ts(result.end, tz) }} · {{ result.files }} arquivo(s) · {{ '%.1f'|format(result.elapsed) }} s
+    {% if result.expanded != result.expr %}<br>Filtro executado: <code class="detail">{{ result.expanded }}</code>{% endif %}</p>
+  {% for n in result.notes %}<p class="warn">{{ n }}</p>{% endfor %}
+  {% if result.rows %}
+  <div class="scroll"><table>
+    <tr>{% for c in result.columns %}<th class="{{ 'num' if c in ('Fluxos','% fluxos','Pacotes','% pacotes','Bytes','% bytes','pps','bps','bytes/pacote') }}">{{ c }}</th>{% endfor %}<th></th></tr>
+    {% for r in result.rows %}<tr>
+      {% for c in result.columns %}{% set v = r[c] %}
+        {% if c in ('Bytes',) %}<td class="num">{{ human(v, 'B') }}</td>
+        {% elif c == 'bps' %}<td class="num">{{ human(v, 'bps') }}</td>
+        {% elif c == 'pps' %}<td class="num">{{ human(v, 'pps') }}</td>
+        {% elif c in ('Fluxos','Pacotes','bytes/pacote') %}<td class="num">{{ '{:,.0f}'.format(v).replace(',', '.') }}</td>
+        {% elif c.startswith('%') %}<td class="num">{{ '%.1f'|format(v) }}%</td>
+        {% else %}<td class="nowrap">{{ v }}{% if r._tags.get(c) %} <span class="tag">{{ r._tags[c] }}</span>{% endif %}</td>{% endif %}
+      {% endfor %}
+      <td class="nowrap">{% set ipcol = r.get('Origem') or r.get(result.columns[0]) %}
+        {% if result.mode == 'flows' and 'pool' in (r._tags.get('Origem') or '') %}<a href="{{ url_for('investigate', ip=r['Origem'], port=r['Porta orig.'], time=r['Início'], tz='UTC', window=2) }}">quem é?</a>
+        {% elif result.mode == 'flows' and 'pool' in (r._tags.get('Destino') or '') %}<a href="{{ url_for('investigate', ip=r['Destino'], port=r['Porta dest.'], time=r['Início'], tz='UTC', window=2) }}">quem é?</a>
+        {% elif r._tags.get(result.columns[0]) and result.columns[0].startswith('IP') %}<a href="{{ url_for('investigate', ip=r[result.columns[0]]) }}">histórico</a>{% endif %}</td>
+    </tr>{% endfor %}
+  </table></div>
+  {% else %}<p class="muted">Nenhum fluxo casou com o filtro no período.</p>{% endif %}
+</section>
+{% endif %}
+</div>
+
+<aside class="card filters">
+  <h2>Filtros salvos</h2>
+  {% for cat, items in saved|groupby('category') %}
+  <h3>{{ cat }}</h3>
+  <ul>{% for x in items %}<li>
+    <a href="{{ url_for('analysis', f=x.id, run=1, mode=form.mode, period=form.period) }}" title="{{ x.expr }}">{{ x.name }}</a>
+    {% if not x.builtin %}<form method="post" class="inlineform">{% include "_csrf.html" %}<input type="hidden" name="fid" value="{{ x.id }}"><button name="action" value="excluir" class="link small" title="excluir">×</button></form>{% endif %}
+    {% if x.description %}<small class="muted">{{ x.description }}</small>{% endif %}
+  </li>{% endfor %}</ul>
+  {% else %}<p class="muted">Nenhum filtro salvo.</p>{% endfor %}
+</aside>
+</div>
+{% endblock %}

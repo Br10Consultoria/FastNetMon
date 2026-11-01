@@ -1,0 +1,1980 @@
+{
+  "apiVersion": "dashboard.grafana.app/v2",
+  "kind": "Dashboard",
+  "metadata": {
+    "name": "orbymon-ip-analytics"
+  },
+  "spec": {
+    "annotations": [
+      {
+        "kind": "AnnotationQuery",
+        "spec": {
+          "query": {
+            "kind": "DataQuery",
+            "group": "grafana",
+            "version": "v0",
+            "datasource": {
+              "name": "-- Grafana --"
+            },
+            "spec": {}
+          },
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "builtIn": true
+        }
+      }
+    ],
+    "cursorSync": "Off",
+    "description": "Pares IP amostrados do Huawei. Tráfego estimado, ifIndex bruto e GeoLite2 quando disponível; não é tráfego único de clientes.",
+    "editable": true,
+    "elements": {
+      "panel-1": {
+        "kind": "Panel",
+        "spec": {
+          "id": 1,
+          "title": "Ranking de IPs de origem",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "orbymon-mysql"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawSql": "SELECT t.asn AS 'ASN',t.nome AS 'Nome',t.ip AS 'IP origem',t.bloco AS 'Bloco',COALESCE(cn.name,NULLIF(t.pais,''),'Não informado') AS 'País',t.vol AS 'Volume',t.bps AS 'Taxa média',t.pps AS 'Pacotes/s médio' FROM (SELECT src_ip AS ip,MAX(src_asn) AS asn,COALESCE(MAX(NULLIF(src_asn_name,'')),'Não identificado') AS nome,COALESCE(MAX(NULLIF(src_prefix,'')),'—') AS bloco,MAX(NULLIF(src_country,'')) AS pais,SUM(total_bytes) AS vol,SUM(total_bytes)*8/GREATEST(1,$__unixEpochTo()-$__unixEpochFrom()) AS bps,SUM(total_packets)/GREATEST(1,$__unixEpochTo()-$__unixEpochFrom()) AS pps FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) GROUP BY src_ip ORDER BY SUM(total_bytes) DESC LIMIT 30) AS t LEFT JOIN orby_country_names AS cn ON cn.code=t.pais ORDER BY t.vol DESC"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "table",
+            "version": "13.3.0",
+            "spec": {
+              "options": {
+                "cellHeight": "sm",
+                "enablePagination": false,
+                "showHeader": true,
+                "zebraStriping": false
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      },
+                      {
+                        "value": 80,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "align": "auto",
+                    "cellOptions": {
+                      "type": "color-background"
+                    },
+                    "filterable": true,
+                    "footer": {
+                      "reducers": []
+                    },
+                    "inspect": false
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Volume"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "decbytes"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 1
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Taxa média"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "bps"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 2
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Pacotes/s médio"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "pps"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 1
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "transparent": true
+        }
+      },
+      "panel-10": {
+        "kind": "Panel",
+        "spec": {
+          "id": 10,
+          "title": "IPs de destino",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "orbymon-mysql"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawSql": "SELECT COUNT(DISTINCT dst_ip) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc)"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "13.3.0",
+            "spec": {
+              "options": {
+                "colorMode": "background",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds",
+                    "fixedColor": "#ad46ff"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          },
+          "transparent": true
+        }
+      },
+      "panel-11": {
+        "kind": "Panel",
+        "spec": {
+          "id": 11,
+          "title": "Pares de IP distintos",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "orbymon-mysql"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawSql": "SELECT COUNT(*) AS value FROM (SELECT src_ip,dst_ip FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) GROUP BY src_ip,dst_ip) t"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "13.3.0",
+            "spec": {
+              "options": {
+                "colorMode": "background",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds",
+                    "fixedColor": "#ad46ff"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          },
+          "transparent": true
+        }
+      },
+      "panel-12": {
+        "kind": "Panel",
+        "spec": {
+          "id": 12,
+          "title": "Último fluxo Huawei UTC (independente do filtro)",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "orbymon-mysql"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawSql": "SELECT MAX(bucket_utc) AS 'Último fluxo Huawei (UTC)' FROM orby_ip_pairs_minute WHERE source='huawei'"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "table",
+            "version": "13.3.0",
+            "spec": {
+              "options": {
+                "cellHeight": "sm",
+                "showHeader": true,
+                "zebraStriping": false
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      },
+                      {
+                        "value": 80,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "align": "auto",
+                    "cellOptions": {
+                      "type": "color-background"
+                    },
+                    "footer": {
+                      "reducers": []
+                    },
+                    "inspect": false
+                  }
+                },
+                "overrides": []
+              }
+            }
+          },
+          "transparent": true
+        }
+      },
+      "panel-13": {
+        "kind": "Panel",
+        "spec": {
+          "id": 13,
+          "title": "Localização aproximada das origens (GeoLite2)",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "orbymon-mysql"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawSql": "SELECT t.latitude,t.longitude,COALESCE(cn.name,NULLIF(t.pais,''),'Não informado') AS 'País',t.asn AS 'ASN',t.nome AS 'Nome',t.ips AS 'IPs de origem',t.vol AS 'Volume' FROM (SELECT src_latitude AS latitude,src_longitude AS longitude,src_asn AS asn,COALESCE(MAX(NULLIF(src_asn_name,'')),'Não identificado') AS nome,MAX(NULLIF(src_country,'')) AS pais,COUNT(DISTINCT src_ip) AS ips,SUM(total_bytes) AS vol FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND src_latitude IS NOT NULL AND src_longitude IS NOT NULL GROUP BY src_latitude,src_longitude,src_asn ORDER BY SUM(total_bytes) DESC LIMIT 300) AS t LEFT JOIN orby_country_names AS cn ON cn.code=t.pais ORDER BY t.vol DESC"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "geomap",
+            "version": "13.3.0",
+            "spec": {
+              "options": {
+                "basemap": {
+                  "name": "Open Street Map",
+                  "type": "default"
+                },
+                "controls": {
+                  "mouseWheelZoom": true,
+                  "showAttribution": true,
+                  "showDebug": false,
+                  "showMeasure": false,
+                  "showScale": false,
+                  "showZoom": true
+                },
+                "layers": [
+                  {
+                    "config": {
+                      "showLegend": true,
+                      "style": {
+                        "color": {
+                          "field": "Volume",
+                          "fixed": "#FF891A"
+                        },
+                        "opacity": 0.7,
+                        "size": {
+                          "field": "Volume",
+                          "fixed": 7,
+                          "max": 26,
+                          "min": 5
+                        },
+                        "symbol": {
+                          "fixed": "img/icons/marker/circle.svg",
+                          "mode": "fixed"
+                        }
+                      }
+                    },
+                    "location": {
+                      "latitude": "latitude",
+                      "longitude": "longitude",
+                      "mode": "coords"
+                    },
+                    "name": "Origens observadas (localização aproximada)",
+                    "tooltip": true,
+                    "type": "markers"
+                  }
+                ],
+                "tooltip": {
+                  "mode": "details"
+                },
+                "view": {
+                  "allLayers": true,
+                  "dashboardVariable": false,
+                  "id": "fit",
+                  "lat": -14,
+                  "lon": -51,
+                  "maxZoom": 6,
+                  "noRepeat": false,
+                  "padding": 10,
+                  "zoom": 3
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      },
+                      {
+                        "value": 80,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "continuous-YlRd"
+                  },
+                  "custom": {
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    }
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Volume"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "decbytes"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 1
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "panel-14": {
+        "kind": "Panel",
+        "spec": {
+          "id": 14,
+          "title": "Países de origem (GeoLite2)",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "orbymon-mysql"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawSql": "SELECT COALESCE(cn.name,NULLIF(t.pais,''),'Não informado') AS 'País',t.ips AS 'IPs distintos',t.vol AS 'Volume',t.bps AS 'Taxa média',t.pps AS 'Pacotes/s médio' FROM (SELECT src_country AS pais,COUNT(DISTINCT src_ip) AS ips,SUM(total_bytes) AS vol,SUM(total_bytes)*8/GREATEST(1,$__unixEpochTo()-$__unixEpochFrom()) AS bps,SUM(total_packets)/GREATEST(1,$__unixEpochTo()-$__unixEpochFrom()) AS pps FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND src_country<>'' GROUP BY src_country ORDER BY SUM(total_bytes) DESC LIMIT 30) AS t LEFT JOIN orby_country_names AS cn ON cn.code=t.pais ORDER BY t.vol DESC"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "table",
+            "version": "13.3.0",
+            "spec": {
+              "options": {
+                "cellHeight": "sm",
+                "enablePagination": false,
+                "showHeader": true,
+                "zebraStriping": false
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      },
+                      {
+                        "value": 80,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "align": "auto",
+                    "cellOptions": {
+                      "type": "color-background"
+                    },
+                    "footer": {
+                      "reducers": []
+                    },
+                    "inspect": false
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Volume"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "decbytes"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 1
+                      },
+                      {
+                        "id": "custom.width",
+                        "value": 102
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Taxa média"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "bps"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 2
+                      },
+                      {
+                        "id": "custom.width",
+                        "value": 107
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Pacotes/s médio"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "pps"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 1
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "scope": "series",
+                      "options": "IPs distintos"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 98
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "transparent": true
+        }
+      },
+      "panel-2": {
+        "kind": "Panel",
+        "spec": {
+          "id": 2,
+          "title": "Ranking de IPs de destino",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "orbymon-mysql"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawSql": "SELECT t.asn AS 'ASN',t.nome AS 'Nome',t.ip AS 'IP destino',t.bloco AS 'Bloco',COALESCE(cn.name,NULLIF(t.pais,''),'Não informado') AS 'País',t.vol AS 'Volume',t.bps AS 'Taxa média',t.pps AS 'Pacotes/s médio' FROM (SELECT dst_ip AS ip,MAX(dst_asn) AS asn,COALESCE(MAX(NULLIF(dst_asn_name,'')),'Não identificado') AS nome,COALESCE(MAX(NULLIF(dst_prefix,'')),'—') AS bloco,MAX(NULLIF(dst_country,'')) AS pais,SUM(total_bytes) AS vol,SUM(total_bytes)*8/GREATEST(1,$__unixEpochTo()-$__unixEpochFrom()) AS bps,SUM(total_packets)/GREATEST(1,$__unixEpochTo()-$__unixEpochFrom()) AS pps FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) GROUP BY dst_ip ORDER BY SUM(total_bytes) DESC LIMIT 30) AS t LEFT JOIN orby_country_names AS cn ON cn.code=t.pais ORDER BY t.vol DESC"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "table",
+            "version": "13.3.0",
+            "spec": {
+              "options": {
+                "cellHeight": "sm",
+                "enablePagination": false,
+                "showHeader": true,
+                "zebraStriping": false
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      },
+                      {
+                        "value": 80,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "align": "auto",
+                    "cellOptions": {
+                      "type": "color-background"
+                    },
+                    "filterable": true,
+                    "footer": {
+                      "reducers": []
+                    },
+                    "inspect": false
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Volume"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "decbytes"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 1
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Taxa média"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "bps"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 2
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Pacotes/s médio"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "pps"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 1
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "transparent": true
+        }
+      },
+      "panel-20": {
+        "kind": "Panel",
+        "spec": {
+          "id": 20,
+          "title": "Atraso da última coleta Huawei (min; agora)",
+          "description": "Independente do período selecionado; negativo indica horário do fluxo no futuro. Ajuda a entender painéis vazios em 15/30 minutos.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "orbymon-mysql"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawSql": "SELECT ROUND(TIMESTAMPDIFF(SECOND,MAX(bucket_utc),UTC_TIMESTAMP())/60,1) AS value FROM orby_ip_pairs_minute WHERE source='huawei'"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "13.3.0",
+            "spec": {
+              "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "suffix: min",
+                  "decimals": 1,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "red"
+                      },
+                      {
+                        "value": 0,
+                        "color": "green"
+                      },
+                      {
+                        "value": 5,
+                        "color": "orange"
+                      },
+                      {
+                        "value": 15,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-3": {
+        "kind": "Panel",
+        "spec": {
+          "id": 3,
+          "title": "Pares origem e destino / principais portas",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "orbymon-mysql"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawSql": "SELECT src_ip AS 'Origem',dst_ip AS 'Destino',protocol AS 'Protocolo',dst_port AS 'Porta',CASE WHEN input_if=0 THEN 'sem interface (0)' ELSE COALESCE(MAX(im_in.if_name),CONCAT('ifIndex ',input_if,' (sem nome)')) END AS 'Entrada Huawei',CASE WHEN output_if=0 THEN 'sem interface (0)' ELSE COALESCE(MAX(im_out.if_name),CONCAT('ifIndex ',output_if,' (sem nome)')) END AS 'Saída Huawei',ROUND(SUM(total_bytes),0) AS 'Volume estimado' FROM orby_ip_pairs_minute LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=input_if LEFT JOIN orby_interface_names AS im_out ON im_out.source='huawei' AND im_out.if_index=output_if WHERE orby_ip_pairs_minute.source='huawei' AND $__timeFilter(bucket_utc) GROUP BY src_ip,dst_ip,protocol,dst_port,input_if,output_if ORDER BY SUM(total_bytes) DESC LIMIT 40"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "table",
+            "version": "13.3.0",
+            "spec": {
+              "options": {
+                "cellHeight": "sm",
+                "showHeader": true,
+                "zebraStriping": false
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      },
+                      {
+                        "value": 80,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "align": "auto",
+                    "cellOptions": {
+                      "type": "color-background"
+                    },
+                    "filterable": true,
+                    "footer": {
+                      "reducers": []
+                    },
+                    "inspect": false
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Volume estimado"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "decbytes"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 1
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "transparent": true
+        }
+      },
+      "panel-4": {
+        "kind": "Panel",
+        "spec": {
+          "id": 4,
+          "title": "Interfaces Huawei",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "orbymon-mysql"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawSql": "SELECT CASE WHEN input_if=0 THEN 'sem interface (0)' ELSE COALESCE(MAX(im_in.if_name),CONCAT('ifIndex ',input_if,' (sem nome)')) END AS 'Entrada Huawei',CASE WHEN output_if=0 THEN 'sem interface (0)' ELSE COALESCE(MAX(im_out.if_name),CONCAT('ifIndex ',output_if,' (sem nome)')) END AS 'Saída Huawei',CASE netflow_direction WHEN 0 THEN 'captura na entrada' WHEN 1 THEN 'captura na saída' ELSE 'direção não informada' END AS 'Captura',ROUND(SUM(total_bytes),0) AS 'Volume estimado',SUM(flow_records) AS 'Registros' FROM orby_ip_pairs_minute LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=input_if LEFT JOIN orby_interface_names AS im_out ON im_out.source='huawei' AND im_out.if_index=output_if WHERE orby_ip_pairs_minute.source='huawei' AND $__timeFilter(bucket_utc) GROUP BY input_if,output_if,netflow_direction ORDER BY SUM(total_bytes) DESC LIMIT 30"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "table",
+            "version": "13.3.0",
+            "spec": {
+              "options": {
+                "cellHeight": "sm",
+                "enablePagination": false,
+                "showHeader": true,
+                "zebraStriping": false
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      },
+                      {
+                        "value": 80,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "align": "auto",
+                    "cellOptions": {
+                      "type": "color-background"
+                    },
+                    "filterable": true,
+                    "footer": {
+                      "reducers": []
+                    },
+                    "inspect": false
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Volume estimado"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "decbytes"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 1
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "transparent": true
+        }
+      },
+      "panel-5": {
+        "kind": "Panel",
+        "spec": {
+          "id": 5,
+          "title": "Prefixos de origem exportados",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "orbymon-mysql"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawSql": "SELECT src_prefix AS 'Rede',COUNT(DISTINCT src_ip) AS 'IPs observados',ROUND(SUM(total_bytes),0) AS 'Volume estimado' FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND src_prefix!='' GROUP BY src_prefix ORDER BY SUM(total_bytes) DESC LIMIT 30"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "table",
+            "version": "13.3.0",
+            "spec": {
+              "options": {
+                "cellHeight": "sm",
+                "enablePagination": false,
+                "showHeader": true,
+                "zebraStriping": false
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      },
+                      {
+                        "value": 80,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "align": "auto",
+                    "cellOptions": {
+                      "type": "color-background"
+                    },
+                    "filterable": true,
+                    "footer": {
+                      "reducers": []
+                    },
+                    "inspect": false
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Volume estimado"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "decbytes"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 1
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "transparent": true
+        }
+      },
+      "panel-6": {
+        "kind": "Panel",
+        "spec": {
+          "id": 6,
+          "title": "Prefixos de destino exportados",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "orbymon-mysql"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawSql": "SELECT dst_prefix AS 'Rede',COUNT(DISTINCT dst_ip) AS 'IPs observados',ROUND(SUM(total_bytes),0) AS 'Volume estimado' FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND dst_prefix!='' GROUP BY dst_prefix ORDER BY SUM(total_bytes) DESC LIMIT 30"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "table",
+            "version": "13.3.0",
+            "spec": {
+              "options": {
+                "cellHeight": "sm",
+                "enablePagination": false,
+                "showHeader": true,
+                "zebraStriping": false
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      },
+                      {
+                        "value": 80,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "align": "auto",
+                    "cellOptions": {
+                      "type": "color-background"
+                    },
+                    "filterable": true,
+                    "footer": {
+                      "reducers": []
+                    },
+                    "inspect": false
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Volume estimado"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "decbytes"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 1
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "transparent": true
+        }
+      },
+      "panel-7": {
+        "kind": "Panel",
+        "spec": {
+          "id": 7,
+          "title": "Top ASNs de origem",
+          "description": "ASN/pais GeoLite2 somente quando conhecido, sem dados inventados.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "orbymon-mysql"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawSql": "SELECT t.asn AS 'ASN',t.nome AS 'Nome',t.blocos AS 'Blocos / IPs',t.ips AS 'IPs',CASE WHEN t.paises>1 THEN 'Vários' ELSE COALESCE(cn.name,NULLIF(t.pais,''),'Não informado') END AS 'País',t.vol AS 'Volume',t.bps AS 'Taxa média',t.pps AS 'Pacotes/s médio' FROM (SELECT src_asn AS asn,COALESCE(MAX(NULLIF(src_asn_name,'')),'Não identificado') AS nome,COALESCE(NULLIF(GROUP_CONCAT(DISTINCT NULLIF(src_prefix,'') ORDER BY src_prefix SEPARATOR ', ' LIMIT 3),''),GROUP_CONCAT(DISTINCT src_ip ORDER BY src_ip SEPARATOR ', ' LIMIT 3)) AS blocos,COUNT(DISTINCT src_ip) AS ips,COUNT(DISTINCT NULLIF(src_country,'')) AS paises,MAX(NULLIF(src_country,'')) AS pais,SUM(total_bytes) AS vol,SUM(total_bytes)*8/GREATEST(1,$__unixEpochTo()-$__unixEpochFrom()) AS bps,SUM(total_packets)/GREATEST(1,$__unixEpochTo()-$__unixEpochFrom()) AS pps FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND src_asn>0 GROUP BY src_asn ORDER BY SUM(total_bytes) DESC LIMIT 30) AS t LEFT JOIN orby_country_names AS cn ON cn.code=t.pais ORDER BY t.vol DESC"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "table",
+            "version": "13.3.0",
+            "spec": {
+              "options": {
+                "cellHeight": "sm",
+                "enablePagination": false,
+                "showHeader": true,
+                "zebraStriping": false
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      },
+                      {
+                        "value": 80,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "align": "auto",
+                    "cellOptions": {
+                      "type": "color-background"
+                    },
+                    "filterable": true,
+                    "footer": {
+                      "reducers": []
+                    },
+                    "inspect": false
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Volume"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "decbytes"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 1
+                      },
+                      {
+                        "id": "custom.width",
+                        "value": 86
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Taxa média"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "bps"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 2
+                      },
+                      {
+                        "id": "custom.width",
+                        "value": 109
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Pacotes/s médio"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "pps"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 1
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "scope": "series",
+                      "options": "Blocos / IPs"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 386
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "scope": "series",
+                      "options": "ASN"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 61
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "scope": "series",
+                      "options": "Nome"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 236
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "scope": "series",
+                      "options": "IPs"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 53
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "transparent": true
+        }
+      },
+      "panel-8": {
+        "kind": "Panel",
+        "spec": {
+          "id": 8,
+          "title": "Taxa estimada por interface de entrada Huawei",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "orbymon-mysql"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "time_series",
+                        "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),CASE WHEN input_if=0 THEN 'sem interface (0)' ELSE COALESCE(CONCAT(im_in.if_name,' (',input_if,')'),CONCAT('ifIndex ',input_if,' (sem nome)')) END AS metric,ROUND(SUM(total_bytes)*8/60,2) AS value FROM orby_ip_pairs_minute LEFT JOIN orby_interface_names AS im_in ON im_in.source='huawei' AND im_in.if_index=input_if WHERE orby_ip_pairs_minute.source='huawei' AND $__timeFilter(bucket_utc) GROUP BY 1,input_if,im_in.if_name ORDER BY 1"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "13.3.0",
+            "spec": {
+              "options": {
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "table",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "bps",
+                  "decimals": 2,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      },
+                      {
+                        "value": 80,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "continuous-BlYlRd",
+                    "seriesBy": "last"
+                  },
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "",
+                    "axisPlacement": "auto",
+                    "barAlignment": 0,
+                    "barWidthFactor": 0.6,
+                    "drawStyle": "line",
+                    "fillOpacity": 19,
+                    "gradientMode": "scheme",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "insertNulls": false,
+                    "lineInterpolation": "smooth",
+                    "lineStyle": {
+                      "fill": "solid"
+                    },
+                    "lineWidth": 2,
+                    "pointSize": 5,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "showPoints": "never",
+                    "showValues": false,
+                    "spanNulls": false,
+                    "stacking": {
+                      "group": "A",
+                      "mode": "none"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  }
+                },
+                "overrides": []
+              }
+            }
+          },
+          "transparent": true
+        }
+      },
+      "panel-9": {
+        "kind": "Panel",
+        "spec": {
+          "id": 9,
+          "title": "IPs de origem",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "orbymon-mysql"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawSql": "SELECT COUNT(DISTINCT src_ip) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc)"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "13.3.0",
+            "spec": {
+              "options": {
+                "colorMode": "background",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds",
+                    "fixedColor": "#ad46ff"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          },
+          "transparent": true
+        }
+      }
+    },
+    "layout": {
+      "kind": "GridLayout",
+      "spec": {
+        "items": [
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 0,
+              "y": 0,
+              "width": 24,
+              "height": 9,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-1"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 0,
+              "y": 9,
+              "width": 24,
+              "height": 10,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-2"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 0,
+              "y": 19,
+              "width": 24,
+              "height": 9,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-3"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 0,
+              "y": 28,
+              "width": 24,
+              "height": 9,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-5"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 0,
+              "y": 37,
+              "width": 24,
+              "height": 9,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-7"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 0,
+              "y": 46,
+              "width": 24,
+              "height": 10,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-4"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 0,
+              "y": 56,
+              "width": 24,
+              "height": 8,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-6"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 0,
+              "y": 64,
+              "width": 24,
+              "height": 9,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-8"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 0,
+              "y": 73,
+              "width": 5,
+              "height": 4,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-9"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 5,
+              "y": 73,
+              "width": 5,
+              "height": 4,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-10"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 10,
+              "y": 73,
+              "width": 5,
+              "height": 4,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-11"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 15,
+              "y": 73,
+              "width": 9,
+              "height": 4,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-12"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 0,
+              "y": 77,
+              "width": 12,
+              "height": 12,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-13"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 12,
+              "y": 77,
+              "width": 12,
+              "height": 12,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-14"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 0,
+              "y": 89,
+              "width": 12,
+              "height": 4,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-20"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "links": [],
+    "liveNow": false,
+    "preload": false,
+    "tags": [
+      "orbymon",
+      "huawei",
+      "ip",
+      "netflow",
+      "asn"
+    ],
+    "timeSettings": {
+      "timezone": "browser",
+      "from": "now-30m",
+      "to": "now",
+      "autoRefresh": "30s",
+      "autoRefreshIntervals": [
+        "5s",
+        "10s",
+        "30s",
+        "1m",
+        "5m",
+        "15m",
+        "30m",
+        "1h",
+        "2h",
+        "1d"
+      ],
+      "hideTimepicker": false,
+      "fiscalYearStartMonth": 0
+    },
+    "title": "Huawei - IPs, Redes e Interfaces",
+    "variables": [],
+    "preferences": {
+      "layout": {
+        "kind": "GridLayout",
+        "spec": {
+          "items": []
+        }
+      }
+    }
+  }
+}

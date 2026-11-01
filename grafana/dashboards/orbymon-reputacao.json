@@ -1,116 +1,212 @@
 {
   "id": null,
   "uid": "orbymon-reputacao",
-  "title": "OrbyMon | Reputação e ataques originados",
-  "timezone": "browser",
-  "schemaVersion": 40,
-  "version": 1,
-  "refresh": "5m",
-  "time": {
-    "from": "now-7d",
-    "to": "now"
-  },
+  "title": "Reputação e ataques originados",
+  "description": "IPs do provedor em listas de bloqueio, assinante provável (CGNAT) e quem origina ataques.",
   "tags": [
     "orbymon",
     "reputacao",
     "abuso"
   ],
-  "description": "IPs do provedor em listas de bloqueio, assinante provável (CGNAT) e quem origina ataques.",
+  "editable": true,
+  "schemaVersion": 41,
+  "version": 1,
+  "graphTooltip": 0,
+  "links": [],
+  "liveNow": false,
+  "timezone": "browser",
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "refresh": "5m",
+  "fiscalYearStartMonth": 0,
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ]
+  },
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
   "templating": {
     "list": [
       {
         "name": "ip",
         "label": "IP (público ou 100.64.x)",
-        "type": "textbox",
-        "query": "",
+        "hide": 0,
+        "skipUrlSync": false,
         "current": {
           "text": "",
           "value": ""
-        }
+        },
+        "type": "textbox",
+        "query": ""
       }
     ]
   },
   "panels": [
     {
-      "id": 1,
-      "type": "text",
-      "title": "Como usar",
+      "id": 2,
+      "type": "gauge",
+      "title": "IPs listados agora",
+      "description": "",
       "gridPos": {
         "x": 0,
         "y": 0,
-        "w": 24,
+        "w": 6,
         "h": 3
       },
+      "links": [],
       "options": {
-        "mode": "markdown",
-        "content": "Ataques **originados** na rede e IPs do provedor em **listas de bloqueio**. Para IP de pool CGNAT, a coluna *Prováveis responsáveis* aponta o assinante (IP privado) pelos fluxos de saída. Para responder uma denúncia com horário e porta, use a página **Investigar** do painel de administração (porta 8443)."
+        "barShape": "rounded",
+        "barWidthFactor": 0.25,
+        "effects": {
+          "barGlow": true,
+          "centerGlow": true,
+          "gradient": true
+        },
+        "endpointMarker": "glow",
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "segmentCount": 10,
+        "segmentSpacing": 0.15,
+        "shape": "circle",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": false,
+        "sizing": "auto",
+        "sparkline": true,
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": 0,
+                "color": "green"
+              }
+            ]
+          },
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "dark-red"
+          }
+        },
+        "overrides": []
+      },
+      "transparent": true,
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawSql": "SELECT COUNT(DISTINCT entry) AS value FROM orby_reputation_listings WHERE removed_at IS NULL"
+        }
+      ],
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
       }
     },
     {
-      "id": 2,
-      "title": "IPs listados agora",
-      "type": "stat",
-      "datasource": {
-        "type": "mysql",
-        "uid": "orbymon-mysql"
-      },
-      "description": "",
-      "gridPos": {
-        "x": 0,
-        "y": 3,
-        "w": 6,
-        "h": 4
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "mysql",
-            "uid": "orbymon-mysql"
-          },
-          "rawSql": "SELECT COUNT(DISTINCT entry) AS value FROM orby_reputation_listings WHERE removed_at IS NULL",
-          "format": "table",
-          "editorMode": "code"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {}
-    },
-    {
       "id": 3,
+      "type": "gauge",
       "title": "Pools CGNAT listados",
-      "type": "stat",
-      "datasource": {
-        "type": "mysql",
-        "uid": "orbymon-mysql"
-      },
       "description": "",
       "gridPos": {
         "x": 6,
-        "y": 3,
+        "y": 0,
         "w": 6,
-        "h": 4
+        "h": 3
       },
+      "links": [],
+      "options": {
+        "barShape": "rounded",
+        "barWidthFactor": 0.25,
+        "effects": {
+          "barGlow": true,
+          "centerGlow": true,
+          "gradient": false
+        },
+        "endpointMarker": "glow",
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "segmentCount": 10,
+        "segmentSpacing": 0.15,
+        "shape": "circle",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": false,
+        "sizing": "auto",
+        "sparkline": true,
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": 0,
+                "color": "green"
+              },
+              {
+                "value": 1,
+                "color": "red"
+              }
+            ]
+          },
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "dark-red"
+          }
+        },
+        "overrides": []
+      },
+      "transparent": true,
       "targets": [
         {
           "refId": "A",
@@ -118,49 +214,79 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT COUNT(DISTINCT entry) AS value FROM orby_reputation_listings WHERE removed_at IS NULL AND scope='cgnat_pool'",
+          "editorMode": "code",
           "format": "table",
-          "editorMode": "code"
+          "rawSql": "SELECT COUNT(DISTINCT entry) AS value FROM orby_reputation_listings WHERE removed_at IS NULL AND scope='cgnat_pool'"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {}
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      }
     },
     {
       "id": 4,
+      "type": "gauge",
       "title": "Ataques originados no período",
-      "type": "stat",
-      "datasource": {
-        "type": "mysql",
-        "uid": "orbymon-mysql"
-      },
       "description": "",
       "gridPos": {
         "x": 12,
-        "y": 3,
+        "y": 0,
         "w": 6,
-        "h": 4
+        "h": 3
       },
+      "links": [],
+      "options": {
+        "barShape": "rounded",
+        "barWidthFactor": 0.25,
+        "effects": {
+          "barGlow": true,
+          "centerGlow": true,
+          "gradient": true
+        },
+        "endpointMarker": "glow",
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "segmentCount": 10,
+        "segmentSpacing": 0.15,
+        "shape": "circle",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": false,
+        "sizing": "auto",
+        "sparkline": true,
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": 0,
+                "color": "green"
+              },
+              {
+                "value": 1,
+                "color": "red"
+              }
+            ]
+          },
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "dark-green"
+          }
+        },
+        "overrides": []
+      },
+      "transparent": true,
       "targets": [
         {
           "refId": "A",
@@ -168,99 +294,79 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT COUNT(*) AS value FROM orby_attack_events WHERE $__timeFilter(event_time) AND direction='out' AND (${ip:sqlstring}='' OR local_ip=${ip:sqlstring} OR subscriber_ip=${ip:sqlstring})",
+          "editorMode": "code",
           "format": "table",
-          "editorMode": "code"
+          "rawSql": "SELECT COUNT(*) AS value FROM orby_attack_events WHERE $__timeFilter(event_time) AND direction='out' AND (${ip:sqlstring}='' OR local_ip=${ip:sqlstring} OR subscriber_ip=${ip:sqlstring})"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {}
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      }
     },
     {
       "id": 5,
-      "title": "Assinantes/IPs que originaram ataque",
-      "type": "stat",
-      "datasource": {
-        "type": "mysql",
-        "uid": "orbymon-mysql"
-      },
+      "type": "gauge",
+      "title": "IPs que originaram ataque",
       "description": "",
       "gridPos": {
         "x": 18,
-        "y": 3,
+        "y": 0,
         "w": 6,
-        "h": 4
+        "h": 3
       },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "mysql",
-            "uid": "orbymon-mysql"
-          },
-          "rawSql": "SELECT COUNT(DISTINCT IF(subscriber_ip='',local_ip,subscriber_ip)) AS value FROM orby_attack_events WHERE $__timeFilter(event_time) AND direction='out' AND (${ip:sqlstring}='' OR local_ip=${ip:sqlstring} OR subscriber_ip=${ip:sqlstring})",
-          "format": "table",
-          "editorMode": "code"
-        }
-      ],
+      "links": [],
+      "options": {
+        "barShape": "rounded",
+        "barWidthFactor": 0.25,
+        "effects": {
+          "barGlow": true,
+          "centerGlow": true,
+          "gradient": true
+        },
+        "endpointMarker": "glow",
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "segmentCount": 10,
+        "segmentSpacing": 0.15,
+        "shape": "circle",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": false,
+        "sizing": "auto",
+        "sparkline": true,
+        "textMode": "auto"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "value": 0,
+                "color": "green"
               },
               {
-                "color": "red",
-                "value": 1
+                "value": 1,
+                "color": "red"
               }
             ]
+          },
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
           }
         },
         "overrides": []
       },
-      "options": {}
-    },
-    {
-      "id": 6,
-      "title": "IPs do provedor em listas de bloqueio (agora)",
-      "type": "table",
-      "datasource": {
-        "type": "mysql",
-        "uid": "orbymon-mysql"
-      },
-      "description": "Atualizado de hora em hora (DNSBL e AbuseIPDB a cada 6 h). Provável responsável = assinante com mais fluxos de saída para as portas típicas do abuso nas últimas 48 h.",
-      "gridPos": {
-        "x": 0,
-        "y": 7,
-        "w": 24,
-        "h": 9
-      },
+      "transparent": true,
       "targets": [
         {
           "refId": "A",
@@ -268,15 +374,61 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT entry AS 'IP / bloco',CASE scope WHEN 'cgnat_pool' THEN CONCAT('pool CGNAT ',pool) WHEN 'dedicated' THEN 'IP dedicado' WHEN 'infra' THEN 'infraestrutura' ELSE scope END AS 'Tipo',GROUP_CONCAT(DISTINCT source_label ORDER BY source_label SEPARATOR ', ') AS 'Listas',GROUP_CONCAT(DISTINCT category ORDER BY category SEPARATOR '; ') AS 'Motivo',MAX(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(detail,'$.suspeitos[0].ip')),JSON_UNQUOTE(JSON_EXTRACT(detail,'$.eventos[0].ip')),'')) AS 'Provável responsável',MIN(first_seen) AS 'Listado desde (UTC)',MAX(last_seen) AS 'Visto (UTC)' FROM orby_reputation_listings WHERE removed_at IS NULL AND (${ip:sqlstring}='' OR entry=${ip:sqlstring} OR JSON_SEARCH(detail,'one',${ip:sqlstring}) IS NOT NULL) GROUP BY entry,scope,pool ORDER BY COUNT(*) DESC,entry LIMIT 200",
+          "editorMode": "code",
           "format": "table",
-          "editorMode": "code"
+          "rawSql": "SELECT COUNT(DISTINCT IF(subscriber_ip='',local_ip,subscriber_ip)) AS value FROM orby_attack_events WHERE $__timeFilter(event_time) AND direction='out' AND (${ip:sqlstring}='' OR local_ip=${ip:sqlstring} OR subscriber_ip=${ip:sqlstring})"
         }
       ],
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      }
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "IPs do provedor em listas de bloqueio (agora)",
+      "description": "Atualizado de hora em hora (DNSBL e AbuseIPDB a cada 6 h). Provável responsável = assinante com mais fluxos de saída para as portas típicas do abuso nas últimas 48 h.",
+      "gridPos": {
+        "x": 0,
+        "y": 3,
+        "w": 24,
+        "h": 9
+      },
+      "links": [],
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true,
+        "zebraStriping": false
+      },
       "fieldConfig": {
         "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": 0,
+                "color": "green"
+              },
+              {
+                "value": 80,
+                "color": "red"
+              }
+            ]
+          },
           "color": {
             "mode": "palette-classic"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "color-background"
+            },
+            "filterable": true,
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false
           }
         },
         "overrides": [
@@ -318,23 +470,7 @@
           }
         ]
       },
-      "options": {}
-    },
-    {
-      "id": 7,
-      "title": "Quem mais originou ataques (assinante ou IP dedicado)",
-      "type": "table",
-      "datasource": {
-        "type": "mysql",
-        "uid": "orbymon-mysql"
-      },
-      "description": "IP privado 100.64.x = assinante CGNAT (identificado pelo log NAT do A10). Os eventos ficam guardados.",
-      "gridPos": {
-        "x": 0,
-        "y": 16,
-        "w": 24,
-        "h": 10
-      },
+      "transparent": true,
       "targets": [
         {
           "refId": "A",
@@ -342,15 +478,61 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT IF(subscriber_ip='',local_ip,subscriber_ip) AS 'Assinante / IP',MAX(local_ip) AS 'IP público',MAX(pool) AS 'Pool',COUNT(*) AS 'Eventos',GROUP_CONCAT(DISTINCT rule_name ORDER BY rule_name SEPARATOR ', ') AS 'Tipos',MAX(pps) AS 'Pico pps',MAX(mbps)*1000000 AS 'Pico taxa',MIN(event_time) AS 'Primeiro (UTC)',MAX(event_time) AS 'Último (UTC)' FROM orby_attack_events WHERE $__timeFilter(event_time) AND direction='out' AND (${ip:sqlstring}='' OR local_ip=${ip:sqlstring} OR subscriber_ip=${ip:sqlstring}) GROUP BY IF(subscriber_ip='',local_ip,subscriber_ip) ORDER BY COUNT(*) DESC LIMIT 100",
+          "editorMode": "code",
           "format": "table",
-          "editorMode": "code"
+          "rawSql": "SELECT entry AS 'IP / bloco',CASE scope WHEN 'cgnat_pool' THEN CONCAT('pool CGNAT ',pool) WHEN 'dedicated' THEN 'IP dedicado' WHEN 'infra' THEN 'infraestrutura' ELSE scope END AS 'Tipo',GROUP_CONCAT(DISTINCT source_label ORDER BY source_label SEPARATOR ', ') AS 'Listas',GROUP_CONCAT(DISTINCT category ORDER BY category SEPARATOR '; ') AS 'Motivo',MAX(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(detail,'$.suspeitos[0].ip')),JSON_UNQUOTE(JSON_EXTRACT(detail,'$.eventos[0].ip')),'')) AS 'Provável responsável',MIN(first_seen) AS 'Listado desde (UTC)',MAX(last_seen) AS 'Visto (UTC)' FROM orby_reputation_listings WHERE removed_at IS NULL AND (${ip:sqlstring}='' OR entry=${ip:sqlstring} OR JSON_SEARCH(detail,'one',${ip:sqlstring}) IS NOT NULL) GROUP BY entry,scope,pool ORDER BY COUNT(*) DESC,entry LIMIT 200"
         }
       ],
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      }
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "title": "Top Mais originou ataques ",
+      "description": "IP privado 100.64.x = assinante CGNAT (identificado pelo log NAT do A10). Os eventos ficam guardados.",
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 24,
+        "h": 6
+      },
+      "links": [],
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true,
+        "zebraStriping": false
+      },
       "fieldConfig": {
         "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": 0,
+                "color": "green"
+              },
+              {
+                "value": 80,
+                "color": "red"
+              }
+            ]
+          },
           "color": {
             "mode": "palette-classic"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "color-background"
+            },
+            "filterable": true,
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false
           }
         },
         "overrides": [
@@ -400,23 +582,7 @@
           }
         ]
       },
-      "options": {}
-    },
-    {
-      "id": 8,
-      "title": "Ataques originados por hora",
-      "type": "timeseries",
-      "datasource": {
-        "type": "mysql",
-        "uid": "orbymon-mysql"
-      },
-      "description": "",
-      "gridPos": {
-        "x": 0,
-        "y": 26,
-        "w": 14,
-        "h": 9
-      },
+      "transparent": true,
       "targets": [
         {
           "refId": "A",
@@ -424,49 +590,172 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT $__timeGroupAlias(event_time,'1h'),rule_name AS metric,COUNT(*) AS value FROM orby_attack_events WHERE $__timeFilter(event_time) AND direction='out' AND (${ip:sqlstring}='' OR local_ip=${ip:sqlstring} OR subscriber_ip=${ip:sqlstring}) GROUP BY 1,rule_name ORDER BY 1",
-          "format": "time_series",
-          "editorMode": "code"
+          "editorMode": "code",
+          "format": "table",
+          "rawSql": "SELECT IF(subscriber_ip='',local_ip,subscriber_ip) AS 'Assinante / IP',MAX(local_ip) AS 'IP público',MAX(pool) AS 'Pool',COUNT(*) AS 'Eventos',GROUP_CONCAT(DISTINCT rule_name ORDER BY rule_name SEPARATOR ', ') AS 'Tipos',MAX(pps) AS 'Pico pps',MAX(mbps)*1000000 AS 'Pico taxa',MIN(event_time) AS 'Primeiro (UTC)',MAX(event_time) AS 'Último (UTC)' FROM orby_attack_events WHERE $__timeFilter(event_time) AND direction='out' AND (${ip:sqlstring}='' OR local_ip=${ip:sqlstring} OR subscriber_ip=${ip:sqlstring}) GROUP BY IF(subscriber_ip='',local_ip,subscriber_ip) ORDER BY COUNT(*) DESC LIMIT 100"
         }
       ],
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Ataques originados por hora",
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 14,
+        "h": 7
+      },
+      "links": [],
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
       "fieldConfig": {
         "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": 0,
+                "color": "green"
+              },
+              {
+                "value": 80,
+                "color": "red"
+              }
+            ]
+          },
           "color": {
-            "mode": "palette-classic"
+            "mode": "continuous-GrYlRd",
+            "seriesBy": "last"
           },
           "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "bars",
             "fillOpacity": 70,
+            "gradientMode": "scheme",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
             "stacking": {
-              "mode": "normal"
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
             }
-          },
-          "unit": "short"
+          }
         },
         "overrides": []
       },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "right"
+      "transparent": true,
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawSql": "SELECT $__timeGroupAlias(event_time,'1h'),rule_name AS metric,COUNT(*) AS value FROM orby_attack_events WHERE $__timeFilter(event_time) AND direction='out' AND (${ip:sqlstring}='' OR local_ip=${ip:sqlstring} OR subscriber_ip=${ip:sqlstring}) GROUP BY 1,rule_name ORDER BY 1"
         }
+      ],
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
       }
     },
     {
       "id": 9,
-      "title": "Ataques originados por tipo",
       "type": "piechart",
-      "datasource": {
-        "type": "mysql",
-        "uid": "orbymon-mysql"
-      },
+      "title": "Ataques originados por tipo",
       "description": "",
       "gridPos": {
         "x": 14,
-        "y": 26,
+        "y": 18,
         "w": 10,
-        "h": 9
+        "h": 7
       },
+      "links": [],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "values": [
+            "value"
+          ]
+        },
+        "pieType": "pie",
+        "reduceOptions": {
+          "calcs": [
+            "sum"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "sort": "desc",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic",
+            "fixedColor": "#73BF69"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          }
+        },
+        "overrides": []
+      },
+      "transparent": true,
       "targets": [
         {
           "refId": "A",
@@ -474,50 +763,65 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT rule_name AS metric,COUNT(*) AS value FROM orby_attack_events WHERE $__timeFilter(event_time) AND direction='out' AND (${ip:sqlstring}='' OR local_ip=${ip:sqlstring} OR subscriber_ip=${ip:sqlstring}) GROUP BY rule_name",
+          "editorMode": "code",
           "format": "table",
-          "editorMode": "code"
+          "rawSql": "SELECT rule_name AS metric,COUNT(*) AS value FROM orby_attack_events WHERE $__timeFilter(event_time) AND direction='out' AND (${ip:sqlstring}='' OR local_ip=${ip:sqlstring} OR subscriber_ip=${ip:sqlstring}) GROUP BY rule_name"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "values": true,
-          "calcs": [
-            "sum"
-          ]
-        },
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "values": [
-            "value"
-          ]
-        }
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
       }
     },
     {
       "id": 10,
-      "title": "Saída suspeita: muitos destinos na mesma porta (48 h, amostrado)",
       "type": "table",
-      "datasource": {
-        "type": "mysql",
-        "uid": "orbymon-mysql"
-      },
+      "title": "Saída suspeita: muitos destinos na mesma porta (48 h, amostrado)",
       "description": "Clientes falando com dezenas de destinos em portas de SSH, Telnet, SMTP, SMB, RDP, SQL, SIP ou MikroTik (8291) costumam estar infectados ou sendo usados para spam/varredura — é o que gera denúncias. NetFlow 1:2048: o número real de destinos é maior.",
       "gridPos": {
         "x": 0,
-        "y": 35,
+        "y": 25,
         "w": 24,
-        "h": 10
+        "h": 6
       },
+      "links": [],
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true,
+        "zebraStriping": false
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": 0,
+                "color": "green"
+              },
+              {
+                "value": 80,
+                "color": "red"
+              }
+            ]
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "color-background"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false
+          }
+        },
+        "overrides": []
+      },
+      "transparent": true,
       "targets": [
         {
           "refId": "A",
@@ -525,73 +829,93 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT IF(subscriber_ip='',local_ip,subscriber_ip) AS 'Assinante / IP',local_ip AS 'IP público',remote_port AS 'Porta',protocol AS 'Proto',COUNT(DISTINCT remote_ip) AS 'Destinos distintos',SUM(flows) AS 'Fluxos' FROM orby_flow_minute WHERE source='huawei' AND direction='out' AND bucket_utc>=UTC_TIMESTAMP()-INTERVAL 2 DAY AND remote_port IN (22,23,25,445,465,587,1433,2323,3306,3389,5060,5900,8291) AND (${ip:sqlstring}='' OR local_ip=${ip:sqlstring} OR subscriber_ip=${ip:sqlstring}) GROUP BY 1,local_ip,remote_port,protocol HAVING COUNT(DISTINCT remote_ip)>=20 ORDER BY COUNT(DISTINCT remote_ip) DESC LIMIT 100",
+          "editorMode": "code",
           "format": "table",
-          "editorMode": "code"
+          "rawSql": "SELECT IF(subscriber_ip='',local_ip,subscriber_ip) AS 'Assinante / IP',local_ip AS 'IP público',remote_port AS 'Porta',protocol AS 'Proto',COUNT(DISTINCT remote_ip) AS 'Destinos distintos',SUM(flows) AS 'Fluxos' FROM orby_flow_minute WHERE source='huawei' AND direction='out' AND bucket_utc>=UTC_TIMESTAMP()-INTERVAL 2 DAY AND remote_port IN (22,23,25,445,465,587,1433,2323,3306,3389,5060,5900,8291) AND (${ip:sqlstring}='' OR local_ip=${ip:sqlstring} OR subscriber_ip=${ip:sqlstring}) GROUP BY 1,local_ip,remote_port,protocol HAVING COUNT(DISTINCT remote_ip)>=20 ORDER BY COUNT(DISTINCT remote_ip) DESC LIMIT 100"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": []
-      },
-      "options": {}
-    },
-    {
-      "id": 11,
-      "title": "Histórico de listagens (saíram das listas)",
-      "type": "table",
       "datasource": {
         "type": "mysql",
         "uid": "orbymon-mysql"
-      },
-      "description": "",
-      "gridPos": {
-        "x": 0,
-        "y": 45,
-        "w": 14,
-        "h": 8
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "mysql",
-            "uid": "orbymon-mysql"
-          },
-          "rawSql": "SELECT entry AS 'IP / bloco',source_label AS 'Lista',category AS 'Motivo',first_seen AS 'Desde (UTC)',removed_at AS 'Saiu (UTC)' FROM orby_reputation_listings WHERE removed_at IS NOT NULL AND (${ip:sqlstring}='' OR entry=${ip:sqlstring}) ORDER BY removed_at DESC LIMIT 200",
-          "format": "table",
-          "editorMode": "code"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": []
-      },
-      "options": {}
+      }
     },
     {
       "id": 12,
-      "title": "Situação das fontes",
       "type": "table",
-      "datasource": {
-        "type": "mysql",
-        "uid": "orbymon-mysql"
-      },
+      "title": "Situação das fontes",
       "description": "",
       "gridPos": {
-        "x": 14,
-        "y": 45,
-        "w": 10,
-        "h": 8
+        "x": 0,
+        "y": 31,
+        "w": 24,
+        "h": 9
       },
+      "links": [],
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true,
+        "zebraStriping": false
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": 0,
+                "color": "green"
+              },
+              {
+                "value": 80,
+                "color": "red"
+              }
+            ]
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "color-background"
+            },
+            "filterable": true,
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "scope": "series",
+              "options": "Situação"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 154
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "scope": "series",
+              "options": "Entradas"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 102
+              }
+            ]
+          }
+        ]
+      },
+      "transparent": true,
       "targets": [
         {
           "refId": "A",
@@ -599,20 +923,82 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT source AS 'Fonte',status AS 'Situação',last_ok AS 'Última com sucesso (UTC)',entries AS 'Entradas',matched AS 'Nos seus blocos',error AS 'Erro' FROM orby_reputation_sources ORDER BY status DESC,source",
+          "editorMode": "code",
           "format": "table",
-          "editorMode": "code"
+          "rawSql": "SELECT source AS 'Fonte',status AS 'Situação',last_ok AS 'Última com sucesso (UTC)',entries AS 'Entradas',matched AS 'Nos seus blocos',error AS 'Erro' FROM orby_reputation_sources ORDER BY status DESC,source"
         }
       ],
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      }
+    },
+    {
+      "id": 11,
+      "type": "table",
+      "title": "Histórico de listagens (saíram das listas)",
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 24,
+        "h": 4
+      },
+      "links": [],
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true,
+        "zebraStriping": false
+      },
       "fieldConfig": {
         "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": 0,
+                "color": "green"
+              },
+              {
+                "value": 80,
+                "color": "red"
+              }
+            ]
+          },
           "color": {
             "mode": "palette-classic"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "color-background"
+            },
+            "filterable": true,
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false
           }
         },
         "overrides": []
       },
-      "options": {}
+      "transparent": true,
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawSql": "SELECT entry AS 'IP / bloco',source_label AS 'Lista',category AS 'Motivo',first_seen AS 'Desde (UTC)',removed_at AS 'Saiu (UTC)' FROM orby_reputation_listings WHERE removed_at IS NOT NULL AND (${ip:sqlstring}='' OR entry=${ip:sqlstring}) ORDER BY removed_at DESC LIMIT 200"
+        }
+      ],
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      }
     }
   ]
 }

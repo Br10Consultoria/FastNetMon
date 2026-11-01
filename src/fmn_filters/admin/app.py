@@ -259,6 +259,10 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
                     meta[cidr] = {"name": name[:64], "max_users_per_ip": users}
                 new_prof["cgnat_pools"], new_prof["cgnat_pool_metadata"] = pools, meta
                 config.save_network(new_cfg, new_prof)
+                try:
+                    store.sync_prefixes(new_cfg, new_prof)          # dashboards usam os blocos novos
+                except Exception as exc:                             # nao desfaz a configuracao salva
+                    flash("Aviso: blocos dos dashboards não atualizados (%s)." % str(exc)[:120])
                 return {"antes": _net_summary(cfg, profile), "depois": _net_summary(new_cfg, new_prof)}
             safe("rede_alterada", apply, "Rede salva. Os serviços usam a configuração nova no próximo ciclo.")
             return redirect(url_for("network"))
@@ -523,6 +527,72 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
                 error = str(exc)
         return render_template("investigate.html", form=form, results=results, history=history, error=error,
                                tz=tz, tz_choices=TZ_CHOICES, ts=al.fmt_ts)
+
+    # ---------------------------------------------------------------- analise avancada (nfdump)
+    @app.route("/analise", methods=["GET", "POST"])
+    def analysis():
+        from datetime import datetime as dt, timedelta as td, timezone as dt_timezone
+        from zoneinfo import ZoneInfo
+        from .. import flow_query as fq
+        from ..abuse_lookup import fmt_ts, parse_time
+        from ..bidir_config import build_scopes
+        f = request.form if request.method == "POST" else request.args
+        saved = store.saved_filters()
+        form = {k: f.get(k, "") for k in ("expr", "start", "end", "name", "description")}
+        form["mode"] = f.get("mode") if f.get("mode") in fq.MODES else "dstip"
+        form["order"] = f.get("order") if f.get("order") in fq.ORDERS else "bytes"
+        form["limit"] = f.get("limit") or "20"
+        form["period"] = f.get("period") if f.get("period") in ("15", "60", "180", "360", "1440", "custom") else "60"
+        form["tz"] = f.get("tz") if f.get("tz") in TZ_CHOICES else "America/Sao_Paulo"
+        tz = dt_timezone.utc if form["tz"] == "UTC" else ZoneInfo(form["tz"])
+        if f.get("f"):
+            chosen = next((x for x in saved if str(x["id"]) == f.get("f")), None)
+            if chosen:
+                form["expr"] = chosen["expr"]
+        result, error, chart = None, None, ""
+        action = f.get("action", "")
+        if request.method == "POST" and action == "salvar":
+            def apply():
+                name = form["name"].strip()
+                if not 3 <= len(name) <= 80:
+                    raise ValueError("nome do filtro entre 3 e 80 caracteres")
+                if not form["expr"].strip() or len(form["expr"]) > fq.MAX_EXPR:
+                    raise ValueError("filtro vazio ou longo demais")
+                store.save_filter(name, form["expr"].strip(), form["description"].strip()[:300], g.user["username"])
+                return {"nome": name, "filtro": form["expr"].strip()}
+            safe("filtro_salvo", apply, "Filtro salvo.")
+            saved = store.saved_filters()
+        elif request.method == "POST" and action == "excluir":
+            def apply_del():
+                if not store.delete_filter(int(f.get("fid", "0"))):
+                    raise ValueError("só filtros criados por usuários podem ser excluídos")
+                return "filtro %s" % f.get("fid")
+            safe("filtro_excluido", apply_del, "Filtro excluído.")
+            return redirect(url_for("analysis"))
+        elif form["expr"].strip() and (request.method == "POST" or f.get("run")):
+            try:
+                cfg = config.bidir()
+                profile = config.profile(cfg)
+                if form["period"] == "custom":
+                    start, end = parse_time(form["start"], tz), parse_time(form["end"], tz)
+                    if not start or not end:
+                        raise fq.QueryError("início/fim com formato inválido (ex.: 2026-11-01 10:00)")
+                else:
+                    end = dt.now(dt_timezone.utc).replace(tzinfo=None, microsecond=0)
+                    start = end - td(minutes=int(form["period"]))
+                result = fq.run(form["expr"], start, end, form["mode"], form["order"], int(form["limit"]),
+                                config.p.flow_root / cfg["source"], fq.macros(cfg, profile),
+                                lock_path=str(config.p.query_lock))
+                fq.annotate(result, build_scopes(cfg, profile), {int(i): n for i, n in store.interfaces()})
+                chart = fq.svg_series(result.series)
+                audit("analise", "%s | %s | %s a %s" % (form["mode"], form["expr"][:500], start, end))
+            except (fq.QueryError, ValueError) as exc:
+                error = str(exc)
+        macro_names = ["@rede", "@src_rede", "@dst_rede", "@pools", "@src_pools", "@dst_pools",
+                       "@assinantes", "@src_assinantes", "@dst_assinantes", "@infra"]
+        return render_template("analysis.html", form=form, result=result, error=error, chart=chart, saved=saved,
+                               modes=fq.MODES, orders=fq.ORDERS, tz=tz, tz_choices=TZ_CHOICES, ts=fmt_ts,
+                               human=fq.human, macro_names=macro_names)
 
     return app
 

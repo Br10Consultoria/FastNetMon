@@ -26,6 +26,8 @@ class Paths:
         self.backups = Path(env.get("ORBYMON_ADMIN_BACKUP_DIR", "/var/lib/orbymon/admin/backups"))
         self.reputation = Path(env.get("ORBYMON_REPUTATION_ENV", "/etc/orbymon/reputation.env"))
         self.nat_dir = Path(env.get("ORBYMON_NAT_DIR", "/var/log/orbymon/a10nat"))
+        self.flow_root = Path(env.get("ORBYMON_FLOW_ROOT", "/var/lib/orbymon/flows"))
+        self.query_lock = Path(env.get("ORBYMON_QUERY_LOCK", "/var/lib/orbymon/admin/query.lock"))
 
 
 def read_env(path: Path) -> dict:

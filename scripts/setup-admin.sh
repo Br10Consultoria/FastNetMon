@@ -53,6 +53,8 @@ setfacl -m u:orbymon-admin:x /etc/orbymon /var/lib/orbymon
 echo "=== Banco de dados ==="
 mariadb orbymon < "$BASE/sql/admin.sql"
 mariadb orbymon < "$BASE/sql/interface_names.sql"
+mariadb orbymon < "$BASE/sql/saved_filters.sql"
+mariadb orbymon < "$BASE/sql/net_prefixes.sql"
 ADMIN_ENV=/etc/orbymon/admin.env
 DB_PASS=""
 [[ -s "$ADMIN_ENV" ]] && DB_PASS=$(sed -n "s/^ORBYMON_ADMIN_DB_PASSWORD='\(.*\)'$/\1/p" "$ADMIN_ENV")
@@ -65,6 +67,8 @@ GRANT INSERT, UPDATE, DELETE ON orbymon.orby_admin_users TO 'orbymon_admin'@'127
 GRANT INSERT, DELETE ON orbymon.orby_admin_login_fail TO 'orbymon_admin'@'127.0.0.1';
 GRANT INSERT ON orbymon.orby_admin_audit TO 'orbymon_admin'@'127.0.0.1';
 GRANT INSERT, UPDATE, DELETE ON orbymon.orby_interface_names TO 'orbymon_admin'@'127.0.0.1';
+GRANT INSERT, UPDATE, DELETE ON orbymon.orby_saved_filters TO 'orbymon_admin'@'127.0.0.1';
+GRANT INSERT, DELETE ON orbymon.orby_net_prefixes TO 'orbymon_admin'@'127.0.0.1';
 SQL
 install -d -o root -g orbymon-admin -m 0750 /etc/orbymon/admin-tls
 SECRET=/etc/orbymon/admin-secret
@@ -85,6 +89,8 @@ ORBYMON_CALIBRATION_DIR='/var/lib/orbymon/calibration'
 ORBYMON_ADMIN_BACKUP_DIR='/var/lib/orbymon/admin/backups'
 ORBYMON_REPUTATION_ENV='/etc/orbymon/reputation.env'
 ORBYMON_NAT_DIR='/var/log/orbymon/a10nat'
+ORBYMON_FLOW_ROOT='/var/lib/orbymon/flows'
+ORBYMON_QUERY_LOCK='/var/lib/orbymon/admin/query.lock'
 ENV
 
 echo "=== Arquivos de configuracao editaveis pelo painel ==="
@@ -133,6 +139,13 @@ if [[ -d /var/log/orbymon/a10nat ]]; then
   setfacl -d -m u:orbymon-admin:r /var/log/orbymon/a10nat
   find /var/log/orbymon/a10nat -maxdepth 1 -type f -exec setfacl -m u:orbymon-admin:r {} +
 fi
+
+echo "=== Leitura dos arquivos de fluxo (pagina Analise) ==="
+if [[ -d /var/lib/orbymon/flows ]]; then
+  setfacl -m u:orbymon-admin:rx /var/lib/orbymon/flows
+  find /var/lib/orbymon/flows -mindepth 1 -maxdepth 1 -type d -exec setfacl -m u:orbymon-admin:rx -m d:u:orbymon-admin:r {} +
+fi
+command -v nfdump >/dev/null || echo "AVISO: nfdump ausente (apt install nfdump) - a pagina Analise nao funciona sem ele"
 
 echo "=== Certificado TLS ==="
 TLS=/etc/orbymon/admin-tls

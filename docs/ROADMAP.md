@@ -1,52 +1,43 @@
-# Roadmap — FastNetMon Combined Filters
+# Próximas etapas (OrbyMon → OrbyFlow)
 
-## Fase 0: POC v0.1.0
+Ordem pensada para deixar **detecção e alarmes certeiros antes da mitigação**.
 
-- [x] Regras AND/OR com CIDR, IP, portas, protocolos, TCP flags e exclusões
-- [x] Janelas PPS, Mbps, fluxos/s, requisições/s e fontes únicas
-- [x] Ingestão NDJSON e nfdump JSON
-- [x] HTTP/PHP baseado em logs (não é inspeção de payload criptografado)
-- [x] Watcher de arquivos rotacionados e checkpoint SQLite
-- [x] Alertas JSON em modo somente leitura e 15 testes unitários
+## Feito
+- Detecção bidirecional CGNAT-aware, calibração, Telegram, painel com 2FA.
+- Investigação de denúncias (log NAT do A10), reputação (listas, DNSBL, AbuseIPDB).
+- Análise avançada com filtros nfdump e filtros salvos; dashboards padronizados a partir do export
+  validado em produção (`grafana/exports`) e sem blocos fixos do provedor (`orby_net_prefixes`).
 
-## Fase 1: coleta e compatibilidade
+## 1. Regras de detecção por filtro (próxima)
+- Regra = filtro nfdump salvo + condições (bps, pps, fluxos, bytes/pacote) + sentido + interfaces.
+- Gatilho fixo **ou relativo à média recente** (ex.: 300% acima dos últimos 15 min do mesmo filtro).
+- Incidente com estados aberto → resfriamento → resolvido, histórico/gráfico por regra.
+- No aviso do Telegram: top alvos e top origens do incidente (agregação), já com o assinante CGNAT.
 
-- [ ] Validar NetFlow v9 e IPFIX reais de MikroTik, Huawei, Cisco e Juniper
-- [ ] Adicionar ingestão de sFlow/IPFIX em streaming com limites de recursos
-- [ ] Tratar amostragem, duplicações, timestamps fora de ordem e atrasos
-- [ ] Testar desempenho em cenários reais de 1/10/40/100Gbps
-- [ ] Usar serviço systemd sem root, healthchecks, persistência e retenção
-- [ ] Reduzir consumo de memória no parsing nfdump
-- [ ] Separar SYN de SYN-ACK, confirmar limites reais de coleta
+## 2. Base de comportamento (menos falso positivo)
+- Linha de base por IP/pool/porta por hora do dia e dia da semana; limites dinâmicos que substituem a
+  calibração diária fixa.
+- Lista de exceções (CDNs, DNS próprios, Google/Meta, servidores do provedor) por grupo.
+- Exportação NetStream com *active timeout* menor (ex.: 60 s) para detectar em ~1 minuto.
 
-## Fase 2: regras multioperadora
+## 3. Clientes
+- Cadastro "Meus clientes" (prefixos dedicados, nome) e consulta ao RADIUS/BRAS para transformar
+  100.64.x + horário em login PPPoE.
+- Relatório por cliente (o que ele originou/recebeu) para enviar junto com a notificação de abuso.
 
-- [ ] Políticas por cliente, hostgroup, ASN, IP/prefixo e exceções
-- [ ] Correlação NetFlow + HTTP/WAF
-- [ ] DNS L7 baseado em logs/sondas (QNAME, QTYPE, NXDOMAIN, RCODE)
-- [ ] Baseline adaptativo por hora, porta e prefixo
-- [ ] IDs persistentes de incidentes, deduplicação e trilha de auditoria
+## 4. Ferramentas
+- RDAP/whois, busca de AS por nome (base GeoLite2-ASN local), prefixos anunciados por AS (RIPEstat),
+  ping/traceroute e diagnóstico DNS a partir do servidor.
 
-## Fase 3: operação
+## 5. Operação
+- Várias fontes (outros roteadores), e-mail e webhook, página de saúde (atraso de coleta, disco,
+  serviços), exportar/importar configuração.
 
-- [ ] API autenticada e dashboard
-- [ ] Prometheus, Zabbix, Grafana, Telegram e webhook
-- [ ] Replays seguros de telemetria para testes
+## 6. Mitigação (última)
+- Blackhole (RTBH) e FlowSpec para o NE8000 a partir dos incidentes, com aprovação manual primeiro,
+  whitelist/blacklist, retirada automática ao resolver.
 
-## Fase 4: mitigação assistida
-
-- [ ] Integrar FlowSpec/RTBH com GoBGP/controlador independente
-- [ ] Aprovação humana, allowlist, RBAC, TTL, rollback e auditoria
-- [ ] Homologar upstream e medir impacto em tráfego legítimo
-
-**Nunca acionar mitigação apenas com a POC.** Ataques acima do link contratado precisam de ação do provedor de trânsito / upstream.
-
-## Fase 5: bidirecional e CGNAT (etapa 1 implementada, ver BIDIRECTIONAL.md)
-
-- [x] Receptor NAT do A10 com framing RFC5424 correto e consulta IP publico:porta -> IP privado
-- [x] Rollup in/out com escopo (dedicado, pool CGNAT, IP privado), porta de servico e SYN
-- [x] Detector de ataque recebido e originado, limites por escopo, soma entre interfaces
-- [x] Regras nao amostradas por alocacao de portas NAT
-- [ ] Homologar SQL em MariaDB real e calibrar limites com trafego real
-- [ ] Etapa 2: consulta do cliente e verificacao em listas de IPs nao seguros
-- [ ] Dashboard Grafana F4; detector em tempo real (segundos)
+## Renomear para OrbyFlow
+1. Nome visível (painel, Grafana, Telegram, documentação).
+2. Identificadores internos (`/etc/orbymon`, serviços `orbymon-*`, banco/tabelas, usuários) com
+   migração assistida e janela de manutenção.

@@ -64,6 +64,8 @@ O instalador configura HTTPS autofirmado na porta 3000, datasource somente leitu
 
 **Painel web de administração:** página própria em HTTPS (porta 8443, separada do Grafana) com usuário, senha e 2FA para configurar provedor, ASNs, blocos, pools CGNAT, bordas, regras, Telegram e retenção: `sudo bash scripts/setup-admin.sh`. Veja [docs/ADMIN.md](docs/ADMIN.md).
 
+**Análise avançada:** filtros nfdump com atalhos da rede (`@dst_rede`, `@src_pools`...), filtros salvos e top IPs/portas/AS/interfaces no painel — [docs/ANALISE.md](docs/ANALISE.md). **Dashboards:** gerados do export validado em produção (`grafana/exports` → `python3 grafana/import_v2.py`). Próximas etapas: [docs/ROADMAP.md](docs/ROADMAP.md).
+
 **Etapa 2 — denúncias de abuso e reputação:** página *Investigar* (denúncia com IP, horário e porta → assinante atrás do CGNAT, pelo log NAT do A10) e monitoramento de hora em hora de listas de bloqueio, DNSBL e AbuseIPDB, com o assinante provável e aviso no Telegram: `sudo bash scripts/setup-reputation.sh`. Veja [docs/REPUTACAO.md](docs/REPUTACAO.md).
 
 **Alertas no Telegram (F4):** início, lembrete e encerramento de cada ataque, com assinante CGNAT e link para o painel: `sudo bash scripts/setup-telegram.sh`. Veja [docs/BIDIRECTIONAL.md](docs/BIDIRECTIONAL.md).
