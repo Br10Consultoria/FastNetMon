@@ -295,17 +295,20 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT src_latitude AS latitude, src_longitude AS longitude, src_country AS country, src_asn_name AS asn_name, src_ip AS source_ip, dst_ip AS destination_ip, rule_name AS attack_type, event_time AS timestamp FROM orby_alerts WHERE $__timeFilter(event_time) AND src_ip IS NOT NULL AND src_latitude IS NOT NULL AND src_longitude IS NOT NULL ORDER BY event_time DESC LIMIT 3000",
+          "rawSql": "SELECT a.src_latitude AS latitude,a.src_longitude AS longitude,COALESCE(cn.name,NULLIF(a.src_country,''),'Não informado') AS 'País',a.src_asn AS 'ASN',a.src_asn_name AS 'Nome',a.src_ip AS 'IP origem',a.dst_ip AS 'IP destino',a.rule_name AS 'Regra',a.pps AS 'Pacotes/s',a.event_time AS 'Data UTC' FROM orby_alerts AS a LEFT JOIN orby_country_names AS cn ON cn.code=a.src_country WHERE $__timeFilter(a.event_time) AND a.src_ip IS NOT NULL AND a.src_latitude IS NOT NULL AND a.src_longitude IS NOT NULL ORDER BY a.event_time DESC LIMIT 3000",
           "format": "table",
           "editorMode": "code"
         }
       ],
       "options": {
         "view": {
-          "id": "coords",
-          "lat": 0,
-          "lon": 0,
-          "zoom": 1
+          "id": "fit",
+          "allLayers": true,
+          "padding": 10,
+          "maxZoom": 6,
+          "lat": -14,
+          "lon": -51,
+          "zoom": 3
         },
         "basemap": {
           "type": "default",
@@ -324,23 +327,59 @@
             "config": {
               "style": {
                 "size": {
-                  "fixed": 7
+                  "fixed": 7,
+                  "min": 5,
+                  "max": 26
                 },
                 "color": {
-                  "fixed": "#FF891A"
+                  "fixed": "#E02F44"
+                },
+                "opacity": 0.7,
+                "symbol": {
+                  "mode": "fixed",
+                  "fixed": "img/icons/marker/circle.svg"
                 }
-              }
+              },
+              "showLegend": true
             }
           }
-        ]
+        ],
+        "controls": {
+          "showZoom": true,
+          "mouseWheelZoom": true,
+          "showAttribution": true,
+          "showScale": false,
+          "showMeasure": false,
+          "showDebug": false
+        },
+        "tooltip": {
+          "mode": "details"
+        }
       },
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "mode": "continuous-YlRd"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Pacotes/s"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "pps"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          }
+        ]
       },
       "description": "Este painel mostra apenas incidentes com IP de origem geolocalizado. Ficar vazio quando não existem alertas é esperado."
     },
@@ -365,7 +404,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT src_asn AS 'ASN', COALESCE(MAX(NULLIF(src_asn_name,'')),'Não identificado') AS 'Organização', CASE WHEN COUNT(DISTINCT NULLIF(src_country,''))>1 THEN 'Vários' ELSE COALESCE(MAX(NULLIF(src_country,'')),'Não informado') END AS 'País', ROUND(SUM(total_bytes),0) AS 'Volume estimado', ROUND(SUM(total_packets),0) AS 'Pacotes estimados' FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND src_asn>0 GROUP BY src_asn ORDER BY SUM(total_bytes) DESC LIMIT 25",
+          "rawSql": "SELECT t.asn AS 'ASN',t.nome AS 'Nome',t.blocos AS 'Blocos / IPs',t.ips AS 'IPs',CASE WHEN t.paises>1 THEN 'Vários' ELSE COALESCE(cn.name,NULLIF(t.pais,''),'Não informado') END AS 'País',t.vol AS 'Volume',t.bps AS 'Taxa média',t.pps AS 'Pacotes/s médio' FROM (SELECT src_asn AS asn,COALESCE(MAX(NULLIF(src_asn_name,'')),'Não identificado') AS nome,COALESCE(NULLIF(GROUP_CONCAT(DISTINCT NULLIF(src_prefix,'') ORDER BY src_prefix SEPARATOR ', ' LIMIT 3),''),GROUP_CONCAT(DISTINCT src_ip ORDER BY src_ip SEPARATOR ', ' LIMIT 3)) AS blocos,COUNT(DISTINCT src_ip) AS ips,COUNT(DISTINCT NULLIF(src_country,'')) AS paises,MAX(NULLIF(src_country,'')) AS pais,SUM(total_bytes) AS vol,SUM(total_bytes)*8/GREATEST(1,$__unixEpochTo()-$__unixEpochFrom()) AS bps,SUM(total_packets)/GREATEST(1,$__unixEpochTo()-$__unixEpochFrom()) AS pps FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND src_asn>0 GROUP BY src_asn ORDER BY SUM(total_bytes) DESC LIMIT 25) AS t LEFT JOIN orby_country_names AS cn ON cn.code=t.pais ORDER BY t.vol DESC",
           "format": "table",
           "editorMode": "code"
         }
@@ -381,12 +420,44 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Volume estimado"
+              "options": "Volume"
             },
             "properties": [
               {
                 "id": "unit",
                 "value": "decbytes"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Taxa média"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bps"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Pacotes/s médio"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "pps"
               },
               {
                 "id": "decimals",
@@ -418,7 +489,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT src_country AS 'País',ROUND(SUM(total_bytes),0) AS 'Volume estimado' FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND src_country<>'' GROUP BY src_country ORDER BY SUM(total_bytes) DESC LIMIT 15",
+          "rawSql": "SELECT COALESCE(cn.name,NULLIF(t.pais,''),'Não informado') AS 'País',t.vol AS 'Volume' FROM (SELECT src_country AS pais,SUM(total_bytes) AS vol FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND src_country<>'' GROUP BY src_country ORDER BY SUM(total_bytes) DESC LIMIT 15) AS t LEFT JOIN orby_country_names AS cn ON cn.code=t.pais ORDER BY t.vol DESC",
           "format": "table",
           "editorMode": "code"
         }
@@ -435,13 +506,14 @@
         "defaults": {
           "color": {
             "mode": "palette-classic"
-          }
+          },
+          "unit": "decbytes"
         },
         "overrides": [
           {
             "matcher": {
               "id": "byName",
-              "options": "Volume estimado"
+              "options": "Volume"
             },
             "properties": [
               {
@@ -577,7 +649,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT event_time AS 'Data UTC', rule_name AS 'Regra', severity AS 'Severidade', src_ip AS 'IP Origem', dst_ip AS 'IP Destino', CONCAT('AS',src_asn) AS 'ASN', src_asn_name AS 'Organização', src_country AS 'País', ROUND(pps,0) AS 'PPS', ROUND(mbps,2) AS 'Mbps', unique_sources AS 'Fontes' FROM orby_alerts WHERE $__timeFilter(event_time) ORDER BY event_time DESC LIMIT 500",
+          "rawSql": "SELECT a.event_time AS 'Data UTC',a.rule_name AS 'Regra',a.severity AS 'Severidade',a.src_asn AS 'ASN',a.src_asn_name AS 'Nome',a.src_ip AS 'IP origem',a.dst_ip AS 'IP destino',COALESCE(cn.name,NULLIF(a.src_country,''),'Não informado') AS 'País',a.pps AS 'Pacotes/s',a.mbps*1000000 AS 'Taxa',a.unique_sources AS 'Fontes' FROM orby_alerts AS a LEFT JOIN orby_country_names AS cn ON cn.code=a.src_country WHERE $__timeFilter(a.event_time) ORDER BY a.event_time DESC LIMIT 500",
           "format": "table",
           "editorMode": "code"
         }
@@ -589,7 +661,40 @@
             "mode": "palette-classic"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Pacotes/s"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "pps"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Taxa"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bps"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          }
+        ]
       }
     },
     {
@@ -686,17 +791,20 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT src_latitude AS latitude,src_longitude AS longitude,MAX(src_country) AS country,src_asn AS asn,MAX(NULLIF(src_asn_name,'')) AS operator_name,COUNT(DISTINCT src_ip) AS source_ips,ROUND(SUM(total_bytes)/1000000,2) AS volume_mb FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND src_latitude IS NOT NULL AND src_longitude IS NOT NULL GROUP BY src_latitude,src_longitude,src_asn ORDER BY SUM(total_bytes) DESC LIMIT 300",
+          "rawSql": "SELECT t.latitude,t.longitude,COALESCE(cn.name,NULLIF(t.pais,''),'Não informado') AS 'País',t.asn AS 'ASN',t.nome AS 'Nome',t.ips AS 'IPs de origem',t.vol AS 'Volume' FROM (SELECT src_latitude AS latitude,src_longitude AS longitude,src_asn AS asn,COALESCE(MAX(NULLIF(src_asn_name,'')),'Não identificado') AS nome,MAX(NULLIF(src_country,'')) AS pais,COUNT(DISTINCT src_ip) AS ips,SUM(total_bytes) AS vol FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND src_latitude IS NOT NULL AND src_longitude IS NOT NULL GROUP BY src_latitude,src_longitude,src_asn ORDER BY SUM(total_bytes) DESC LIMIT 300) AS t LEFT JOIN orby_country_names AS cn ON cn.code=t.pais ORDER BY t.vol DESC",
           "format": "table",
           "editorMode": "code"
         }
       ],
       "options": {
         "view": {
-          "id": "coords",
-          "lat": 0,
-          "lon": 0,
-          "zoom": 1
+          "id": "fit",
+          "allLayers": true,
+          "padding": 10,
+          "maxZoom": 6,
+          "lat": -14,
+          "lon": -51,
+          "zoom": 3
         },
         "basemap": {
           "type": "default",
@@ -715,23 +823,61 @@
             "config": {
               "style": {
                 "size": {
-                  "fixed": 9
+                  "fixed": 7,
+                  "min": 5,
+                  "max": 26,
+                  "field": "Volume"
                 },
                 "color": {
+                  "field": "Volume",
                   "fixed": "#FF891A"
+                },
+                "opacity": 0.7,
+                "symbol": {
+                  "mode": "fixed",
+                  "fixed": "img/icons/marker/circle.svg"
                 }
-              }
+              },
+              "showLegend": true
             }
           }
-        ]
+        ],
+        "controls": {
+          "showZoom": true,
+          "mouseWheelZoom": true,
+          "showAttribution": true,
+          "showScale": false,
+          "showMeasure": false,
+          "showDebug": false
+        },
+        "tooltip": {
+          "mode": "details"
+        }
       },
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "mode": "continuous-YlRd"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Volume"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "decbytes"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          }
+        ]
       },
       "description": "Origens públicas observadas no NetFlow Huawei, localizadas aproximadamente pela GeoLite2. Não são alertas nem locais exatos. A atualização depende da importação nfcapd → MariaDB."
     },
