@@ -730,6 +730,7 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
                     values["RADIUS_SQL_B64"] = cu.b64e(f.get("sql_text", "").strip())
                     values["RADIUS_HTTP_BODY_B64"] = cu.b64e(f.get("http_body", "").strip())
                     values["RADIUS_HTTP_HEADERS_B64"] = cu.b64e(f.get("http_headers", "").strip())
+                    values["RADIUS_HTTP_PUBLIC_HEADERS_B64"] = cu.b64e(f.get("http_public_headers", "").strip())
                     values["RADIUS_HTTP_INSECURE"] = "1" if f.get("RADIUS_HTTP_INSECURE") == "1" else ""
                     for secret in cu.SECRET_KEYS:                     # vazio = manter o atual
                         if not values[secret]:
@@ -818,10 +819,12 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
         shown = dict(current, RADIUS_MODE=cu._mode(current)) if form_source is None else form_source
         if form_source is None and request.method == "POST" and f.get("action") in ("radius", "testar_fonte", "modelo"):
             shown = {k: f.get(k, "") for k in cu.RADIUS_KEYS}             # erro de validacao: mantem o digitado
-            shown.update(RADIUS_SQL_B64=cu.b64e(f.get("sql_text", "")), RADIUS_HTTP_BODY_B64=cu.b64e(f.get("http_body", "")))
+            shown.update(RADIUS_SQL_B64=cu.b64e(f.get("sql_text", "")), RADIUS_HTTP_BODY_B64=cu.b64e(f.get("http_body", "")),
+                         RADIUS_HTTP_PUBLIC_HEADERS_B64=cu.b64e(f.get("http_public_headers", "")))
         radius_view = {k: shown.get(k, "") for k in cu.RADIUS_KEYS if k not in cu.SECRET_KEYS}
         radius_view.update(sql_text=cu.b64d(shown.get("RADIUS_SQL_B64", "")),
-                           http_body=cu.b64d(shown.get("RADIUS_HTTP_BODY_B64", "")))
+                           http_body=cu.b64d(shown.get("RADIUS_HTTP_BODY_B64", "")),
+                           http_public_headers=cu.b64d(shown.get("RADIUS_HTTP_PUBLIC_HEADERS_B64", "")))
         return render_template("customers.html", items=items or [], installed=items is not None, edit=edit or {},
                                radius=radius_view, has_password=bool(current.get("RADIUS_DB_PASSWORD")),
                                has_headers=bool(cu.b64d(current.get("RADIUS_HTTP_HEADERS_B64", ""))),

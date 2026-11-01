@@ -33,7 +33,7 @@ quem está conectado agora — senão funciona para os avisos em tempo real, mas
 - **URL** e, para POST, **corpo JSON** com marcadores: `{ip}`, `{quando}` (data e hora local no fuso escolhido),
   `{data}`, `{quando_iso}` (UTC), `{epoch}`, e o início da busca 31 dias antes (para sessões longas): `{desde}`,
   `{desde_data}`, `{desde_iso}`. Na URL os valores são codificados; no corpo, escapados para JSON.
-- **Cabeçalhos de autenticação**, um por linha (`Authorization: Bearer …`, `Authorization: Basic …`, ou o que o ERP
+- **Cabeçalhos fixos** (visíveis, ex.: `ixcsoft: listar`) e **cabeçalhos de autenticação**, um por linha (`Authorization: Bearer …`, `Authorization: Basic …`, ou o que o ERP
   pedir). Guardados só para escrita: nunca voltam para a página nem para a auditoria.
 - **Mapeamento da resposta**: caminho da lista (ex.: `registros`; vazio = raiz ou objeto único) e dos campos de
   login, início, fim, MAC, nome do cliente e contrato (aninhados com ponto: `dados.cliente.login`; índice com número: `itens.0`).
@@ -50,7 +50,8 @@ Na página Clientes, **Modelo pronto** + endereço do ERP preenche URL e mapeame
 | ERP | Endpoint | Token |
 |---|---|---|
 | OrbyCore | `GET /api/v1/network/radius/accounting/?assigned_ip={ip}&from={desde_iso}&to={quando_iso}&limit=20` (sessões quentes e arquivadas, com nome do cliente e contrato) | ServiceToken com permissão `network.view` (de preferência com ACL só para o IP do OrbyMon): `Authorization: ServiceToken orby_...` |
-| IXC, SGP | a incluir com os endpoints de histórico de conexões | — |
+| IXC Provedor | `POST /webservice/v1/radacct` com `ixcsoft: listar`, filtro `radacct.framedipaddress = {ip}` e início ≤ horário (`grid_param`), ordenado do mais recente — **confirme com Testar** (tabela/campos podem variar por versão) | `Authorization: Basic <base64 de ID_USUARIO:TOKEN>` |
+| SGP | a incluir | — |
 
 ### Banco de dados
 

@@ -19,7 +19,7 @@ from zoneinfo import ZoneInfo
 
 RADIUS_KEYS = ("RADIUS_MODE", "RADIUS_TZ",
                "RADIUS_HTTP_URL", "RADIUS_HTTP_METHOD", "RADIUS_HTTP_BODY_B64", "RADIUS_HTTP_HEADERS_B64",
-               "RADIUS_HTTP_LIST", "RADIUS_HTTP_LOGIN", "RADIUS_HTTP_START", "RADIUS_HTTP_STOP", "RADIUS_HTTP_MAC",
+               "RADIUS_HTTP_PUBLIC_HEADERS_B64", "RADIUS_HTTP_LIST", "RADIUS_HTTP_LOGIN", "RADIUS_HTTP_START", "RADIUS_HTTP_STOP", "RADIUS_HTTP_MAC",
                "RADIUS_HTTP_NAME", "RADIUS_HTTP_CONTRACT", "RADIUS_HTTP_INSECURE",
                "RADIUS_DB_HOST", "RADIUS_DB_PORT", "RADIUS_DB_NAME", "RADIUS_DB_USER", "RADIUS_DB_PASSWORD",
                "RADIUS_TABLE", "RADIUS_SQL_B64")
@@ -122,6 +122,19 @@ SECRET_KEYS = ("RADIUS_DB_PASSWORD", "RADIUS_HTTP_HEADERS_B64")
 PLACEHOLDERS = ("ip", "quando_iso", "quando", "data", "epoch", "desde_iso", "desde_data", "desde")
 SESSION_LOOKBACK_DAYS = 31
 
+def b64e(text):
+    import base64
+    return base64.b64encode((text or "").encode("utf-8")).decode("ascii")
+
+
+def b64d(text):
+    import base64
+    try:
+        return base64.b64decode((text or "").encode("ascii"), validate=True).decode("utf-8")
+    except Exception:
+        return ""
+
+
 # Modelos prontos: preenchem o formulario; o operador informa o endereco do ERP e o token.
 #   {base} = endereco do ERP (https://erp.exemplo.com.br), sem barra no fim
 PRESETS = {
@@ -137,6 +150,24 @@ PRESETS = {
                    "RADIUS_HTTP_STOP": "ended_at", "RADIUS_HTTP_MAC": "mac_address",
                    "RADIUS_HTTP_NAME": "customer_name", "RADIUS_HTTP_CONTRACT": "contract_number"},
     },
+    "ixc": {
+        "nome": "IXC Provedor",
+        "ajuda": "No IXC, gere o token de API do usuário (Configurações > Usuários > token) com permissão de leitura "
+                 "nas conexões Radius. Cabeçalho: Authorization: Basic <base64 de ID_USUARIO:TOKEN>. Confira com "
+                 "Testar: os nomes da tabela e dos campos podem variar com a versão do IXC.",
+        "header_hint": "Authorization: Basic <base64 de ID_USUARIO:TOKEN>",
+        "values": {"RADIUS_MODE": "http", "RADIUS_HTTP_METHOD": "POST",
+                   "RADIUS_HTTP_URL": "{base}/webservice/v1/radacct",
+                   "RADIUS_HTTP_PUBLIC_HEADERS_B64": b64e("ixcsoft: listar"),
+                   "RADIUS_HTTP_BODY_B64": b64e(
+                       '{"qtype": "radacct.framedipaddress", "query": "{ip}", "oper": "=", "page": "1", "rp": "20", '
+                       '"sortname": "radacct.acctstarttime", "sortorder": "desc", '
+                       '"grid_param": "[{\\"TB\\": \\"radacct.acctstarttime\\", \\"OP\\": \\"<=\\", '
+                       '\\"P\\": \\"{quando}\\"}]"}'),
+                   "RADIUS_HTTP_LIST": "registros", "RADIUS_HTTP_LOGIN": "username",
+                   "RADIUS_HTTP_START": "acctstarttime", "RADIUS_HTTP_STOP": "acctstoptime",
+                   "RADIUS_HTTP_MAC": "callingstationid"},
+    },
 }
 
 
@@ -148,24 +179,13 @@ def apply_preset(name, base):
     if not re.match(r"^https?://[A-Za-z0-9.:\[\]_-]+(/[^\s'\\?#]*)?$", base):
         raise CustomerError("informe o endereço do ERP (ex.: https://erp.exemplo.com.br)")
     out = dict(p["values"])
+    out.setdefault("RADIUS_HTTP_PUBLIC_HEADERS_B64", "")
+    out.setdefault("RADIUS_HTTP_BODY_B64", "")
     out["RADIUS_HTTP_URL"] = out["RADIUS_HTTP_URL"].replace("{base}", base)
     return out
 TABLE_RE = re.compile(r"^[A-Za-z0-9_]{1,64}(\.[A-Za-z0-9_]{1,64})?$")
 FIELD_RE = re.compile(r"^[A-Za-z0-9_.\-]{0,120}$")
 HEADER_RE = re.compile(r"^[A-Za-z0-9-]{1,64}:[^\r\n]{0,2000}$")
-
-
-def b64e(text):
-    import base64
-    return base64.b64encode((text or "").encode("utf-8")).decode("ascii")
-
-
-def b64d(text):
-    import base64
-    try:
-        return base64.b64decode((text or "").encode("ascii"), validate=True).decode("utf-8")
-    except Exception:
-        return ""
 
 
 def _mode(env):
@@ -195,7 +215,7 @@ def validate_radius(env):
         out["RADIUS_HTTP_METHOD"] = (out["RADIUS_HTTP_METHOD"] or "GET").upper()
         if out["RADIUS_HTTP_METHOD"] not in ("GET", "POST"):
             raise CustomerError("método GET ou POST")
-        for line in b64d(out["RADIUS_HTTP_HEADERS_B64"]).splitlines():
+        for line in (b64d(out["RADIUS_HTTP_HEADERS_B64"]) + "\n" + b64d(out["RADIUS_HTTP_PUBLIC_HEADERS_B64"])).splitlines():
             if line.strip() and not HEADER_RE.match(line.strip()):
                 raise CustomerError("cabeçalho inválido (use Nome: valor, um por linha)")
         body = b64d(out["RADIUS_HTTP_BODY_B64"])
@@ -233,6 +253,7 @@ def validate_radius(env):
         out["RADIUS_SQL_B64"] = b64e(sql)
         out["RADIUS_TABLE"] = ""
     for key in ("RADIUS_HTTP_URL", "RADIUS_HTTP_METHOD", "RADIUS_HTTP_BODY_B64", "RADIUS_HTTP_HEADERS_B64",
+                "RADIUS_HTTP_PUBLIC_HEADERS_B64",
                 "RADIUS_HTTP_LIST", "RADIUS_HTTP_LOGIN", "RADIUS_HTTP_START", "RADIUS_HTTP_STOP", "RADIUS_HTTP_MAC",
                 "RADIUS_HTTP_NAME", "RADIUS_HTTP_CONTRACT", "RADIUS_HTTP_INSECURE"):
         out[key] = ""
@@ -380,7 +401,8 @@ class Radius:
                                      headers={"User-Agent": "OrbyMon/1.0", "Accept": "application/json"})
         if data is not None:
             req.add_header("Content-Type", "application/json")
-        for line in b64d(self.env["RADIUS_HTTP_HEADERS_B64"]).splitlines():
+        for line in (b64d(self.cfg["RADIUS_HTTP_PUBLIC_HEADERS_B64"]) + "\n" +
+                     b64d(self.env["RADIUS_HTTP_HEADERS_B64"])).splitlines():
             if ":" in line:
                 k, v = line.split(":", 1)
                 req.add_header(k.strip(), v.strip())

@@ -204,6 +204,29 @@ class SourceTests(unittest.TestCase):
         with self.assertRaises(cu.CustomerError):
             cu.apply_preset("orbycore", "erp sem http")
 
+    def test_ixc_preset(self):
+        env = dict(cu.apply_preset("ixc", "https://ixc.exemplo.com.br"), RADIUS_TZ="America/Bahia",
+                   RADIUS_HTTP_HEADERS_B64=cu.b64e("Authorization: Basic MTIzOnRva2Vu"))
+        payload = {"page": "1", "total": "2", "registros": [
+            {"username": "joao123", "framedipaddress": "100.64.70.12", "acctstarttime": "2026-11-01 08:30:00",
+             "acctstoptime": "0000-00-00 00:00:00", "callingstationid": "AA:BB"},
+            {"username": "antigo", "framedipaddress": "100.64.70.12", "acctstarttime": "2026-10-30 08:00:00",
+             "acctstoptime": "2026-11-01 08:00:00", "callingstationid": "CC:DD"}]}
+        seen = []
+
+        def opener(req, timeout):
+            seen.append(req)
+            return Resp(__import__("json").dumps(payload).encode())
+        got = cu.Radius(env, opener=opener).sessions("100.64.70.12", datetime(2026, 11, 1, 15))
+        self.assertEqual([(x["login"], x["fim"]) for x in got], [("joao123", None)])
+        req = seen[0]
+        self.assertEqual((req.full_url, req.get_method()), ("https://ixc.exemplo.com.br/webservice/v1/radacct", "POST"))
+        self.assertEqual(req.get_header("Ixcsoft"), "listar")
+        self.assertEqual(req.get_header("Authorization"), "Basic MTIzOnRva2Vu")
+        body = __import__("json").loads(req.data)
+        self.assertEqual((body["qtype"], body["query"]), ("radacct.framedipaddress", "100.64.70.12"))
+        self.assertEqual(__import__("json").loads(body["grid_param"])[0]["P"], "2026-11-01 12:00:00")
+
     def test_custom_sql_placeholders(self):
         log = []
         sql = "SELECT c.login, s.inicio, s.fim, s.mac FROM sessoes s JOIN clientes c ON c.id=s.cliente " \

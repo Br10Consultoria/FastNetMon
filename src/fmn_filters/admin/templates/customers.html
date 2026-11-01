@@ -77,7 +77,8 @@ ou no RADIUS. Os dados ficam só no servidor e nos chats privados configurados.<
       <code>{quando_iso}</code> (UTC), <code>{epoch}</code>; início da busca (31 dias antes, para sessões longas):
       <code>{desde}</code>, <code>{desde_data}</code>, <code>{desde_iso}</code>.</p>
     <label>Corpo JSON (só POST) <textarea name="http_body" rows="3" class="mono" placeholder='{"ip": "{ip}", "data_hora": "{quando}"}'>{{ radius.http_body }}</textarea></label>
-    <label>Cabeçalhos de autenticação (um por linha){% if has_headers %} — <small>configurados; vazio = manter</small>{% endif %}
+    <label>Cabeçalhos fixos (não secretos, um por linha) <textarea name="http_public_headers" rows="1" class="mono" placeholder="ixcsoft: listar">{{ radius.http_public_headers }}</textarea></label>
+    <label>Cabeçalhos de autenticação (secretos, um por linha){% if has_headers %} — <small>configurados; vazio = manter</small>{% endif %}
       <textarea name="http_headers" rows="2" class="mono" placeholder="Authorization: Bearer seu-token"></textarea></label>
     <div class="grid">
       <label>Lista na resposta <input name="RADIUS_HTTP_LIST" value="{{ radius.RADIUS_HTTP_LIST }}" placeholder="registros (vazio = raiz)"></label>
