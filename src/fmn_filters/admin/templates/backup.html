@@ -1,0 +1,30 @@
+{% extends "base.html" %}{% block title %}Backup{% endblock %}
+{% block body %}
+<h1>Backup</h1>
+<p class="muted">Todo dia às 03:37 o servidor guarda a configuração (<code>/etc/orbymon</code>, com os segredos), as tabelas de
+configuração (usuários do painel, regras, alarmes, filtros, exceções, clientes, linha de base), o histórico (eventos de ataque,
+incidentes, listas de reputação, auditoria) e o Grafana. Ficam os 14 mais recentes em <code>{{ folder }}</code>. Os arquivos
+contêm segredos: por isso não são baixados pelo painel — copie pelo servidor ou configure a cópia externa.</p>
+{% if files is none %}
+  <p class="flash">Backup não instalado. Rode <code>sudo bash scripts/setup-backup.sh --encrypt</code>.</p>
+{% else %}
+  {% if status %}<p><span class="pill {{ {'ok':'ok','warn':'sev-high','crit':'bad'}.get(status.status, 'idle') }}">{{ status.value }}</span>
+    {% if status.detail %}<small class="warn">{{ status.detail }}</small>{% endif %}</p>{% endif %}
+  <section class="card">
+    {% if files %}<div class="scroll"><table><tr><th>Arquivo</th><th class="num">Tamanho</th><th>Data</th></tr>
+      {% for f in files %}<tr><td><code>{{ f.name }}</code></td><td class="num">{{ '%.1f'|format(f.size / 1048576) }} MB</td><td>{{ f.when }}</td></tr>{% endfor %}
+    </table></div>{% else %}<p class="muted">Nenhum backup ainda.</p>{% endif %}
+  </section>
+{% endif %}
+<section class="card">
+  <h2>Como usar</h2>
+  <ul>
+    <li>Backup agora: <code>sudo systemctl start orbymon-backup</code></li>
+    <li>Ver o conteúdo de um backup (não altera nada): <code>sudo bash /opt/orbymon/scripts/orbymon-restore.sh {{ folder }}/ARQUIVO</code></li>
+    <li>Restaurar: o mesmo comando com <code>--yes</code> (opcional <code>--only etc|db|history|grafana</code>). A configuração atual
+      vai para <code>/etc/orbymon.antes-restore-…</code>.</li>
+    <li>Cópia fora do servidor: <code>ORBYMON_ARCHIVE_CMD</code> em <code>/etc/orbymon/retention-archive.conf</code> (ex.: <code>rclone copy {} remoto:orbymon/</code>).
+      Com <code>/etc/orbymon/backup.key</code> o arquivo sai cifrado (AES-256) — guarde a chave fora do servidor.</li>
+  </ul>
+</section>
+{% endblock %}

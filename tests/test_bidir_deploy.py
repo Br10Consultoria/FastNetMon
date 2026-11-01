@@ -39,7 +39,7 @@ class DeployTests(unittest.TestCase):
 
     def test_operational_scripts_are_valid_bash(self):
         for name in ("orbymon-retention.sh", "a10-receiver-cutover.sh", "tune-mariadb.sh", "calibrate.sh",
-                     "setup-telegram.sh", "setup-filter-rules.sh", "setup-baseline.sh", "setup-health.sh", "setup-customers.sh"):
+                     "setup-telegram.sh", "setup-filter-rules.sh", "setup-baseline.sh", "setup-health.sh", "setup-customers.sh", "setup-backup.sh", "orbymon-backup.sh", "orbymon-restore.sh"):
             subprocess.run(["bash", "-n", str(ROOT / "scripts" / name)], check=True)
         cut = (ROOT / "scripts/a10-receiver-cutover.sh").read_text()
         self.assertIn("--rollback", cut)

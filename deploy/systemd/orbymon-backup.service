@@ -1,0 +1,14 @@
+[Unit]
+Description=OrbyMon - backup diario da configuracao e do historico
+After=mariadb.service
+
+[Service]
+Type=oneshot
+# root: le os segredos de /etc/orbymon e faz o dump do banco pelo socket local
+ExecStart=/opt/orbymon/scripts/orbymon-backup.sh
+TimeoutStartSec=1800
+Nice=10
+IOSchedulingClass=idle
+PrivateTmp=true
+ProtectHome=true
+NoNewPrivileges=true

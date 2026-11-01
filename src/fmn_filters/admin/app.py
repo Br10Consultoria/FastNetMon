@@ -29,7 +29,7 @@ METRICS = (("min_pps", "Pacotes/s", float), ("min_mbps", "Mbps", float), ("min_r
 SERVICES = ("orbymon-nfcapd@huawei.service", "orbymon-a10-nat.service", "orbymon-flow-rollup-huawei.timer",
             "orbymon-bidir-huawei.timer", "orbymon-ip-huawei.timer", "orbymon-telegram.timer",
             "orbymon-retention.timer", "orbymon-calibrate.timer", "orbymon-filter-rules.timer",
-            "orbymon-exceptions.timer", "orbymon-health.timer", "grafana-server.service", "mariadb.service")
+            "orbymon-exceptions.timer", "orbymon-health.timer", "orbymon-backup.timer", "grafana-server.service", "mariadb.service")
 
 
 def _secret_key(env):
@@ -858,6 +858,19 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
             except Exception as exc:                        # rede, RDAP fora do ar, JSON inesperado
                 error = "consulta falhou: %s" % (str(exc)[:200] or type(exc).__name__)
         return render_template("tools.html", form=form, result=result, error=error, dns_types=tl.DNS_TYPES)
+
+    # ---------------------------------------------------------------- backup
+    @app.route("/backup")
+    def backup_page():
+        from datetime import datetime as dt
+        from ..health import check_backup, latest_backups
+        try:
+            files = [{"name": n, "size": sz, "when": dt.fromtimestamp(mt).strftime("%d/%m/%Y %H:%M")}
+                     for n, sz, mt in latest_backups(str(config.p.backups_dir))]
+            status = check_backup(str(config.p.backups_dir))
+        except OSError:
+            files, status = None, None
+        return render_template("backup.html", files=files, status=status, folder=str(config.p.backups_dir))
 
     # ---------------------------------------------------------------- saude
     @app.route("/saude")

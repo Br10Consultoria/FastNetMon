@@ -33,6 +33,7 @@ RUNTIME = {
     "orbymon-traffic-huawei.service": (60, 45, 90),
     "orbymon-ddos-huawei.service": (60, 45, 90),
     "orbymon-telegram.service": (30, 30, 90),
+    "orbymon-backup.service": (86400, 900, 1800),
 }
 
 
@@ -75,6 +76,34 @@ def check_nfcapd(flow_dir, now_ts=None):
     st = lag_status(age, 120, 300) if newest is not None else CRIT
     return item("nfcapd", "Coleta NetStream (nfcapd)", st, "último arquivo há %s" % fmt_age(age),
                 "" if st == OK else "o roteador parou de exportar ou o nfcapd parou (%s)" % flow_dir)
+
+
+BACKUP_DIR = "/var/lib/orbymon/backups"
+
+
+def latest_backups(directory=BACKUP_DIR):
+    """[(nome, tamanho, mtime)] dos backups, mais recente primeiro (lista o diretorio; nao le os arquivos)."""
+    out = []
+    with os.scandir(directory) as it:
+        for e in it:
+            if e.name.startswith("orbymon-backup-") and (e.name.endswith(".tar.gz") or e.name.endswith(".tar.gz.enc")):
+                st = e.stat()
+                out.append((e.name, st.st_size, st.st_mtime))
+    return sorted(out, key=lambda x: -x[2])
+
+
+def check_backup(directory=BACKUP_DIR, now_ts=None):
+    label = "Backup diário"
+    if not os.path.isdir(directory):
+        return item("backup", label, WARN, "não instalado", "rode sudo bash scripts/setup-backup.sh")
+    files = latest_backups(directory)
+    if not files:
+        return item("backup", label, WARN, "nenhum backup ainda", "veja journalctl -u orbymon-backup -n 30")
+    age = (now_ts or time.time()) - files[0][2]
+    st = CRIT if age > 4 * 86400 else WARN if age > 36 * 3600 else OK
+    return item("backup", label, st, "último há %s (%d arquivo(s)%s)" % (
+        fmt_age(age), len(files), ", cifrado" if files[0][0].endswith(".enc") else ""),
+        "" if st == OK else "o backup diário não está rodando: veja journalctl -u orbymon-backup -n 30")
 
 
 def check_disks(paths=DISK_PATHS, usage=shutil.disk_usage, stat=os.stat):
@@ -312,7 +341,8 @@ def _guard(key, label, fn):
         return [item(key, label, UNKNOWN, "verificação falhou", "%s: %s" % (type(exc).__name__, str(exc)[:200]))]
 
 
-def collect(db, cfg, flow_root, now, telegram_on=False, run=_systemctl, now_ts=None, disks=DISK_PATHS):
+def collect(db, cfg, flow_root, now, telegram_on=False, run=_systemctl, now_ts=None, disks=DISK_PATHS,
+            backup_dir=BACKUP_DIR):
     items = _guard("nfcapd", "Coleta NetStream (nfcapd)", lambda: check_nfcapd(Path(flow_root) / cfg["source"], now_ts))
 
     def db_checks():
@@ -320,6 +350,7 @@ def collect(db, cfg, flow_root, now, telegram_on=False, run=_systemctl, now_ts=N
             return check_db(cur, cfg, now, telegram_on, a10_on=bool(cfg.get("a10_sources") or cfg.get("nat_rules")))
     items += _guard("db", "Verificações no banco", db_checks)
     items += _guard("disk", "Disco", lambda: check_disks(disks))
+    items += _guard("backup", "Backup diário", lambda: check_backup(backup_dir))
     items += _guard("services", "Serviços", lambda: check_failed_units(run))
     items += _guard("runtime", "Tempo de execução", lambda: check_runtimes(run=run))
     return items

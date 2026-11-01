@@ -38,6 +38,22 @@ class FileChecks(unittest.TestCase):
                          [("disk:/", h.OK), ("disk:/var/lib/orbymon", h.WARN), ("disk:/var/log/orbymon", h.CRIT)])
 
 
+class BackupChecks(unittest.TestCase):
+    def test_backup_age(self):
+        self.assertEqual(h.check_backup("/nao/existe")["status"], h.WARN)
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(h.check_backup(d)["value"], "nenhum backup ainda")
+            f = Path(d) / "orbymon-backup-20261101-033700.tar.gz.enc"
+            f.write_bytes(b"x")
+            (Path(d) / "outro.txt").write_bytes(b"x")
+            now = time.time()
+            os.utime(f, (now - 3600, now - 3600))
+            ok = h.check_backup(d, now)
+            self.assertEqual((ok["status"], ok["value"]), (h.OK, "último há 60 min (1 arquivo(s), cifrado)"))
+            self.assertEqual(h.check_backup(d, now + 2 * 86400)["status"], h.WARN)
+            self.assertEqual(h.check_backup(d, now + 5 * 86400)["status"], h.CRIT)
+
+
 class SystemdChecks(unittest.TestCase):
     def test_failed_units_and_runtime(self):
         self.assertEqual(h.check_failed_units(lambda a: "")["status"], h.OK)

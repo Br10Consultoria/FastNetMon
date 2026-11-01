@@ -12,8 +12,9 @@ Ordem pensada para deixar **detecção e alarmes certeiros antes da mitigação*
   top alvos/origens e assinante CGNAT.
 - **Linha de base por hora e exceções** ([BASE.md](BASE.md)): limite dinâmico por hora (dias úteis/fim de
   semana, nunca acima do fixo), exceções por IP/rede/ASN com validade, limite próprio por IP, “acima do habitual”
-  nos alarmes por filtro. Pendente do lado do roteador: active timeout do NetStream em 1 minuto.
+  nos alarmes por filtro. Active timeout do NetStream em 1 minuto aplicado no NE8000.
 
+- **Backup** ([BACKUP.md](BACKUP.md)): diário, cifrado, com cópia externa opcional e restauração assistida.
 - **Saúde** ([SAUDE.md](SAUDE.md)): coleta, atrasos, disco, serviços e tempo de execução, com aviso no Telegram.
 
 - **Clientes e RADIUS** ([CLIENTES.md](CLIENTES.md)): clientes com prefixos dedicados e login PPPoE pelo `radacct`
@@ -28,7 +29,7 @@ Ordem pensada para deixar **detecção e alarmes certeiros antes da mitigação*
 - Busca de AS por nome (base GeoLite2-ASN local).
 
 ## 5. Operação
-- Várias fontes (outros roteadores), e-mail e webhook, exportar/importar configuração.
+- Várias fontes (outros roteadores).
 
 ## 6. Mitigação (última)
 - Blackhole (RTBH) e FlowSpec para o NE8000 a partir dos incidentes, com aprovação manual primeiro,

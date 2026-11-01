@@ -280,7 +280,7 @@ def make_tree(tmp: Path):
     return {"ORBYMON_ADMIN_TESTING": "1", "ORBYMON_CONFIG": str(etc / "bidir.json"),
             "ORBYMON_TELEGRAM_ENV": str(etc / "telegram.env"), "ORBYMON_RETENTION_ENV": str(etc / "retention.env"),
             "ORBYMON_CALIBRATION_DIR": str(calib), "ORBYMON_ADMIN_BACKUP_DIR": str(tmp / "backups"),
-            "ORBYMON_REPUTATION_ENV": str(etc / "reputation.env"), "ORBYMON_RADIUS_ENV": str(etc / "radius.env"), "ORBYMON_NAT_DIR": str(tmp / "nat"),
+            "ORBYMON_REPUTATION_ENV": str(etc / "reputation.env"), "ORBYMON_RADIUS_ENV": str(etc / "radius.env"), "ORBYMON_BACKUP_DIR": str(tmp / "backups"), "ORBYMON_NAT_DIR": str(tmp / "nat"),
             "ORBYMON_FLOW_ROOT": str(tmp / "flows"), "ORBYMON_QUERY_LOCK": str(tmp / "query.lock")}
 
 
@@ -894,6 +894,18 @@ class PanelTests(unittest.TestCase):
         self.assertIn(b"ServiceToken", r.data)
         env = read_env(Path(self.env["ORBYMON_RADIUS_ENV"]))
         self.assertEqual(env["RADIUS_HTTP_LIST"], "registros")                 # modelo nao salva sozinho
+
+
+    def test_backup_page(self):
+        self.login()
+        page = self.c.get("/backup")
+        self.assertIn(b"setup-backup.sh --encrypt", page.data)
+        folder = Path(self.env["ORBYMON_BACKUP_DIR"])
+        folder.mkdir()
+        (folder / "orbymon-backup-20261101-033700.tar.gz.enc").write_bytes(b"x" * 2048)
+        page = self.c.get("/backup")
+        self.assertIn(b"orbymon-backup-20261101-033700.tar.gz.enc", page.data)
+        self.assertIn("cifrado".encode(), page.data)
 
 
 class CliTests(unittest.TestCase):
