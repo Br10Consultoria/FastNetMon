@@ -68,6 +68,15 @@ class DbTests(unittest.TestCase):
         self.assertIn("originado · teste rel OUT SSH · 2 evento(s)", text)
         self.assertIn("tcp/22 39", text)
         self.assertIn("IPs públicos usados (CGNAT): 45.238.170.70", text)
+        from pathlib import Path
+        from fmn_filters.bidir_config import build_scopes, validate_config
+        root = Path(__file__).resolve().parent.parent
+        scopes = build_scopes(validate_config(json.loads((root / "rules/bidir.example.json").read_text())),
+                              json.loads((root / "rules/cgnat-profiles.a10.json").read_text()))
+        r = cr.build(cur, cr.parse_targets("45.238.170.70 187.87.201.42"), T - timedelta(hours=1), T + timedelta(hours=1),
+                     "reltest", scopes)                                 # escopo real (classify devolve 3 valores)
+        self.assertEqual([(i["ip"], i["escopo"], i["pool"]) for i in r["identificacao"]],
+                         [("45.238.170.70", "cgnat_pool", "NAT-POOL-08"), ("187.87.201.42", "dedicated", "")])
         r = cr.build(cur, cr.parse_targets("187.87.201.40/29"), T - timedelta(hours=1), T + timedelta(hours=1), "reltest")
         self.assertEqual([e["regra"] for e in r["eventos"]], ["teste rel IN UDP"])      # o antigo fica fora do periodo
         self.assertEqual(r["trafego"]["in"]["bytes"], 8e8)

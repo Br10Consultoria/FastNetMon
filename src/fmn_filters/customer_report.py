@@ -70,7 +70,7 @@ def build(cur, nets, start, end, source="huawei", scopes=None, identify=None):
     for n in nets:
         if n.num_addresses == 1:
             ip = str(n.network_address)
-            scope, pool = scopes.classify(ip) if scopes else ("", "")
+            scope, pool = scopes.classify(ip)[:2] if scopes else ("", "")
             who = identify(ip, end) if identify else ""
             r["identificacao"].append({"ip": ip, "escopo": scope, "pool": pool, "quem": who})
     where, params = _match_sql(("local_ip", "subscriber_ip"), nets)
