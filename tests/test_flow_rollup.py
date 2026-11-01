@@ -91,11 +91,14 @@ class RollupTests(unittest.TestCase):
         self.assertEqual(syn, {"1.2.3.4": 100.0, "1.2.3.5": 0.0, "1.2.3.6": 0.0})
 
     def test_observation_ifindex_filter_avoids_double_counting(self):
-        cfg = config(observation_ifindexes={"in": [101], "out": []})
-        rows, stats = run([flow("8.8.8.8", "45.238.170.10", 53, 40000, in_if=101),
-                           flow("8.8.8.8", "45.238.170.10", 53, 40000, in_if=999)], cfg)
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(stats["filtrado_por_ifindex"], 1)
+        cfg = config(observation_ifindexes={"in": [86], "out": [86]})
+        rows, stats = run([
+            flow("8.8.8.8", "45.238.170.10", 53, 40000, in_if=86, out_if=0),     # entrou pelo uplink
+            flow("8.8.8.8", "45.238.170.10", 53, 40000, in_if=16, out_if=0),     # mesmo pacote visto no A10
+            flow("45.238.170.10", "8.8.8.8", 40000, 53, in_if=0, out_if=86),     # saiu pelo uplink (Huawei exporta in=0)
+            flow("45.238.170.10", "8.8.8.8", 40000, 53, in_if=16, out_if=99)], cfg)
+        self.assertEqual(sorted(r["direction"] for r in as_dicts(rows)), ["in", "out"])
+        self.assertEqual(stats["filtrado_por_ifindex"], 2)
 
     def test_same_key_sums_and_multiplier_applies(self):
         cfg = config(counter_multiplier=2.0)

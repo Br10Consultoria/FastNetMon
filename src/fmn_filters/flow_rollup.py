@@ -75,7 +75,10 @@ def aggregate(records, source, scopes, cfg, resolve=None):
         if not _public(remote[0]):
             # NAO descartar: flood com origem forjada usa justamente enderecos bogon/reservados.
             stats["remoto_nao_publico_mantido"] += 1
-        if obs[direction] and event.input_if not in obs[direction]:
+        # in: pacote ENTROU pelo uplink (input_if); out: pacote SAIU pelo uplink (output_if).
+        # O Huawei exporta 0 no lado oposto (visto em producao), por isso nao usar input_if na saida.
+        edge_if = event.input_if if direction == "in" else event.output_if
+        if obs[direction] and edge_if not in obs[direction]:
             stats["filtrado_por_ifindex"] += 1
             continue
         local_ip, scope, pool, local_port = local

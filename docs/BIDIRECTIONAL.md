@@ -78,10 +78,14 @@ os eventos que o rsyslog fragmentou.
 
 ### Pontos de observação no Huawei (importante para não duplicar)
 
-O mesmo pacote pode ser visto em mais de uma interface (antes e depois do A10). Em `observation_ifindexes`:
+O mesmo pacote pode ser visto em mais de uma interface (antes e depois do A10). Em `observation_ifindexes`
+liste os ifIndex dos **uplinks de internet** (trânsito, CDN, IX) nas duas chaves:
 
-- `in`: ifIndex por onde entra tráfego **vindo da internet** (uplinks/trânsito).
-- `out`: ifIndex por onde entra tráfego **de assinantes** (lado BNG/A10).
+- `in`: o fluxo conta como recebido só se **entrou** por um uplink (`input_if`).
+- `out`: o fluxo conta como originado só se **saiu** por um uplink (`output_if`).
+
+O Huawei exporta ifIndex 0 no lado oposto (entrada com `output_if=0`, saída com `input_if=0`), por isso a saída
+é filtrada pelo `output_if`. Use o NetStream nos uplinks em `inbound` e `outbound`.
 
 Vazio = sem filtro (aceita tudo; pode haver dupla contagem entre pré e pós-NAT). Se o NetStream do Huawei
 enxerga o tráfego **antes** do A10, o IP de origem já é o `100.64.x` (escopo `cgnat_private`) e a identificação
