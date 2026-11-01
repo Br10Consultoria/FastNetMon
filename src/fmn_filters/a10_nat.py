@@ -445,7 +445,7 @@ async def serve(service: NatService, host, port, socket_path, *, use_db=True):
         service.log.close()
 
 
-def replay_rsyslog_spool(path, scopes: ScopeMap, *, max_bytes=2_000_000_000):
+def replay_rsyslog_spool(path, scopes: ScopeMap, *, max_bytes=2_000_000_000, progress=False):
     """Reprocessa o spool NDJSON do rsyslog (texto ou .gz) juntando blocos consecutivos.
 
     O rsyslog dividiu o stream em blocos sem descartar bytes: concatenar na ordem
@@ -476,6 +476,10 @@ def replay_rsyslog_spool(path, scopes: ScopeMap, *, max_bytes=2_000_000_000):
             service.ingest_text(text, splitters[source], now=0.0)
             if lines % 200 == 0 and service.span[1]:
                 service.table.prune(service.span[1])      # memoria limitada em arquivos de 1 h
+            if progress and lines % 2000 == 0:
+                done = service.stats.get("eventos_allocated", 0) + service.stats.get("eventos_freed", 0)
+                print("... linhas=%d eventos=%d (aguarde, 1 h de log leva alguns minutos)" % (lines, done),
+                      file=sys.stderr, flush=True)
     freed = service.stats.get("eventos_freed", 0)
     first, last = service.span
     period = max(0.0, last - first) if last else 0.0
@@ -521,7 +525,7 @@ def main(argv=None):
         cfg = read_config(args.config)
         scopes = build_scopes(cfg)
         if args.replay_rsyslog:
-            print(json.dumps(replay_rsyslog_spool(args.replay_rsyslog, scopes),
+            print(json.dumps(replay_rsyslog_spool(args.replay_rsyslog, scopes, progress=True),
                              ensure_ascii=False, indent=2))
             return 0
         service = NatService(scopes, allowed_sources=args.allow or ["10.100.10.10"],
