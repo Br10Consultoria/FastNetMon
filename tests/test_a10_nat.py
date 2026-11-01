@@ -6,7 +6,8 @@ import unittest
 
 from fmn_filters.a10_nat import (EventLog, NatEvent, NatService, NatTable, StreamSplitter,
                                  _parse_time, handle_lookup, handle_stream, lookup_many,
-                                 parse_message, replay_log, replay_rsyslog_spool)
+                                 parse_events, parse_message, replay_log, replay_rsyslog_spool)
+import gzip
 from fmn_filters.bidir_config import build_scopes, validate_config
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -194,6 +195,59 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(svc.stats.get("eventos_allocated", 0), 0)
         writer.close()
         tcp.close()
+
+
+class ReasonAndReplayTests(unittest.TestCase):
+    def test_reasons(self):
+        def reason(text):
+            return parse_events(text, SCOPES, received=1.0)[1]
+        self.assertEqual(reason("sem cabecalho LSN:PortAllocated"), "sem_cabecalho")
+        self.assertEqual(reason("<134>1 2026-10-30T12:00:00Z A10 acos - - - LSN:UserQuotaExceeded x"),
+                         "sem_marcador_nat")
+        self.assertEqual(reason(msg(inside="10.9.9.9")), "interno_fora_da_rede")
+        self.assertEqual(reason(msg(public="187.87.201.50")), "publico_fora_dos_pools")
+        self.assertEqual(reason(msg(pub_port=0)), "porta_invalida")
+        self.assertIsNone(reason(msg()))
+
+    def test_several_mappings_after_one_header_are_all_kept(self):
+        text = msg(pub_port=1) + " LSN:PortFreed:UDP [100.64.64.9 5 45.238.171.70 7 - -]"
+        events, reason = parse_events(text, SCOPES, received=1.0)
+        self.assertIsNone(reason)
+        self.assertEqual([(e.kind, e.public_port) for e in events], [("allocated", 1), ("freed", 7)])
+
+    def write_spool(self, path, text, opener=open):
+        blocks = [text[n:n + 4000] for n in range(0, len(text), 4000)]
+        with opener(path, "wt") as fh:
+            for b in blocks:
+                fh.write(json.dumps({"raw": b, "source_ip": "10.100.10.10"}) + "\n")
+
+    def test_gz_replay_reports_period_matches_and_no_subscriber_data(self):
+        parts = []
+        for n in range(100):
+            sec = n
+            parts.append(msg(pub_port=3000 + n, ip_port=n + 1, when="2026-10-30T12:00:%02d-03:00" % (sec % 60)
+                             if sec < 60 else "2026-10-30T12:01:%02d-03:00" % (sec - 60)))
+        for n in range(50):                                      # liberacoes das 50 primeiras
+            parts.append(msg(kind="Freed", pub_port=3000 + n, ip_port=n + 1, when="2026-10-30T12:01:50-03:00"))
+        parts.append(msg(kind="Freed", pub_port=9999, when="2026-10-30T12:01:51-03:00"))  # alocada antes
+        parts.append("<134>1 2026-10-30T12:01:52-03:00 A10 acos - - - LSN:UserQuotaExceeded [100.64.64.5]")
+        parts.append(msg(public="187.87.201.50", when="2026-10-30T12:01:53-03:00"))
+        with tempfile.TemporaryDirectory() as d:
+            spool = Path(d) / "a10-current.ndjson-20261030-12.gz"
+            self.write_spool(spool, "".join(parts), gzip.open)
+            res = replay_rsyslog_spool(spool, SCOPES)
+        self.assertEqual(res["eventos"], {"eventos_allocated": 100, "eventos_freed": 51})
+        self.assertEqual(res["liberacoes_casadas_com_alocacao"], 50)
+        self.assertEqual(res["liberacoes_sem_alocacao"], 1)
+        self.assertEqual(res["alocacoes_ainda_ativas_no_fim"], 50)
+        self.assertEqual(res["periodo_a10_segundos"], 111.0)
+        self.assertEqual(res["mensagens_ignoradas_por_motivo"],
+                         {"ignorado_sem_marcador_nat": 1, "ignorado_publico_fora_dos_pools": 1})
+        self.assertEqual(res["detalhe_ignoradas_top"],
+                         {"tipo:LSN:UserQuotaExceeded": 1, "publico_fora:187.87.201.0/24": 1})
+        dumped = json.dumps(res)
+        self.assertNotIn("100.64.64.5", dumped)
+        self.assertNotIn("45.238.170.70", dumped)
 
 
 if __name__ == "__main__":

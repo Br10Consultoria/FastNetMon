@@ -18,7 +18,8 @@ from __future__ import annotations
 import argparse
 import asyncio
 import codecs
-from collections import defaultdict, deque
+import gzip
+from collections import Counter, defaultdict, deque
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
@@ -86,29 +87,65 @@ class StreamSplitter:
         return out
 
 
-def parse_message(message: str, scopes: ScopeMap, *, received: float,
-                  time_source: str = "received") -> NatEvent | None:
-    """Valida cada evento individualmente; candidato fora dos pools/rede interna e descartado."""
+MARKER = re.compile(r"LSN:([A-Za-z]+)")
+
+
+def parse_events(message: str, scopes: ScopeMap, *, received: float,
+                 time_source: str = "received"):
+    """Retorna (eventos, motivo_do_descarte). Cada mapeamento e validado individualmente.
+
+    Motivos: sem_cabecalho, sem_marcador_nat, horario_invalido, porta_invalida,
+    interno_fora_da_rede, publico_fora_dos_pools. Uma mensagem pode ter varios mapeamentos.
+    """
     head = HEADER.search(message)
-    mapping = MAPPING.search(message)
-    if head is None or mapping is None:
-        return None
+    if head is None:
+        return [], "sem_cabecalho"
     try:
         a10_ts = _parse_time(head.group("time"))
+    except ValueError:
+        return [], "horario_invalido"
+    events, reason = [], None
+    for mapping in MAPPING.finditer(message):
         inside_port = int(mapping.group("inside_port"))
         public_port = int(mapping.group("public_port"))
-    except ValueError:
-        return None
-    if not (1 <= inside_port <= 65535 and 1 <= public_port <= 65535):
-        return None
-    inside_ip, public_ip = mapping.group("inside"), mapping.group("public")
-    if scopes.scope(inside_ip) != SCOPE_PRIVATE or scopes.scope(public_ip) != SCOPE_POOL:
-        return None
-    kind = "allocated" if mapping.group("event").lower() in ("allocated", "allocation") else "freed"
-    return NatEvent(ts=received if time_source == "received" else a10_ts, a10_ts=a10_ts,
-                    kind=kind, protocol=mapping.group("protocol").lower(),
-                    inside_ip=inside_ip, inside_port=inside_port,
-                    public_ip=public_ip, public_port=public_port)
+        if not (1 <= inside_port <= 65535 and 1 <= public_port <= 65535):
+            reason = "porta_invalida"
+            continue
+        inside_ip, public_ip = mapping.group("inside"), mapping.group("public")
+        if scopes.scope(inside_ip) != SCOPE_PRIVATE:
+            reason = "interno_fora_da_rede"
+            continue
+        if scopes.scope(public_ip) != SCOPE_POOL:
+            reason = "publico_fora_dos_pools"
+            continue
+        kind = "allocated" if mapping.group("event").lower() in ("allocated", "allocation") else "freed"
+        events.append(NatEvent(ts=received if time_source == "received" else a10_ts, a10_ts=a10_ts,
+                               kind=kind, protocol=mapping.group("protocol").lower(),
+                               inside_ip=inside_ip, inside_port=inside_port,
+                               public_ip=public_ip, public_port=public_port))
+    if events:
+        return events, None
+    return [], reason or "sem_marcador_nat"
+
+
+def parse_message(message: str, scopes: ScopeMap, *, received: float,
+                  time_source: str = "received") -> NatEvent | None:
+    """Compatibilidade: primeiro evento valido da mensagem, ou None."""
+    events, _ = parse_events(message, scopes, received=received, time_source=time_source)
+    return events[0] if events else None
+
+
+def _diagnose(message: str, reason: str, diag: Counter):
+    """Agrega o motivo sem expor IP/porta de assinante (somente tipo, /24 publico, /16 interno)."""
+    if reason == "sem_marcador_nat":
+        found = MARKER.search(message)
+        diag["tipo:" + (found.group(0) if found else "sem_LSN")] += 1
+    elif reason in ("interno_fora_da_rede", "publico_fora_dos_pools"):
+        for m in MAPPING.finditer(message):
+            if reason == "publico_fora_dos_pools":
+                diag["publico_fora:" + ".".join(m.group("public").split(".")[:3]) + ".0/24"] += 1
+            else:
+                diag["interno_fora:" + ".".join(m.group("inside").split(".")[:2]) + ".0.0/16"] += 1
 
 
 class NatTable:
@@ -243,7 +280,7 @@ def replay_log(path, table: NatTable, since: float, max_bytes=512 * 1024 * 1024)
 
 class NatService:
     def __init__(self, scopes: ScopeMap, *, allowed_sources, time_source="received",
-                 log_dir=None, retention_seconds=3600, slack_seconds=120):
+                 log_dir=None, retention_seconds=900, slack_seconds=120):
         if time_source not in ("received", "a10"):
             raise ValueError("time_source deve ser received ou a10")
         self.scopes = scopes
@@ -253,19 +290,28 @@ class NatService:
         self.log = EventLog(log_dir)
         self.minutes: dict[tuple, list] = {}
         self.stats = defaultdict(int)
+        self.diag = None          # Counter de diagnostico (somente no replay)
+        self.span = None          # [primeiro, ultimo] horario do A10 (somente no replay)
 
     def ingest_text(self, text: str, splitter: StreamSplitter, now: float | None = None):
         received = time.time() if now is None else now
         for message in splitter.feed(text):
-            ev = parse_message(message, self.scopes, received=received, time_source=self.time_source)
-            if ev is None:
-                self.stats["mensagens_ignoradas"] += 1
+            events, reason = parse_events(message, self.scopes, received=received,
+                                          time_source=self.time_source)
+            if not events:
+                self.stats["ignorado_" + reason] += 1
+                if self.diag is not None:
+                    _diagnose(message, reason, self.diag)
                 continue
-            self.stats["eventos_" + ev.kind] += 1
-            self.table.apply(ev)
-            self.log.write(ev)
-            slot = self.minutes.setdefault((int(ev.ts // 60), ev.inside_ip), [0, 0])
-            slot[0 if ev.kind == "allocated" else 1] += 1
+            for ev in events:
+                self.stats["eventos_" + ev.kind] += 1
+                self.table.apply(ev)
+                self.log.write(ev)
+                slot = self.minutes.setdefault((int(ev.ts // 60), ev.inside_ip), [0, 0])
+                slot[0 if ev.kind == "allocated" else 1] += 1
+                if self.span is not None:
+                    self.span[0] = min(self.span[0], ev.a10_ts)
+                    self.span[1] = max(self.span[1], ev.a10_ts)
 
     def drain_minutes(self, now: float):
         """Linhas de minutos ja completos para orby_nat_user_minute."""
@@ -400,20 +446,25 @@ async def serve(service: NatService, host, port, socket_path, *, use_db=True):
 
 
 def replay_rsyslog_spool(path, scopes: ScopeMap, *, max_bytes=2_000_000_000):
-    """Reprocessa o spool NDJSON do rsyslog juntando blocos consecutivos (stream original).
+    """Reprocessa o spool NDJSON do rsyslog (texto ou .gz) juntando blocos consecutivos.
 
-    O rsyslog dividiu o stream em blocos de 8096 bytes sem descartar bytes: concatenar
-    na ordem recupera os eventos, exceto nas fronteiras entre conexoes TCP diferentes.
-    Retorna apenas contagens agregadas (nunca IPs/portas).
+    O rsyslog dividiu o stream em blocos sem descartar bytes: concatenar na ordem
+    recupera os eventos, exceto nas fronteiras entre conexoes TCP diferentes.
+    Retorna apenas contagens agregadas (nunca IP/porta de assinante).
     """
     service = NatService(scopes, allowed_sources=(), time_source="a10")
+    service.diag = Counter()
+    service.span = [float("inf"), 0.0]
     splitters = defaultdict(StreamSplitter)
     lines = 0
-    with Path(path).open("rb") as stream:
-        size = stream.seek(0, 2)
-        stream.seek(max(0, size - max_bytes))
-        if size > max_bytes:
-            stream.readline()
+    path = Path(path)
+    opener = gzip.open if path.suffix == ".gz" else open
+    with opener(path, "rb") as stream:
+        if path.suffix != ".gz":
+            size = stream.seek(0, 2)
+            stream.seek(max(0, size - max_bytes))
+            if size > max_bytes:
+                stream.readline()
         for raw in stream:
             try:
                 item = json.loads(raw)
@@ -423,11 +474,30 @@ def replay_rsyslog_spool(path, scopes: ScopeMap, *, max_bytes=2_000_000_000):
                 continue
             lines += 1
             service.ingest_text(text, splitters[source], now=0.0)
-    return {"linhas": lines, "eventos": dict(service.stats),
-            "estado": service.table.sizes(),
-            "liberacoes_sem_alocacao": service.table.orphan_frees,
-            "liberacoes_perdidas": service.table.missed_frees,
-            "bytes_descartados_inicio": sum(s.discarded_prefix for s in splitters.values())}
+            if lines % 200 == 0 and service.span[1]:
+                service.table.prune(service.span[1])      # memoria limitada em arquivos de 1 h
+    freed = service.stats.get("eventos_freed", 0)
+    first, last = service.span
+    period = max(0.0, last - first) if last else 0.0
+    ignored = {k: v for k, v in service.stats.items() if k.startswith("ignorado_")}
+    total = service.stats.get("eventos_allocated", 0) + freed
+    return {
+        "linhas": lines,
+        "periodo_a10_segundos": round(period, 1),
+        "inicio_a10_utc": (datetime.fromtimestamp(first, timezone.utc).isoformat() if last else None),
+        "fim_a10_utc": (datetime.fromtimestamp(last, timezone.utc).isoformat() if last else None),
+        "eventos": {k: v for k, v in service.stats.items() if k.startswith("eventos_")},
+        "eventos_por_segundo": round(total / period, 1) if period else None,
+        "mensagens_ignoradas_por_motivo": ignored,
+        "detalhe_ignoradas_top": dict(service.diag.most_common(15)),
+        "liberacoes_casadas_com_alocacao": freed - service.table.orphan_frees,
+        "liberacoes_sem_alocacao": service.table.orphan_frees,
+        "alocacoes_ainda_ativas_no_fim": service.table.sizes()["ativos"],
+        "realocacao_sem_liberacao": service.table.missed_frees,
+        "bytes_descartados_inicio": sum(s.discarded_prefix for s in splitters.values()),
+        "observacao": ("liberacoes_sem_alocacao altas sao esperadas em janelas curtas: a alocacao "
+                       "ocorreu antes do inicio do arquivo. Compare com periodo_a10_segundos."),
+    }
 
 
 def main(argv=None):
@@ -441,10 +511,11 @@ def main(argv=None):
     ap.add_argument("--log-dir", default="/var/log/orbymon/a10nat")
     ap.add_argument("--time-source", choices=("received", "a10"), default="received",
                     help="use 'a10' somente depois de NTP confirmado no A10")
-    ap.add_argument("--retention-seconds", type=int, default=3600)
+    ap.add_argument("--retention-seconds", type=int, default=900,
+                    help="historico de mapeamentos fechados em memoria (~450 B cada)")
     ap.add_argument("--no-db", action="store_true")
     ap.add_argument("--replay-rsyslog", type=Path,
-                    help="reprocessa o spool NDJSON do rsyslog e imprime so contagens")
+                    help="reprocessa o spool NDJSON do rsyslog (ou .gz rotacionado) e imprime so contagens")
     args = ap.parse_args(argv)
     try:
         cfg = read_config(args.config)

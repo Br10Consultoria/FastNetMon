@@ -54,6 +54,15 @@ PYTHONPATH=src python3 -m unittest discover -s tests -q
 sudo bash scripts/setup-bidir.sh
 ```
 
+Para diagnosticar um arquivo de 1 hora já rotacionado (mostra período, eventos/s, liberações casadas e por
+que mensagens foram ignoradas, sem IP de assinante):
+
+```bash
+sudo -u orbymon env PYTHONPATH=/opt/orbymon/src /opt/orbymon/.venv/bin/python -m fmn_filters.a10_nat \
+  --config /opt/orbymon/rules/bidir.example.json \
+  --replay-rsyslog /var/log/orbymon/a10/a10-current.ndjson-20261031-20.gz
+```
+
 O instalador valida a configuração, cria as tabelas, instala as units e, se existir o spool do rsyslog, roda
 `a10_nat --replay-rsyslog` mostrando **somente contagens** — é a prova rápida de que o novo framing recupera
 os eventos que o rsyslog fragmentou.
@@ -120,7 +129,12 @@ de serviço, pps, Mbps, IPs remotos, razão SYN, interfaces e detalhes (top remo
   (`counter_multiplier` = 1.0 assume que sim; não multiplique duas vezes).
 - **Latência**: rotação de 30 s + rollup + `settle_minutes` + janelas de minuto = detecção em ~3–5 min. Não
   é detecção em segundos; para isso é preciso um detector em tempo real (ex.: FastNetMon Community) ao lado.
-- **Estado NAT em memória**: ao reiniciar, o receptor reconstrói a última hora a partir do log TSV; mapeamentos
+- **Memória do receptor**: cada mapeamento ocupa ~450 bytes. O histórico de mapeamentos fechados fica 15 min
+  em memória (`--retention-seconds 900`, ~0,6 GB a ~1500 liberações/s). Rollup atrasado mais que isso deixa
+  fluxos sem assinante resolvido.
+- **Disco**: enquanto rsyslog (5514) e receptor (5515) recebem juntos, o log NAT é gravado duas vezes. O spool
+  do rsyslog já usa ~3,5–4 GB/dia compactado. Depois de validar o receptor, desligue a destinação 5514 no A10.
+- **Estado NAT em memória**: ao reiniciar, o receptor reconstrói a última janela a partir do log TSV; mapeamentos
   mais antigos ainda abertos (sessões longas) ficam não resolvidos. Fluxos sem mapeamento têm `subscriber_ip`
   vazio e **nunca** são atribuídos por aproximação.
 - **Volume do log NAT**: o spool atual cresce ~31 GiB/dia (~3 mil eventos/s, indica log por porta). Avalie
