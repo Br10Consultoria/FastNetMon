@@ -1,4 +1,4 @@
-# OrbyMon fase 2 - IPs, prefixos, ASNs, ifIndex e direcao
+# OrbyFlow fase 2 - IPs, prefixos, ASNs, ifIndex e direcao
 
 No Ubuntu flow, que ja possui NetFlow Huawei, MariaDB e Grafana:
 
@@ -12,7 +12,7 @@ O script:
 - Le arquivos rotacionados nfcapd com janela de 1 hora e checkpoint separado.
 - Usa o mesmo usuario escritor MariaDB existente e a mesma expansao amostral do nfdump.
 - Habilita timer independente orbymon-ip-huawei.timer para processamento periodico.
-- Instala o painel OrbyMon | Huawei - IPs, Redes e Interfaces na pasta OrbyMon.
+- Instala o painel OrbyFlow | Huawei - IPs, Redes e Interfaces na pasta OrbyFlow.
 - Nao muda Mikrotik, Huawei, nfcapd, BGP/PPPoE, firewall nem o timer da fase 1.
 
 ## Checagem

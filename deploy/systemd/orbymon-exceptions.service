@@ -1,5 +1,5 @@
 [Unit]
-Description=OrbyMon - prefixos dos ASNs de excecao (RIPEstat) e nomes de AS (RIPE)
+Description=OrbyFlow - prefixos dos ASNs de excecao (RIPEstat) e nomes de AS (RIPE)
 After=network-online.target mariadb.service
 Wants=network-online.target
 

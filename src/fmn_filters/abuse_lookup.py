@@ -511,7 +511,7 @@ def render_text(r: Result, tz=timezone.utc):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="OrbyMon: investigar denúncia de abuso (IP + horário -> assinante)")
+    ap = argparse.ArgumentParser(description="OrbyFlow: investigar denúncia de abuso (IP + horário -> assinante)")
     ap.add_argument("--config", default="/etc/orbymon/bidir.json")
     ap.add_argument("--ip")
     ap.add_argument("--time", help="horário da denúncia (ex.: 2026-10-30 14:05:00, ou ISO com fuso)")

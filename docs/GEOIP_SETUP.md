@@ -1,4 +1,4 @@
-# GeoIP/ASN para OrbyMon no Ubuntu 24.04
+# GeoIP/ASN para OrbyFlow no Ubuntu 24.04
 
 ## Diagnostico
 Em 30/10/2026, o flow possui timer Huawei ativo, 8.727 registros

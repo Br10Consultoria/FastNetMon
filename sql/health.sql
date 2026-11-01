@@ -1,4 +1,4 @@
--- Saude do OrbyMon (gravada pelo orbymon-health a cada 2 min; lida pelo painel).
+-- Saude do OrbyFlow (gravada pelo orbymon-health a cada 2 min; lida pelo painel).
 CREATE TABLE IF NOT EXISTS orby_health (
  check_key VARCHAR(64) CHARACTER SET ascii NOT NULL PRIMARY KEY,
  label VARCHAR(100) NOT NULL,

@@ -10,7 +10,7 @@ from .parsers import stream_records
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description='OrbyMon offline ASN e país (GeoLite2)')
+    ap = argparse.ArgumentParser(description='OrbyFlow offline ASN e país (GeoLite2)')
     ap.add_argument('--asn-mmdb', required=False)
     ap.add_argument('--city-mmdb', required=False)
     ap.add_argument('--format', choices=('json', 'ndjson'), default='ndjson')

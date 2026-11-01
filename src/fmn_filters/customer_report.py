@@ -153,7 +153,7 @@ def human_bytes(b):
 
 def render_text(r, fmt_ts, title=""):
     """Texto puro para anexar numa resposta de abuso (horarios no fuso de fmt_ts)."""
-    L = ["Relatório OrbyMon%s" % (" — " + title if title else ""),
+    L = ["Relatório OrbyFlow%s" % (" — " + title if title else ""),
          "Alvos: %s" % ", ".join(r["alvos"]),
          "Período: %s a %s" % (fmt_ts(r["inicio"]), fmt_ts(r["fim"])), ""]
     for i in r["identificacao"]:

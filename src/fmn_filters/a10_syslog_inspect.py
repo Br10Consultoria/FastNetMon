@@ -133,7 +133,7 @@ def inspect(path=LOG, last=200, max_bytes=8000000, examples=3):
 
 
 def main(argv=None):
-    ap=argparse.ArgumentParser(description="OrbyMon inspecao inicial syslog A10")
+    ap=argparse.ArgumentParser(description="OrbyFlow inspecao inicial syslog A10")
     ap.add_argument("--file",type=Path,default=LOG)
     ap.add_argument("--last",type=int,default=200)
     ap.add_argument("--samples",type=int,default=3)

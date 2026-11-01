@@ -64,7 +64,7 @@ def verify_totp(secret: str, code: str, last_step: int = -1, at: float | None = 
     return None
 
 
-def otpauth_uri(secret: str, username: str, issuer: str = "OrbyMon") -> str:
+def otpauth_uri(secret: str, username: str, issuer: str = "OrbyFlow") -> str:
     label = urllib.parse.quote("%s:%s" % (issuer, username))
     return "otpauth://totp/%s?%s" % (label, urllib.parse.urlencode(
         {"secret": secret, "issuer": issuer, "algorithm": "SHA1", "digits": 6, "period": 30}))

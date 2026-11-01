@@ -1,6 +1,6 @@
-# OrbyMon — laboratório de incidentes (v0.3 POC)
+# OrbyFlow — laboratório de incidentes (v0.3 POC)
 
-Esta entrega acrescenta **correlação e persistência de alertas** ao OrbyMon sem enviar qualquer configuração a roteadores. O objetivo é começar testes de ponta a ponta antes de um piloto com NetFlow/IPFIX real.
+Esta entrega acrescenta **correlação e persistência de alertas** ao OrbyFlow sem enviar qualquer configuração a roteadores. O objetivo é começar testes de ponta a ponta antes de um piloto com NetFlow/IPFIX real.
 
 ## Dependências
 

@@ -1,4 +1,4 @@
-"""Leitura e gravacao validada, atomica e com backup dos arquivos de configuracao do OrbyMon."""
+"""Leitura e gravacao validada, atomica e com backup dos arquivos de configuracao do OrbyFlow."""
 from __future__ import annotations
 
 import copy
@@ -53,7 +53,7 @@ def read_env(path: Path) -> dict:
 
 
 def render_env(values: dict, header: str, keep_lines=()) -> str:
-    lines = ["# " + header, "# Gerado pelo painel OrbyMon. Valores entre aspas simples; nao execute este arquivo."]
+    lines = ["# " + header, "# Gerado pelo painel OrbyFlow. Valores entre aspas simples; nao execute este arquivo."]
     for key, value in values.items():
         value = str(value)
         if not re.fullmatch(r"[A-Z][A-Z0-9_]*", key) or not ENV_VALUE.match(value):
@@ -145,7 +145,7 @@ class ConfigStore:
         self._write(self.p.config, json.dumps(cfg, ensure_ascii=False, indent=2) + "\n")
 
     def save_telegram(self, values: dict):
-        self._write(self.p.telegram, render_env(values, "Alertas OrbyMon no Telegram (contem o token: nao compartilhe)"))
+        self._write(self.p.telegram, render_env(values, "Alertas OrbyFlow no Telegram (contem o token: nao compartilhe)"))
 
     def save_retention(self, log_days: int, flow_days: int):
         """Somente os dias. O comando de envio a nuvem fica em retention-archive.conf (root, fora do painel)."""
@@ -153,7 +153,7 @@ class ConfigStore:
             raise ValueError("dias de retencao entre 1 e 3650")
         self._write(self.p.retention, render_env(
             {"ORBYMON_LOG_RETENTION_DAYS": log_days, "ORBYMON_FLOW_RETENTION_DAYS": flow_days},
-            "Retencao de arquivos do OrbyMon"))
+            "Retencao de arquivos do OrbyFlow"))
 
     def notify(self) -> dict:
         return read_env(self.p.notify)

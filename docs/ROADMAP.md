@@ -1,4 +1,4 @@
-# Próximas etapas (OrbyMon → OrbyFlow)
+# Próximas etapas (OrbyFlow)
 
 Ordem pensada para deixar **detecção e alarmes certeiros antes da mitigação**.
 
@@ -35,6 +35,6 @@ Ordem pensada para deixar **detecção e alarmes certeiros antes da mitigação*
   whitelist/blacklist, retirada automática ao resolver.
 
 ## Renomear para OrbyFlow
-1. Nome visível (painel, Grafana, Telegram, documentação).
+1. ~~Nome visível (painel, Grafana, Telegram, e-mail, documentação)~~ — feito.
 2. Identificadores internos (`/etc/orbymon`, serviços `orbymon-*`, banco/tabelas, usuários) com
    migração assistida e janela de manutenção.

@@ -35,7 +35,7 @@ def sync(db, cfg, profile):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="OrbyMon: blocos do provedor para os dashboards")
+    ap = argparse.ArgumentParser(description="OrbyFlow: blocos do provedor para os dashboards")
     ap.add_argument("--config", default="/etc/orbymon/bidir.json")
     args = ap.parse_args(argv)
     try:

@@ -5,7 +5,7 @@
 # - /etc/orbymon/reputation.env (editavel no painel, pagina Reputacao);
 # - timer de hora em hora + primeira verificacao agora (avisos no Telegram se configurado);
 # - leitura do log NAT pelo painel (pagina Investigar);
-# - dashboard "OrbyMon | Reputacao e ataques originados".
+# - dashboard "OrbyFlow | Reputacao e ataques originados".
 set -euo pipefail
 [[ $EUID -eq 0 ]] || { echo "Execute com sudo" >&2; exit 1; }
 BASE="$(cd "$(dirname "$0")/.." && pwd)"
@@ -83,7 +83,7 @@ if [[ -d /var/lib/grafana/dashboards/orbymon ]]; then
   echo "=== Dashboard ==="
   python3 -m json.tool "$BASE/grafana/dashboards/orbymon-reputacao.json" >/dev/null
   install -o grafana -g grafana -m 0644 "$BASE/grafana/dashboards/orbymon-reputacao.json" /var/lib/grafana/dashboards/orbymon/
-  echo "OrbyMon | Reputacao e ataques originados (aparece no Grafana em ~30 s)"
+  echo "OrbyFlow | Reputacao e ataques originados (aparece no Grafana em ~30 s)"
 fi
 cat <<MSG
 

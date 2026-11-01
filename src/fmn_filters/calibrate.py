@@ -330,7 +330,7 @@ def render(summary):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="OrbyMon F4: calibracao dos limites com o trafego real")
+    ap = argparse.ArgumentParser(description="OrbyFlow F4: calibracao dos limites com o trafego real")
     ap.add_argument("--config", default=DEFAULT_CONFIG)
     ap.add_argument("--hours", type=int, default=24, help="periodo analisado (o rollup guarda 2 dias)")
     ap.add_argument("--factor", type=float, default=2.0, help="limite = p99,9 x fator (padrao 2)")

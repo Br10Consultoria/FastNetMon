@@ -192,7 +192,7 @@ def load(cur, now=None):
 
 # ------------------------------------------------------------------ ASN -> prefixos
 def fetch_asn(asn, opener=urllib.request.urlopen, timeout=30):
-    req = urllib.request.Request(RIPESTAT % int(asn), headers={"User-Agent": "OrbyMon-exceptions/1.0"})
+    req = urllib.request.Request(RIPESTAT % int(asn), headers={"User-Agent": "OrbyFlow-exceptions/1.0"})
     with opener(req, timeout=timeout) as resp:
         data = json.loads(resp.read(32 * 1024 * 1024).decode("utf-8"))
     out = set()
@@ -246,7 +246,7 @@ def sync(db, opener=urllib.request.urlopen, now=None, only_id=None, force=False,
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="OrbyMon: excecoes da deteccao (prefixos de ASN)")
+    ap = argparse.ArgumentParser(description="OrbyFlow: excecoes da deteccao (prefixos de ASN)")
     ap.add_argument("--sync", action="store_true", help="atualiza os prefixos dos ASNs de excecao")
     ap.add_argument("--force", action="store_true", help="atualiza mesmo os sincronizados ha pouco")
     args = ap.parse_args(argv)

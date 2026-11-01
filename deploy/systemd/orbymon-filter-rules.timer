@@ -1,5 +1,5 @@
 [Unit]
-Description=OrbyMon - avaliacao dos alarmes por filtro a cada minuto
+Description=OrbyFlow - avaliacao dos alarmes por filtro a cada minuto
 
 [Timer]
 OnBootSec=2min

@@ -227,7 +227,7 @@ def run(cfg, *, max_files=40, max_age_hours=2, min_age=45, dry_run=False, folder
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="OrbyMon F4: rollup bidirecional de fluxos")
+    ap = argparse.ArgumentParser(description="OrbyFlow F4: rollup bidirecional de fluxos")
     ap.add_argument("--config", default=DEFAULT_CONFIG)
     ap.add_argument("--max-files", type=int, default=40)
     ap.add_argument("--max-age-hours", type=int, default=2)

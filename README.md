@@ -1,8 +1,10 @@
-# OrbyMon 🛡️
+# OrbyFlow 🛡️
 
-**OrbyMon — observabilidade de tráfego e defesa DDoS para provedores** · [BR10 Consultoria](https://github.com/Br10Consultoria) · Estágio: **piloto passivo / laboratório**.
+**OrbyFlow — observabilidade de tráfego e defesa DDoS para provedores** · [BR10 Consultoria](https://github.com/Br10Consultoria) · Estágio: **piloto passivo / laboratório**.
 
-![OrbyMon](assets/orbymon-logo.svg)
+![OrbyFlow](assets/orbymon-logo.svg)
+
+> Antes chamado **OrbyMon**. Os identificadores internos (serviços `orbymon-*`, `/etc/orbymon`, banco `orbymon`, variáveis `ORBYMON_*`) continuam com o nome antigo até a migração planejada em [docs/ROADMAP.md](docs/ROADMAP.md).
 
 > **Pode instalar num Ubuntu 24.04 LTS ou Debian e receber NetFlow/IPFIX do Huawei e MikroTik.** Isso coleta tráfego normal, mesmo sem qualquer ataque. A consulta inicial funciona com `nfdump`; **a ingestao MariaDB e o provisionamento automatico de dashboards Grafana estao disponiveis em piloto, ainda nao homologados para producao.** Sem mitigação automática.
 
@@ -43,7 +45,7 @@ A inspeção mostra volume normal, top IPs, portas e protocolos, sem depender de
 
 ## Instalar Grafana e importar TODOS os dashboards automaticamente
 
-No Ubuntu com MariaDB OrbyMon instalado:
+No Ubuntu com MariaDB OrbyFlow instalado:
 
 ```bash
 cd /opt/orbymon
@@ -99,8 +101,8 @@ O instalador configura HTTPS autofirmado na porta 3000, datasource somente leitu
 
 ## Limites importantes
 
-O OrbyMon é um **complemento independente**; não inclui código nem instalador do daemon FastNetMon Community. NetFlow/IPFIX é telemetria de fluxos, não inspeção de todos os pacotes. Ao usar amostragem, as taxas exigem validação. Informações de ASN/GeoIP podem ser aproximadas ou ausentes; o endereço de origem UDP pode ser forjado. URLs PHP não são reveladas por HTTPS/NetFlow sem logs Nginx/Apache/WAF.
+O OrbyFlow é um **complemento independente**; não inclui código nem instalador do daemon FastNetMon Community. NetFlow/IPFIX é telemetria de fluxos, não inspeção de todos os pacotes. Ao usar amostragem, as taxas exigem validação. Informações de ASN/GeoIP podem ser aproximadas ou ausentes; o endereço de origem UDP pode ser forjado. URLs PHP não são reveladas por HTTPS/NetFlow sem logs Nginx/Apache/WAF.
 
 O `nfcapd` cria arquivos rotacionados continuamente; **não há retenção automática no bootstrap**. Monitore disco e estabeleça política antes de manter um piloto ativo por dias. Fluxos de dois roteadores podem representar **as mesmas conexões** vistas em pontos diferentes: nunca some sem de-duplicação.
 
-Código original OrbyMon sob licença MIT. FastNetMon Community é independente (GPL-2.0).
+Código original OrbyFlow sob licença MIT. FastNetMon Community é independente (GPL-2.0).

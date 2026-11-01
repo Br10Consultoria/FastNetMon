@@ -121,7 +121,7 @@ class MessageTests(unittest.TestCase):
         a = h.item("nfcapd", "Coleta <NetStream>", h.CRIT, "último arquivo há 10 min", "parou")
         r = h.item("disk:/", "Disco /", h.OK, "50% usado")
         text = h.message([a], [r], [], site="POP1")
-        self.assertIn("🔴 [POP1] <b>Saúde do OrbyMon: problema</b>", text)
+        self.assertIn("🔴 [POP1] <b>Saúde do OrbyFlow: problema</b>", text)
         self.assertIn("Coleta &lt;NetStream&gt;", text)
         self.assertIn("🟢", text)
         self.assertEqual(h.message([], [], []), "")

@@ -1,5 +1,5 @@
 [Unit]
-Description=OrbyMon - alertas de ataque no Telegram
+Description=OrbyFlow - alertas de ataque no Telegram
 After=network-online.target mariadb.service
 Wants=network-online.target
 

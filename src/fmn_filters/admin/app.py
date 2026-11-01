@@ -1,4 +1,4 @@
-"""Painel web de administracao do OrbyMon (Flask). Execucao: gunicorn com TLS (ver setup-admin.sh)."""
+"""Painel web de administracao do OrbyFlow (Flask). Execucao: gunicorn com TLS (ver setup-admin.sh)."""
 from __future__ import annotations
 
 import copy
@@ -176,7 +176,7 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
             store.fail(client_ip(), user["username"])
             flash("Código inválido. Confira o horário do celular e tente de novo.")
         import segno
-        issuer = re.sub(r"[^\w .-]", "", ("OrbyMon " + config_safe_name()).strip())[:40]
+        issuer = re.sub(r"[^\w .-]", "", ("OrbyFlow " + config_safe_name()).strip())[:40]
         uri = security.otpauth_uri(secret, user["username"], issuer)
         qr = segno.make(uri, error="m").svg_data_uri(scale=5, dark="#111", light="#fff")
         return render_template("enroll.html", qr=qr, secret=secret, username=user["username"])
@@ -348,7 +348,7 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
                     if f.get("action") == "teste":
                         s = Settings.from_env(current)
                         (telegram_factory or Telegram)(s.token, s.chats).send(
-                            Formatter(s).header("🛡️", "Teste do painel OrbyMon") + "\nEnviado por %s." % g.user["username"])
+                            Formatter(s).header("🛡️", "Teste do painel OrbyFlow") + "\nEnviado por %s." % g.user["username"])
                         flash("Mensagem de teste enviada.")
                         audit("telegram_teste")
                     else:
@@ -939,7 +939,7 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
                     site = config.telegram().get("ORBYMON_SITE_NAME", "")
                     for ch in chn.extras_from_env(clean, site):
                         try:
-                            ch.send("🛡️ <b>Teste de aviso do OrbyMon</b>\nEnviado por %s pelo painel." % g.user["username"])
+                            ch.send("🛡️ <b>Teste de aviso do OrbyFlow</b>\nEnviado por %s pelo painel." % g.user["username"])
                             sent.append(repr(ch))
                         except Exception as exc:
                             failed.append("%r: %s" % (ch, (str(exc) if repr(ch) == "e-mail" else type(exc).__name__)[:200]))

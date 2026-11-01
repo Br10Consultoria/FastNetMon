@@ -1,5 +1,5 @@
 [Unit]
-Description=OrbyMon - verificacao de alertas para o Telegram a cada 30 segundos
+Description=OrbyFlow - verificacao de alertas para o Telegram a cada 30 segundos
 
 [Timer]
 OnBootSec=2min

@@ -1,4 +1,4 @@
-"""OrbyMon read-only incident correlation store.
+"""OrbyFlow read-only incident correlation store.
 
 Consumes alert-only NDJSON produced by fmn_filters and creates deduplicated,
 persistent incidents. Does NOT access routers or issue mitigation commands.
@@ -230,7 +230,7 @@ def serve(store, token, port=8765, tenant='default'):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description='OrbyMon Incident Workspace (somente alertas)')
+    ap = argparse.ArgumentParser(description='OrbyFlow Incident Workspace (somente alertas)')
     ap.add_argument('--db', default='state/incidents.sqlite3')
     ap.add_argument('--tenant', default='default')
     ap.add_argument('--quiet-seconds', type=int, default=300)

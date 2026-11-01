@@ -17,7 +17,7 @@ if [[ $# -eq 2 ]]; then
 fi
 BASE="$(cd "$(dirname "$0")/.." && pwd)"
 PY="$BASE/.venv/bin/python"
-[[ -x "$PY" ]] || { echo "Python OrbyMon ausente" >&2; exit 1; }
+[[ -x "$PY" ]] || { echo "Python OrbyFlow ausente" >&2; exit 1; }
 command -v snmpwalk >/dev/null || { echo "Instale o pacote snmp (apt install snmp)" >&2; exit 1; }
 SNMP_CONF=/root/.snmp/snmp.conf
 if [[ ! -r "$SNMP_CONF" ]] || ! grep -Eq '^[[:space:]]*defCommunity[[:space:]]+[^[:space:]#]+' "$SNMP_CONF"; then
@@ -59,7 +59,7 @@ fi
 [[ -r /etc/orbymon/pipeline.env ]] || {
   echo "[ERRO] /etc/orbymon/pipeline.env ausente" >&2; exit 1;
 }
-# Trusted root-owned environment file from the existing OrbyMon deployment.
+# Trusted root-owned environment file from the existing OrbyFlow deployment.
 set -a
 # shellcheck source=/dev/null
 source /etc/orbymon/pipeline.env

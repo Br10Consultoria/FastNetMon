@@ -1,5 +1,5 @@
 [Unit]
-Description=OrbyMon Fase 2 - importar IPs e interfaces Huawei periodicamente
+Description=OrbyFlow Fase 2 - importar IPs e interfaces Huawei periodicamente
 
 [Timer]
 OnBootSec=2min

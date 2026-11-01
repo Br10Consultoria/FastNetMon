@@ -13,7 +13,7 @@ import urllib.request
 
 HOST_RE = re.compile(r"^(?=.{1,253}$)([A-Za-z0-9_]([A-Za-z0-9_-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}\.?$")
 DNS_TYPES = ("A", "AAAA", "MX", "TXT", "NS", "PTR", "SOA", "CNAME")
-UA = {"User-Agent": "OrbyMon-tools/1.0", "Accept": "application/rdap+json, application/json"}
+UA = {"User-Agent": "OrbyFlow-tools/1.0", "Accept": "application/rdap+json, application/json"}
 
 
 class ToolError(ValueError):

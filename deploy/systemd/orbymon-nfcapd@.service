@@ -1,5 +1,5 @@
 [Unit]
-Description=OrbyMon pilot NetFlow/IPFIX collector (%i)
+Description=OrbyFlow pilot NetFlow/IPFIX collector (%i)
 Wants=network-online.target
 After=network-online.target
 

@@ -1,5 +1,5 @@
 [Unit]
-Description=OrbyMon F4 - deteccao bidirecional passiva (entrada e saida), sem bloqueio
+Description=OrbyFlow F4 - deteccao bidirecional passiva (entrada e saida), sem bloqueio
 After=network-online.target mariadb.service
 Wants=network-online.target mariadb.service
 

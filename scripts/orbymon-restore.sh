@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Restaura um backup do OrbyMon (feito por orbymon-backup.sh), no mesmo servidor ou num servidor novo.
+# Restaura um backup do OrbyFlow (feito por orbymon-backup.sh), no mesmo servidor ou num servidor novo.
 #
 #   sudo bash scripts/orbymon-restore.sh ARQUIVO              # mostra o conteudo e o que seria feito
 #   sudo bash scripts/orbymon-restore.sh ARQUIVO --yes [--only etc|db|history|grafana]
 #
-# Servidor novo: instale o OrbyMon (prepare-ubuntu + setup-*), restaure com --yes e rode de novo os setup-* para
+# Servidor novo: instale o OrbyFlow (prepare-ubuntu + setup-*), restaure com --yes e rode de novo os setup-* para
 # recriar usuarios/permissoes do banco e as units. A configuracao atual vai para /etc/orbymon.antes-restore-<data>.
 set -euo pipefail
 umask 077

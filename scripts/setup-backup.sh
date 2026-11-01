@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Backup diario do OrbyMon (configuracao, banco de configuracao/historico e Grafana).
+# Backup diario do OrbyFlow (configuracao, banco de configuracao/historico e Grafana).
 #   sudo bash scripts/setup-backup.sh             # instala o timer (03:37) e faz o primeiro backup
 #   sudo bash scripts/setup-backup.sh --encrypt   # tambem cria a chave de criptografia (/etc/orbymon/backup.key)
 # Copia para fora do servidor: ORBYMON_ARCHIVE_CMD em /etc/orbymon/retention-archive.conf (ex.: rclone).
@@ -16,7 +16,7 @@ if id orbymon-admin >/dev/null 2>&1 && command -v setfacl >/dev/null; then
 fi
 if [[ ! -e /etc/orbymon/backup.conf ]]; then
   install -o root -g root -m 0600 /dev/stdin /etc/orbymon/backup.conf <<CONF
-# Backup do OrbyMon (somente root). Lido como dados.
+# Backup do OrbyFlow (somente root). Lido como dados.
 ORBYMON_BACKUP_DIR=$DIR
 ORBYMON_BACKUP_KEEP=14
 ORBYMON_BACKUP_HISTORY=1

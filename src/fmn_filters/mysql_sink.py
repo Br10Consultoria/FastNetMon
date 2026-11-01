@@ -110,7 +110,7 @@ def process(stream, cur, kind: str, fmt='ndjson', batch=1000, commit=lambda:None
 
 
 def main(argv=None):
-    parser=argparse.ArgumentParser(description='OrbyMon event sink MariaDB - use DB credentials in environment')
+    parser=argparse.ArgumentParser(description='OrbyFlow event sink MariaDB - use DB credentials in environment')
     parser.add_argument('--kind',required=True,choices=('alerts','flows'))
     parser.add_argument('--format',default='ndjson',choices=('ndjson','json'))
     parser.add_argument('--batch',type=int,default=1000)

@@ -134,7 +134,7 @@ def match(entries, blocks):
 
 
 def fetch(url, timeout=60, opener=urllib.request.urlopen):
-    req = urllib.request.Request(url, headers={"User-Agent": "OrbyMon-reputation/1.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": "OrbyFlow-reputation/1.0"})
     with opener(req, timeout=timeout) as resp:
         data = resp.read(MAX_DOWNLOAD + 1)
     if len(data) > MAX_DOWNLOAD:
@@ -199,7 +199,7 @@ def check_abuseipdb(key, blocks, opener=urllib.request.urlopen, max_calls=64):
             url = "https://api.abuseipdb.com/api/v2/check-block?" + urllib.parse.urlencode(
                 {"network": str(net), "maxAgeInDays": 30})
             req = urllib.request.Request(url, headers={"Key": key, "Accept": "application/json",
-                                                       "User-Agent": "OrbyMon-reputation/1.0"})
+                                                       "User-Agent": "OrbyFlow-reputation/1.0"})
             try:
                 with opener(req, timeout=30) as resp:
                     body = json.loads(resp.read().decode())
@@ -467,7 +467,7 @@ def settings_from_env(env):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="OrbyMon: IPs do provedor em listas de bloqueio")
+    ap = argparse.ArgumentParser(description="OrbyFlow: IPs do provedor em listas de bloqueio")
     ap.add_argument("--config", default="/etc/orbymon/bidir.json")
     ap.add_argument("--env-file", help="configuracao da reputacao (KEY='valor'; nunca executado)")
     ap.add_argument("--telegram-env", help="telegram.env para avisar novas listagens")

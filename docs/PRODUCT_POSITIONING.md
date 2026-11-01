@@ -1,12 +1,12 @@
-# OrbyMon — identidade própria e plano de produto
+# OrbyFlow — identidade própria e plano de produto
 
-O OrbyMon é uma plataforma original de **investigação explicável de DDoS para ISPs**, não uma reprodução de um analisador de tráfego genérico. Referências de mercado, incluindo manuais do RR Flow fornecidos pelo solicitante, servem apenas para identificar necessidades e padrões de rede. **Não reutilizar telas, elementos gráficos, textos, workflows exatos, código ou comandos do bot do concorrente.**
+O OrbyFlow é uma plataforma original de **investigação explicável de DDoS para ISPs**, não uma reprodução de um analisador de tráfego genérico. Referências de mercado, incluindo manuais do RR Flow fornecidos pelo solicitante, servem apenas para identificar necessidades e padrões de rede. **Não reutilizar telas, elementos gráficos, textos, workflows exatos, código ou comandos do bot do concorrente.**
 
 ## O que manter do padrão de redes
 
 Filtros IP e IPv6/CIDR, ASN, portas, protocolos, direções, TTL, ICMP, TCP flags, NAT e interfaces são capacidades genéricas de fluxo. Usar JSON próprio, configuração validada e critérios de segurança. ASN e GeoIP significam origem **aproximada do prefixo**, não identidade geográfica do atacante; IP de origem UDP pode ser falsificado. Resolver DNS em HTTPS e ataques PHP exige telemetria de logs DNS/HTTP/WAF, não somente NetFlow.
 
-## O que distingue o OrbyMon
+## O que distingue o OrbyFlow
 
 - **Central de incidentes:** cada alerta relacionado é agrupado em incidente persistente com histórico, severidade, destino e picos PPS/Mbps/RPS.
 - **Evidência e contraevidência:** mostrar quais métricas provocaram o disparo e quais campos estavam ausentes; guardar o registro bruto com retenção controlada.
@@ -25,7 +25,7 @@ Filtros IP e IPv6/CIDR, ASN, portas, protocolos, direções, TTL, ICMP, TCP flag
 
 ## Interface proposta (autoral)
 
-OrbyMon azul/laranja com navegação baseada em tarefas: **Central, Incidentes, Sinais, Políticas, Proteção, Integrações**. Evitar menus, cards, screenshots e tokens visuais do RR Flow. O GitHub permanecerá com o nome `FastNetMon` por compatibilidade; a marca de produto pode ser `OrbyMon`.
+OrbyFlow azul/laranja com navegação baseada em tarefas: **Central, Incidentes, Sinais, Políticas, Proteção, Integrações**. Evitar menus, cards, screenshots e tokens visuais do RR Flow. O GitHub permanecerá com o nome `FastNetMon` por compatibilidade; a marca de produto pode ser `OrbyFlow`.
 
 ## Roadmap por critérios verificáveis
 

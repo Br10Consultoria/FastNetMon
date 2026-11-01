@@ -81,12 +81,12 @@ class Email:
 
     def send(self, text_html):
         plain = to_text(text_html)
-        first = plain.splitlines()[0] if plain else "OrbyMon"
+        first = plain.splitlines()[0] if plain else "OrbyFlow"
         msg = EmailMessage()
         msg["Subject"] = first[:150]
         msg["From"] = self.env["SMTP_FROM"]
         msg["To"] = ", ".join(self.env["SMTP_TO"].split(","))
-        msg.set_content(plain + "\n\n-- \nOrbyMon")
+        msg.set_content(plain + "\n\n-- \nOrbyFlow")
         msg.add_alternative("<div style=\"font-family:sans-serif\">%s</div>" %
                             (text_html or "").replace("\n", "<br>\n"), subtype="html")
         host, port, sec = self.env["SMTP_HOST"], int(self.env["SMTP_PORT"]), self.env["SMTP_SECURITY"]
@@ -123,12 +123,12 @@ class Webhook:
             return {"content": plain[:1900]}
         if fmt in ("slack", "teams"):
             return {"text": plain[:3900]}
-        return {"origem": "orbymon", "site": self.site, "texto": plain, "html": text_html}
+        return {"origem": "orbyflow", "site": self.site, "texto": plain, "html": text_html}
 
     def send(self, text_html):
         data = json.dumps(self.payload(text_html), ensure_ascii=False).encode("utf-8")
         req = urllib.request.Request(self.env["WEBHOOK_URL"], data=data, method="POST",
-                                     headers={"Content-Type": "application/json", "User-Agent": "OrbyMon/1.0"})
+                                     headers={"Content-Type": "application/json", "User-Agent": "OrbyFlow/1.0"})
         with self.opener(req, timeout=10) as resp:
             resp.read(65536)
 

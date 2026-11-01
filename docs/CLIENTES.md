@@ -49,13 +49,13 @@ Na página Clientes, **Modelo pronto** + endereço do ERP preenche URL e mapeame
 
 | ERP | Endpoint | Token |
 |---|---|---|
-| OrbyCore | `GET /api/v1/network/radius/accounting/?assigned_ip={ip}&from={desde_iso}&to={quando_iso}&limit=20` (sessões quentes e arquivadas, com nome do cliente e contrato) | ServiceToken com permissão `network.view` (de preferência com ACL só para o IP do OrbyMon): `Authorization: ServiceToken orby_...` |
+| OrbyCore | `GET /api/v1/network/radius/accounting/?assigned_ip={ip}&from={desde_iso}&to={quando_iso}&limit=20` (sessões quentes e arquivadas, com nome do cliente e contrato) | ServiceToken com permissão `network.view` (de preferência com ACL só para o IP do OrbyFlow): `Authorization: ServiceToken orby_...` |
 | IXC Provedor | `POST /webservice/v1/radacct` com `ixcsoft: listar`, filtro `radacct.framedipaddress = {ip}` e início ≤ horário (`grid_param`), ordenado do mais recente — **confirme com Testar** (tabela/campos podem variar por versão) | `Authorization: Basic <base64 de ID_USUARIO:TOKEN>` |
 | SGP | a incluir | — |
 
 ### Banco de dados
 
-Crie um usuário só com leitura e libere o acesso a partir do OrbyMon, por exemplo (MySQL/MariaDB):
+Crie um usuário só com leitura e libere o acesso a partir do OrbyFlow, por exemplo (MySQL/MariaDB):
 
 ```sql
 CREATE USER 'orbymon_ro'@'IP_DO_ORBYMON' IDENTIFIED BY 'senha-forte';

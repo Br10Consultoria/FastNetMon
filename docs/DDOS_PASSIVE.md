@@ -1,4 +1,4 @@
-# OrbyMon Fase 3 - deteccao PASSIVA de anomalias DDoS
+# OrbyFlow Fase 3 - deteccao PASSIVA de anomalias DDoS
 
 > Limitacoes conhecidas desta fase (so entrada, ifIndex nao somado, sem porta de origem, sem CGNAT): a [F4 bidirecional](BIDIRECTIONAL.md) as corrige.
 
@@ -56,9 +56,9 @@ nao somados; contagens do nfdump ja consideram sampler 1:2048.
     sudo systemctl is-active orbymon-ddos-huawei.timer
     sudo journalctl -u orbymon-ddos-huawei.service -n 30 --no-pager
     sudo mariadb orbymon -e "SELECT * FROM orby_ddos_checks"
-    sudo mariadb orbymon -e "SELECT event_time,rule_name,dst_ip,dst_port,pps,mbps,unique_sources FROM orby_alerts WHERE rule_name LIKE 'OrbyMon F3:%' ORDER BY event_time DESC LIMIT 25"
+    sudo mariadb orbymon -e "SELECT event_time,rule_name,dst_ip,dst_port,pps,mbps,unique_sources FROM orby_alerts WHERE rule_name LIKE 'OrbyFlow F3:%' ORDER BY event_time DESC LIMIT 25"
 
-Dashboard: "OrbyMon | Fase 3 - Sinais DDoS passivos", pasta OrbyMon.
+Dashboard: "OrbyFlow | Fase 3 - Sinais DDoS passivos", pasta OrbyFlow.
 
 Para parar SOMENTE detector:
     sudo systemctl disable --now orbymon-ddos-huawei.timer

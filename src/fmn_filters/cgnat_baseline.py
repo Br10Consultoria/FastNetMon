@@ -267,7 +267,7 @@ def run(cfg, *, limit=20, now=None):
 
 
 def main(argv=None):
-    ap=argparse.ArgumentParser(description="OrbyMon CGNAT: diagnostico read-only")
+    ap=argparse.ArgumentParser(description="OrbyFlow CGNAT: diagnostico read-only")
     ap.add_argument("--config",default=DEFAULT_CONFIG)
     ap.add_argument("--top",type=int,default=20)
     ap.add_argument("--validate",action="store_true")

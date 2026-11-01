@@ -53,7 +53,7 @@ FIRST=0
 grep -Eq "^TELEGRAM_CHAT_IDS='?-?[0-9]" "$ENV_FILE" 2>/dev/null || FIRST=1
 [[ "$GRAFANA$SITE" != *"'"* && "$GRAFANA$SITE" != *\\* ]] || { echo "--site/--grafana-url sem aspas simples ou barra invertida" >&2; exit 1; }
 install -o "$ENV_OWNER" -g orbymon -m 0640 /dev/stdin "$ENV_FILE" <<ENV
-# Alertas OrbyMon no Telegram (arquivo com segredo: nao compartilhe). Tambem editavel no painel web.
+# Alertas OrbyFlow no Telegram (arquivo com segredo: nao compartilhe). Tambem editavel no painel web.
 TELEGRAM_BOT_TOKEN='$TOKEN'
 TELEGRAM_CHAT_IDS='$CHAT'
 ORBYMON_NOTIFY_MIN_SEVERITY='$SEV'

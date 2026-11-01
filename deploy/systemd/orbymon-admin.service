@@ -1,5 +1,5 @@
 [Unit]
-Description=OrbyMon - painel web de administracao (HTTPS, usuario + senha + 2FA)
+Description=OrbyFlow - painel web de administracao (HTTPS, usuario + senha + 2FA)
 After=network-online.target mariadb.service
 Wants=network-online.target
 

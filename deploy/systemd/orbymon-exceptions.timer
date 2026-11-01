@@ -1,5 +1,5 @@
 [Unit]
-Description=OrbyMon - atualizacao diaria dos prefixos dos ASNs de excecao
+Description=OrbyFlow - atualizacao diaria dos prefixos dos ASNs de excecao
 
 [Timer]
 OnBootSec=5min

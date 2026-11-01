@@ -1,4 +1,4 @@
-# OrbyMon: Grafana automatico, MariaDB e dashboards
+# OrbyFlow: Grafana automatico, MariaDB e dashboards
 
 ## Um comando no Ubuntu 24.04
 
@@ -16,7 +16,7 @@ O script:
 - gera senha forte para datasource, protegida em /etc/orbymon/grafana.env;
 - configura datasource MySQL/MariaDB UID orbymon-mysql e timezone +00:00;
 - instala TODOS os arquivos JSON da pasta grafana/dashboards/;
-- provisiona a pasta OrbyMon no Grafana, sem importacao manual;
+- provisiona a pasta OrbyFlow no Grafana, sem importacao manual;
 - habilita Grafana no boot e publica HTTPS na porta 3000;
 - usa certificado autofirmado temporario com IP/dominio no SAN;
 - preserva arquivos e credenciais em futuras execucoes;
@@ -51,9 +51,9 @@ NAO exponha TCP 3306.
     sudo journalctl -u grafana-server -n 60 --no-pager
     sudo mariadb orbymon -e "SELECT COUNT(*) FROM orby_ingested_files"
 
-No Grafana, abra a pasta OrbyMon. Os paineis importados sao:
-- OrbyMon | Huawei - Trafego em tempo real: Mbps, PPS, volume, ASN, porta e fluxos.
-- OrbyMon | Trafego, ASN e Defesa DDoS: dashboards existentes de trafego e alertas.
+No Grafana, abra a pasta OrbyFlow. Os paineis importados sao:
+- OrbyFlow | Huawei - Trafego em tempo real: Mbps, PPS, volume, ASN, porta e fluxos.
+- OrbyFlow | Trafego, ASN e Defesa DDoS: dashboards existentes de trafego e alertas.
 
 Alguns painéis de alertas, paises e mapa permanecem vazios ate que o
 detector e GeoLite2 sejam integrados. Os valores Mbps e PPS sao ESTIMATIVAS

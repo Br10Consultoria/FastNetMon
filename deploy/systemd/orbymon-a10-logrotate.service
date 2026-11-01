@@ -1,5 +1,5 @@
 [Unit]
-Description=OrbyMon rotate raw A10 syslog (no retention deletion)
+Description=OrbyFlow rotate raw A10 syslog (no retention deletion)
 
 [Service]
 Type=oneshot

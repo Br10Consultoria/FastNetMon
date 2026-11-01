@@ -22,7 +22,7 @@ echo "=== Instalando servico e timer isolados F3 ==="
 install -m 0644 "$BASE/deploy/systemd/orbymon-ddos-huawei.service" /etc/systemd/system/
 install -m 0644 "$BASE/deploy/systemd/orbymon-ddos-huawei.timer" /etc/systemd/system/
 systemctl daemon-reload
-echo "=== Importando dashboard OrbyMon F3 ==="
+echo "=== Importando dashboard OrbyFlow F3 ==="
 DASH_DIR=/var/lib/grafana/dashboards/orbymon
 if [[ -d "$DASH_DIR" ]] && id grafana >/dev/null 2>&1; then
   install -o grafana -g grafana -m 0644 \

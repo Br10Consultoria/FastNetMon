@@ -1,4 +1,4 @@
-"""OrbyMon fase 2: pares IP por minuto, separado da ingestao geral.
+"""OrbyFlow fase 2: pares IP por minuto, separado da ingestao geral.
 
 Sem mitigacao e sem alteracao no Huawei. Checkpoint e metricas na mesma
 transacao MariaDB. GeoLite2 opcional, com consulta exclusivamente offline.
@@ -213,7 +213,7 @@ def run(source="huawei",*,max_files=20,max_age_hours=1,min_age=45,
 
 
 def main(argv=None):
-    ap=argparse.ArgumentParser(description="OrbyMon fase 2 - IPs, ASN e interfaces")
+    ap=argparse.ArgumentParser(description="OrbyFlow fase 2 - IPs, ASN e interfaces")
     ap.add_argument("--source",choices=["huawei","mikrotik"],default="huawei")
     ap.add_argument("--max-files",type=int,default=20)
     ap.add_argument("--max-age-hours",type=int,default=1)

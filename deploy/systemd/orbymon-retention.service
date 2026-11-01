@@ -1,5 +1,5 @@
 [Unit]
-Description=OrbyMon - retencao de logs NAT, spool A10 e arquivos nfcapd
+Description=OrbyFlow - retencao de logs NAT, spool A10 e arquivos nfcapd
 
 [Service]
 Type=oneshot

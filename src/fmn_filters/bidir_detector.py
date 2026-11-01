@@ -231,7 +231,7 @@ def insert_event(cur, source, rule, ev, cooldown):
         group["src_ip"] = ev["subscriber_ip"] or ev["local_ip"]
         group["dst_port"] = ev["remote_port"]
     cur.execute(ALERT_SQL, alert_to_row({
-        "action": "alert_only", "rule": "OrbyMon F4: " + rule["name"], "severity": rule["severity"],
+        "action": "alert_only", "rule": "OrbyFlow F4: " + rule["name"], "severity": rule["severity"],
         "kind": "flow", "time_unix": ev["bucket"].replace(tzinfo=timezone.utc).timestamp(),
         "group": group, "context": {},
         "metrics_estimated": {"pps": ev["pps"], "mbps": ev["mbps"],
@@ -307,7 +307,7 @@ signals=VALUES(signals),alerts=VALUES(alerts)""",
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="OrbyMon F4: deteccao bidirecional passiva (sem bloqueio)")
+    ap = argparse.ArgumentParser(description="OrbyFlow F4: deteccao bidirecional passiva (sem bloqueio)")
     ap.add_argument("--config", default=DEFAULT_CONFIG)
     ap.add_argument("--validate", action="store_true")
     ap.add_argument("--dry-run", action="store_true")

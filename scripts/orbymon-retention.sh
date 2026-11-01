@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Retencao de arquivos do OrbyMon (executado de hora em hora pelo systemd).
+# Retencao de arquivos do OrbyFlow (executado de hora em hora pelo systemd).
 #  - compacta logs NAT por hora (TSV) assim que a hora termina;
 #  - apaga, apos N dias: logs NAT, spool antigo do rsyslog do A10 e arquivos nfcapd;
 #  - opcional: ORBYMON_ARCHIVE_CMD envia o arquivo para a nuvem ANTES de apagar

@@ -1,4 +1,4 @@
-# OrbyMon - CGNAT A10: pools publicos reais e rede interna
+# OrbyFlow - CGNAT A10: pools publicos reais e rede interna
 
 ## Topologia informada
 
@@ -47,7 +47,7 @@ O relatorio read-only inclui:
   separacao de direcoes e interfaces. Nao soma o mesmo pacote visto duas vezes.
 - Capacidade teorica por pool, sem fingir saber uso real.
 - Declaracao de 100.64.64.0/19 como rede interna do A10.
-- Dashboard OrbyMon CGNAT atualizado: visoes por POOL e observacoes de rede
+- Dashboard OrbyFlow CGNAT atualizado: visoes por POOL e observacoes de rede
   privada quando houver exportacao desses fluxos no Huawei.
 
     sudo systemctl start orbymon-cgnat-report.service
@@ -61,7 +61,7 @@ desativado: o Huawei pode observar a posicao pos-NAT do fluxo.
 ## Limitacoes de identificacao dos assinantes
 
 Um IP publico pode corresponder a ate 32 usuarios conforme configurado,
-mas NAO ha correlacao por assinante no rollup do OrbyMon.
+mas NAO ha correlacao por assinante no rollup do OrbyFlow.
 Precisaremos de eventos/logs de mapeamento do A10 contendo
 IP privado:porta -> IP publico:porta, protocolo e horarios, alem da
 ligacao PPPoE/RADIUS com o assinante. A Fase 2 NAO registra portas de

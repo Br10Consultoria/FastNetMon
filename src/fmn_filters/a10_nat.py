@@ -564,7 +564,7 @@ def replay_rsyslog_spool(path, scopes: ScopeMap, *, max_bytes=2_000_000_000, pro
 
 def main(argv=None):
     from .bidir_config import DEFAULT_CONFIG, build_scopes, read_config
-    ap = argparse.ArgumentParser(description="OrbyMon: receptor NAT do A10 (CGNAT)")
+    ap = argparse.ArgumentParser(description="OrbyFlow: receptor NAT do A10 (CGNAT)")
     ap.add_argument("--config", default=DEFAULT_CONFIG)
     ap.add_argument("--listen", default="0.0.0.0")
     ap.add_argument("--port", type=int, default=5515)

@@ -1,4 +1,4 @@
-"""Saude do OrbyMon: coleta, atrasos, disco, servicos e tempo de execucao dos timers.
+"""Saude do OrbyFlow: coleta, atrasos, disco, servicos e tempo de execucao dos timers.
 
 Roda a cada 2 minutos (orbymon-health.timer), grava o resultado em orby_health (pagina Saude do painel) e avisa no
 Telegram quando um item passa a ter problema (depois de 2 verificacoes seguidas, para nao avisar por oscilacao),
@@ -318,7 +318,7 @@ def message(alerts, recovered, reminders, site=""):
     lines = []
     if alerts or reminders:
         worst = max([RANK[a["status"]] for a in alerts + reminders])
-        lines.append("%s %s<b>Saúde do OrbyMon: %s</b>" % ("🔴" if worst == RANK[CRIT] else "🟠", head,
+        lines.append("%s %s<b>Saúde do OrbyFlow: %s</b>" % ("🔴" if worst == RANK[CRIT] else "🟠", head,
                                                           "problema" if alerts else "problema continua"))
         for a in alerts + reminders:
             lines.append("• <b>%s</b> (%s): %s%s" % (e(a["label"]), LABEL[a["status"]], e(a["value"]),
@@ -357,7 +357,7 @@ def collect(db, cfg, flow_root, now, telegram_on=False, run=_systemctl, now_ts=N
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="OrbyMon: verificacao de saude")
+    ap = argparse.ArgumentParser(description="OrbyFlow: verificacao de saude")
     ap.add_argument("--config", default="/etc/orbymon/bidir.json")
     ap.add_argument("--flow-root", default="/var/lib/orbymon/flows")
     ap.add_argument("--telegram-env", help="telegram.env para avisar (lido como dados)")

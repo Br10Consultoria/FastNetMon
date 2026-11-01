@@ -1,4 +1,4 @@
--- Execute dentro de um banco MariaDB/MySQL já criado para o OrbyMon.
+-- Execute dentro de um banco MariaDB/MySQL já criado para o OrbyFlow.
 -- Os usuários da aplicação devem ter somente INSERT/UPDATE/SELECT neste schema.
 CREATE TABLE IF NOT EXISTS orby_alerts (
     alert_id CHAR(64) NOT NULL PRIMARY KEY,

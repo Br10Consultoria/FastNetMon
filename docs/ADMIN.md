@@ -1,6 +1,6 @@
 # Painel web de administração
 
-Página própria do OrbyMon para configurar cada instalação (provedor, ASNs, blocos, pools CGNAT,
+Página própria do OrbyFlow para configurar cada instalação (provedor, ASNs, blocos, pools CGNAT,
 bordas, regras, Telegram e retenção) sem editar arquivos no terminal. Roda em **HTTPS na porta
 8443** (configurável), separada do Grafana (3000), com **usuário + senha + 2FA (TOTP)** obrigatório.
 

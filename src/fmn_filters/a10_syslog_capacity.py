@@ -82,7 +82,7 @@ def measure(path=DEFAULT_LOG, seconds=15):
 
 
 def main(argv=None):
-    p = argparse.ArgumentParser(description="OrbyMon: taxa de logs CGNAT A10 (read-only)")
+    p = argparse.ArgumentParser(description="OrbyFlow: taxa de logs CGNAT A10 (read-only)")
     p.add_argument("--file", type=Path, default=DEFAULT_LOG)
     p.add_argument("--seconds", type=int, default=15)
     a = p.parse_args(argv)

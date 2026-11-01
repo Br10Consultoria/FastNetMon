@@ -1,4 +1,4 @@
-# OrbyMon — filtros combinados (referência RR Flow)
+# OrbyFlow — filtros combinados (referência RR Flow)
 
 O documento fornecido pelo usuário **Filtros Manuais – RR Flow.pdf** contém grupos de IP, portas, redes, ASN, geolocalização, protocolos, flags, ICMP, TTL, bytes, pacotes, duração, interfaces, NAT e next-hop. **Esta implementação usa um formato JSON próprio; não aceita diretamente a DSL textual do RR Flow.**
 

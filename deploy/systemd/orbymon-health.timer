@@ -1,5 +1,5 @@
 [Unit]
-Description=OrbyMon - verificacao de saude a cada 2 minutos
+Description=OrbyFlow - verificacao de saude a cada 2 minutos
 
 [Timer]
 OnBootSec=3min

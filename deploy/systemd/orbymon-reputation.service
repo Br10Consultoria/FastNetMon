@@ -1,5 +1,5 @@
 [Unit]
-Description=OrbyMon - IPs do provedor em listas de bloqueio (reputacao) e assinante provavel
+Description=OrbyFlow - IPs do provedor em listas de bloqueio (reputacao) e assinante provavel
 After=network-online.target mariadb.service
 Wants=network-online.target
 

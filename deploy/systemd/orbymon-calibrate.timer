@@ -1,5 +1,5 @@
 [Unit]
-Description=OrbyMon F4 - calibracao diaria (madrugada, so relatorio)
+Description=OrbyFlow F4 - calibracao diaria (madrugada, so relatorio)
 
 [Timer]
 OnCalendar=*-*-* 05:17:00

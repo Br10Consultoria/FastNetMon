@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Troca o recebimento do log NAT do A10: rsyslog (TCP 5514) -> receptor OrbyMon (TCP 5514).
+# Troca o recebimento do log NAT do A10: rsyslog (TCP 5514) -> receptor OrbyFlow (TCP 5514).
 # NAO altera o A10 nem o firewall: o A10 continua enviando para a mesma porta e reconecta sozinho.
 # O receptor grava o log NAT compacto em /var/log/orbymon/a10nat (retencao em retention.env).
 # Uso:  sudo bash scripts/a10-receiver-cutover.sh            (troca)
@@ -52,7 +52,7 @@ if [[ -e "$CONF" ]]; then
 fi
 systemctl restart rsyslog
 
-echo "=== 2/4 Receptor OrbyMon na porta $PORT ==="
+echo "=== 2/4 Receptor OrbyFlow na porta $PORT ==="
 install -d -m 0755 "$DROPIN_DIR"
 cat > "$DROPIN" <<EOF
 [Service]

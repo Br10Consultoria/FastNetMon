@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Atualiza os paineis OrbyMon e a tabela de nomes de paises (orby_country_names).
+# Atualiza os paineis OrbyFlow e a tabela de nomes de paises (orby_country_names).
 # Sem reiniciar o Grafana, sem segredos e sem acoes em roteadores.
 set -euo pipefail
 [[ $EUID -eq 0 ]] || { echo "Execute como root/sudo" >&2; exit 1; }

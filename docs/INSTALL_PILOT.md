@@ -1,6 +1,6 @@
-# OrbyMon — instalação de piloto NetFlow/IPFIX em servidor novo
+# OrbyFlow — instalação de piloto NetFlow/IPFIX em servidor novo
 
-**Status em 28/10/2026:** coleta de tráfego normal/atípico com `nfcapd` e consulta com `nfdump` pronta para **piloto passivo** em Ubuntu 24.04 LTS (recomendado) ou Debian 12/13 (validar versões). O motor de alertas OrbyMon é uma prova de conceito; correlação de incidentes e dashboards não estão totalmente integrados ao coletor em modo contínuo. Não há bloqueios automáticos.
+**Status em 28/10/2026:** coleta de tráfego normal/atípico com `nfcapd` e consulta com `nfdump` pronta para **piloto passivo** em Ubuntu 24.04 LTS (recomendado) ou Debian 12/13 (validar versões). O motor de alertas OrbyFlow é uma prova de conceito; correlação de incidentes e dashboards não estão totalmente integrados ao coletor em modo contínuo. Não há bloqueios automáticos.
 
 ## 1. Servidor e dimensionamento inicial
 
@@ -120,7 +120,7 @@ Isso mostra **independentemente de haver ataques**: resumo do volume, IPs de ori
 
 **Atenção:** se os dados vêm de Huawei e MikroTik e representam as mesmas conexões em pontos diferentes da rede, **não some os dois valores** como se fossem tráfego independente.
 
-## 7. Detecção OrbyMon (opcional após validar a coleta)
+## 7. Detecção OrbyFlow (opcional após validar a coleta)
 
 As regras atuais no repositório trazem prefixos **reservados para documentação**, não os prefixos do provedor. Antes de usar em produção, copie e personalize as regras e exceções:
 

@@ -50,7 +50,7 @@ sudo -u orbymon env $(grep -v '^#' /etc/orbymon/pipeline.env | xargs) PYTHONPATH
 ### Limites
 
 - O log NAT fica **15 dias** (`retention.env`). Denúncias mais antigas não têm como ser resolvidas
-  pelo OrbyMon. O **Marco Civil da Internet (Lei 12.965/2014, art. 13)** obriga o provedor de conexão a
+  pelo OrbyFlow. O **Marco Civil da Internet (Lei 12.965/2014, art. 13)** obriga o provedor de conexão a
   guardar registros de conexão por **1 ano**; com CGNAT isso inclui IP público + **porta** + horário.
   Use `ORBYMON_ARCHIVE_CMD` em `/etc/orbymon/retention-archive.conf` para enviar os logs NAT a um
   armazenamento antes de apagar (consulte o jurídico sobre a sua obrigação).
@@ -73,7 +73,7 @@ resolvedores DNS próprios (não 8.8.8.8/1.1.1.1); o setup avisa se for o caso. 
 
 Para cada IP listado:
 
-- **pool CGNAT**: o OrbyMon procura nos fluxos de saída das últimas 48 h quem falou com as portas
+- **pool CGNAT**: o OrbyFlow procura nos fluxos de saída das últimas 48 h quem falou com as portas
   típicas da lista (SSH → 22, e-mail → 25/465/587, web → 80/443...) e quem tem ataque originado
   detectado. Esse é o **provável responsável**;
 - **IP dedicado**: o responsável é o próprio cliente; aparecem as portas de saída usadas.
@@ -81,7 +81,7 @@ Para cada IP listado:
 Avisos no Telegram (mesmo grupo dos ataques): quando um IP entra em lista (com o provável responsável) e
 quando sai de todas. Falha de uma fonte nunca remove listagens antigas.
 
-Dashboard **OrbyMon | Reputação e ataques originados**: IPs listados, quem mais originou ataques,
+Dashboard **OrbyFlow | Reputação e ataques originados**: IPs listados, quem mais originou ataques,
 ataques por hora/tipo, **saída suspeita** (clientes falando com dezenas de destinos em portas de SSH,
 Telnet, SMTP, SMB, RDP, SQL, SIP e Winbox), histórico e situação das fontes.
 

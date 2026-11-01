@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# OrbyMon Grafana: HTTPS externo, MariaDB somente leitura e dashboards automaticos.
+# OrbyFlow Grafana: HTTPS externo, MariaDB somente leitura e dashboards automaticos.
 # Nao modifica Huawei, BGP, nfcapd, timer de NetFlow nem firewall.
 set -euo pipefail
 umask 077
@@ -70,7 +70,7 @@ CERT=/etc/orbymon/grafana-tls/grafana.crt
 MARKER=/etc/orbymon/grafana-tls/host
 if [[ ! -s "$KEY" || ! -s "$CERT" || ! -f "$MARKER" || "$(cat "$MARKER")" != "$PUBLIC_HOST" ]]; then
   openssl req -new -newkey rsa:3072 -x509 -sha256 -nodes -days 365 \
-    -subj '/CN=OrbyMon-Grafana' -addext "subjectAltName=$SAN" \
+    -subj '/CN=OrbyFlow-Grafana' -addext "subjectAltName=$SAN" \
     -keyout "$KEY" -out "$CERT" >/dev/null 2>&1
   printf '%s\n' "$PUBLIC_HOST" > "$MARKER"
 fi
@@ -110,7 +110,7 @@ trap 'rm -f "$TMP"' EXIT
 cat > "$TMP" <<'YAML'
 apiVersion: 1
 datasources:
-  - name: OrbyMon MariaDB
+  - name: OrbyMon MariaDB   # nome mantido: o Grafana identifica a fonte provisionada pelo nome
     uid: orbymon-mysql
     type: mysql
     access: proxy

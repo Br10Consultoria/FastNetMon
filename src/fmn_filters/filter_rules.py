@@ -511,7 +511,7 @@ def run(db, cfg, profile, flow_root, now=None, telegram=None, formatter=None, re
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="OrbyMon: alarmes por filtro (nfdump)")
+    ap = argparse.ArgumentParser(description="OrbyFlow: alarmes por filtro (nfdump)")
     ap.add_argument("--config", default="/etc/orbymon/bidir.json")
     ap.add_argument("--flow-root", default="/var/lib/orbymon/flows")
     ap.add_argument("--telegram-env", help="telegram.env para avisar (lido como dados)")

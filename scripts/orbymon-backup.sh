@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Backup diario do OrbyMon (executado como root pelo orbymon-backup.timer; tambem pode ser rodado a mao).
+# Backup diario do OrbyFlow (executado como root pelo orbymon-backup.timer; tambem pode ser rodado a mao).
 #
 # Conteudo (um arquivo orbymon-backup-AAAAMMDD-HHMMSS.tar.gz):
 #   etc/orbymon/...        configuracao completa (inclui segredos: token do Telegram, senhas de banco/API)
@@ -7,7 +7,7 @@
 #                          clientes, linha de base, nomes de interface
 #   db-history.sql         historico: eventos de ataque, incidentes, listas de reputacao, auditoria
 #   grafana/               provisionamento e banco do Grafana (dashboards editados na interface)
-#   MANIFEST.txt           versao do OrbyMon, servidor, data e tamanhos
+#   MANIFEST.txt           versao do OrbyFlow, servidor, data e tamanhos
 # Fluxos (nfcapd) e logs NAT NAO entram: sao grandes e ja tem retencao/arquivamento proprios.
 #
 # Opcoes (arquivo /etc/orbymon/backup.conf, somente root):
@@ -83,7 +83,7 @@ if [[ -d /etc/grafana || -f /var/lib/grafana/grafana.db ]]; then
 fi
 
 {
-  echo "OrbyMon backup $STAMP"
+  echo "OrbyFlow backup $STAMP"
   echo "servidor: $(hostname)"
   echo "versao: $(git -C "$BASE" rev-parse --short HEAD 2>/dev/null || echo desconhecida)"
   (cd "$WORK/b" && find . -type f -printf '%P %s\n' | sort)

@@ -24,7 +24,7 @@ if (( ram_mb < 3072 )); then
 fi
 
 NEW=$(cat <<EOF
-# Gerado por scripts/tune-mariadb.sh (OrbyMon)
+# Gerado por scripts/tune-mariadb.sh (OrbyFlow)
 [mysqld]
 innodb_buffer_pool_size = ${pool_mb}M
 innodb_flush_log_at_trx_commit = 2

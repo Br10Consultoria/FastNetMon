@@ -24,7 +24,7 @@
       <small>Roteadores, coletor, servidores próprios: não geram alerta de assinante.</small></label>
     <label>IPs do A10 (origem do log NAT)
       <textarea name="a10_sources" rows="3">{{ (cfg.a10_sources or [])|join('\n') }}</textarea>
-      <small>Somente esses IPs podem enviar log NAT ao OrbyMon.</small></label>
+      <small>Somente esses IPs podem enviar log NAT ao OrbyFlow.</small></label>
   </div>
   <h2>Pools CGNAT</h2>
   {% set pools = profile.cgnat_pools %}

@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% block title %}OrbyMon{% endblock %} · OrbyMon admin</title>
+<title>{% block title %}OrbyFlow{% endblock %} · OrbyFlow admin</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
 </head>
 <body>
 <header class="top">
-  <span class="brand">OrbyMon <small>admin</small></span>
+  <span class="brand">OrbyFlow <small>admin</small></span>
   {% if g.user %}
   <nav>
     {% set here = request.endpoint %}

@@ -1,4 +1,4 @@
-# OrbyMon — piloto Huawei NE8000 primeiro
+# OrbyFlow — piloto Huawei NE8000 primeiro
 
 **Fase atual: somente Huawei NetEngine 8000.** Este guia é a etapa 1 do [manual geral](INSTALL_PILOT.md). O MikroTik **não deve ser ativado nesta fase**. A coleta de fluxos funciona mesmo sem ataque DDoS. Todo o piloto é somente leitura da telemetria; sem RTBH/FlowSpec, sem mudanças de rota, sem bloqueio automático.
 
@@ -73,7 +73,7 @@ Não compartilhar dados de IP de clientes publicamente.
 4. Diferença de totais com SNMP/interfaces (NetFlow não é contador exato).
 5. Campos disponíveis no fluxo real: ASN, interface ingress, BGP next-hop, TCP flags e NAT. Não assumir que todos estarão presentes.
 6. Disco da VM: `df -h /var/lib/orbymon` e `sudo du -sh /var/lib/orbymon/flows/huawei/`. **Não existe limpeza automática no bootstrap**. Definir retenção após medir o volume e antes de deixar serviço sem supervisão.
-7. Alertas OrbyMon apenas após substituir prefixos de documentação em `rules/example-rules.json` por endereços reais de teste, revisando exceções.
+7. Alertas OrbyFlow apenas após substituir prefixos de documentação em `rules/example-rules.json` por endereços reais de teste, revisando exceções.
 
 **O Grafana contínuo ainda requer um pipeline de agregação idempotente**: os coletores gravam todos os fluxos e o `nfdump` permite ver tráfego normal mesmo sem ataque, mas a nova camada de incidentes e as métricas MariaDB ainda não estão totalmente integradas ao coletor contínuo.
 

@@ -349,7 +349,7 @@ last_sent=%s WHERE incident_key=%s""", (inc["events"], inc["peak_bps"], inc["pea
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="OrbyMon: alertas de ataque no Telegram")
+    ap = argparse.ArgumentParser(description="OrbyFlow: alertas de ataque no Telegram")
     ap.add_argument("--test", action="store_true", help="envia mensagem de teste")
     ap.add_argument("--find-chat", action="store_true",
                     help="lista chats que falaram com o bot (mande uma mensagem ao bot antes)")
@@ -385,7 +385,7 @@ def main(argv=None):
             from .channels import wrap
             telegram = wrap(telegram, os.environ.get("ORBYMON_NOTIFY_ENV", "/etc/orbymon/notify.env"), settings.site)
         if args.test:
-            telegram.send(Formatter(settings).header("🛡️", "OrbyMon conectado ao Telegram") +
+            telegram.send(Formatter(settings).header("🛡️", "OrbyFlow conectado ao Telegram") +
                           "\nAlertas de severidade %s ou maior serão enviados aqui."
                           % SEVERITY_PT[settings.min_severity])
             print("mensagem de teste enviada para %d chat(s)" % len(settings.chats))

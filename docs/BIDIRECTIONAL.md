@@ -1,4 +1,4 @@
-# OrbyMon F4 — detecção bidirecional com CGNAT (etapa 1)
+# OrbyFlow F4 — detecção bidirecional com CGNAT (etapa 1)
 
 Detecta ataques **recebidos** (internet → sua rede) e **originados** (sua rede → internet), separa IP
 dedicado de IP de CGNAT e identifica o **IP privado do assinante** (100.64.64.0/19) usando o log NAT do A10.
@@ -12,7 +12,7 @@ Somente alertas: nenhuma ação em Huawei, A10, firewall ou BGP.
 | Pools CGNAT (A10) | NAT-POOL-08..11 = `45.238.170.64/26`, `45.238.171.64/26`, `45.238.170.128/26`, `45.238.171.128/26` (32 usuários/IP) |
 | Rede privada CGNAT | `100.64.64.0/19` |
 | Exportador de fluxos (Huawei) | `187.87.201.193` (classificado como infraestrutura) |
-| Servidor OrbyMon (flow) | `187.87.201.198` (infraestrutura) — assumido; confirme se o digitado foi `87.87.201.198` |
+| Servidor OrbyFlow (flow) | `187.87.201.198` (infraestrutura) — assumido; confirme se o digitado foi `87.87.201.198` |
 | A10 (origem do syslog) | `10.100.10.10` |
 
 IPs públicos dos blocos que não são pool nem infraestrutura contam como **dedicados**. Ajuste
@@ -191,7 +191,7 @@ não perde alerta: o evento só é marcado como enviado depois do envio.
 
 - `ipv6_protected_cidrs` (opcional) em `/etc/orbymon/bidir.json`, ex.: `["2804:4fa8::/32"]`: o IPv6 do
   provedor é tratado como IP dedicado nos dois sentidos. O Huawei precisa exportar o NetStream IPv6 para o
-  OrbyMon (`ipv6 netstream export host 187.87.201.198 2056`).
+  OrbyFlow (`ipv6 netstream export host 187.87.201.198 2056`).
 - `extra_infrastructure_cidrs`: redes próprias que conversam com assinantes sem passar pelo A10 (ex.:
   callcenter que acessa CPEs em 100.64.x pela borda). Tráfego entre elas e a rede do provedor é interno e
   não gera alerta.

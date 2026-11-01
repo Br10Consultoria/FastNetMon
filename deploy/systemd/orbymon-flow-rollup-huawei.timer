@@ -1,5 +1,5 @@
 [Unit]
-Description=OrbyMon F4 - rollup de fluxos a cada 30 segundos
+Description=OrbyFlow F4 - rollup de fluxos a cada 30 segundos
 
 [Timer]
 OnBootSec=1min

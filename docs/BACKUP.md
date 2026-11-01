@@ -38,6 +38,6 @@ sudo bash scripts/orbymon-restore.sh ARQUIVO --yes --only db                    
 Pausa os timers, guarda a configuração atual em `/etc/orbymon.antes-restore-<data>` (e o banco do Grafana ao lado do
 original), restaura e retoma.
 
-**Servidor novo**: instale o OrbyMon (`prepare-ubuntu.sh`), copie o backup e a chave (`/etc/orbymon/backup.key`), restaure
+**Servidor novo**: instale o OrbyFlow (`prepare-ubuntu.sh`), copie o backup e a chave (`/etc/orbymon/backup.key`), restaure
 com `--yes` e rode de novo os `setup-*` (bidir, admin, telegram, reputation, filter-rules, baseline, health, customers,
 backup) para recriar usuários e permissões do banco e as units do systemd.

@@ -25,7 +25,7 @@ e-mail/webhook só fica no log do serviço. Senha e URL do webhook nunca voltam 
       <input name="WEBHOOK_URL" type="password" autocomplete="off" placeholder="https://hooks.slack.com/... ou https://seu-sistema/api/alertas"></label>
     <label>Formato <select name="WEBHOOK_FORMAT">{% for k, l in formats.items() %}<option value="{{ k }}" {{ 'selected' if (v.WEBHOOK_FORMAT or 'json')==k }}>{{ l }}</option>{% endfor %}</select></label>
   </div>
-  <p class="muted">JSON genérico: <code>{"origem": "orbymon", "site": "...", "texto": "...", "html": "..."}</code> por POST.</p>
+  <p class="muted">JSON genérico: <code>{"origem": "orbyflow", "site": "...", "texto": "...", "html": "..."}</code> por POST.</p>
   {% if webhook_host %}<label class="check"><input type="checkbox" name="remover_webhook" value="1"> Desligar webhook</label>{% endif %}
 </section>
 <div class="inline">

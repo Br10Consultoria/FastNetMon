@@ -1,4 +1,4 @@
-# OrbyMon: fase 2 — NetFlow Huawei para MariaDB/Grafana
+# OrbyFlow: fase 2 — NetFlow Huawei para MariaDB/Grafana
 
 ## Estado
 Piloto passivo; NAO altera nfcapd, Huawei, BGP, interfaces nem firewall.

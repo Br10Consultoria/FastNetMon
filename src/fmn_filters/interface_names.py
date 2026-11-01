@@ -63,7 +63,7 @@ def parse_text(content, fmt='auto'):
     return mappings
 
 def main(argv=None):
-    p=argparse.ArgumentParser(description='Importar ifName confirmado para dashboards OrbyMon')
+    p=argparse.ArgumentParser(description='Importar ifName confirmado para dashboards OrbyFlow')
     p.add_argument('--source',choices=('huawei','mikrotik'),default='huawei')
     p.add_argument('--file',required=True)
     p.add_argument('--format',choices=('auto','csv','snmpwalk'),default='auto')

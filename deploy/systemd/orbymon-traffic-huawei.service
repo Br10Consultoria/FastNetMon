@@ -1,5 +1,5 @@
 [Unit]
-Description=OrbyMon Huawei flow ingestion (read-only source, MariaDB sink)
+Description=OrbyFlow Huawei flow ingestion (read-only source, MariaDB sink)
 After=network-online.target
 Wants=network-online.target
 

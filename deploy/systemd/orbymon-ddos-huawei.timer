@@ -1,5 +1,5 @@
 [Unit]
-Description=OrbyMon fase 3 - DDoS passivo a cada minuto
+Description=OrbyFlow fase 3 - DDoS passivo a cada minuto
 
 [Timer]
 OnBootSec=2min

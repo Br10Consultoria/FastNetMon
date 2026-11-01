@@ -1,4 +1,4 @@
-"""Numeros de protocolo IP (IANA) -> nome curto usado no OrbyMon.
+"""Numeros de protocolo IP (IANA) -> nome curto usado no OrbyFlow.
 
 O nfdump exporta o protocolo como numero; antes so 6/17/1/58/50 viravam nome e o resto ficava
 como numero ("47"), o que escondia GRE, AH, OSPF etc. dos filtros por nome.

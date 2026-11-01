@@ -150,7 +150,7 @@ def run(source="huawei", *, dry_run=False, max_files=20,
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="OrbyMon: ingestao Huawei nfcapd para MariaDB")
+    ap = argparse.ArgumentParser(description="OrbyFlow: ingestao Huawei nfcapd para MariaDB")
     ap.add_argument("--source", choices=["huawei", "mikrotik"], default="huawei")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--max-files", type=int, default=20)

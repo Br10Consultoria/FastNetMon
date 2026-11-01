@@ -1,5 +1,5 @@
 [Unit]
-Description=OrbyMon hourly syslog rotation A10
+Description=OrbyFlow hourly syslog rotation A10
 
 [Timer]
 OnCalendar=hourly

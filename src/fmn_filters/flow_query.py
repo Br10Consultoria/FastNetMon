@@ -89,7 +89,7 @@ def expand(expr: str, table: dict) -> str:
         if table[name] is None:
             raise QueryError("@%s está vazio na configuração (página Rede)" % name)
         return table[name]
-    expr = re.sub(r"\bproto\s+(icmpv6|ipv6-icmp)\b", "proto 58", expr, flags=re.I)   # nome usado no OrbyMon
+    expr = re.sub(r"\bproto\s+(icmpv6|ipv6-icmp)\b", "proto 58", expr, flags=re.I)   # nome usado no OrbyFlow
     return re.sub(r"@([A-Za-z_]+)", repl, expr)
 
 

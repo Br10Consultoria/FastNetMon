@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install OrbyMon GeoLite2 integration without reading secrets into shell history.
+# Install OrbyFlow GeoLite2 integration without reading secrets into shell history.
 set -euo pipefail
 umask 027
 [[ $EUID -eq 0 ]] || { echo "Execute com sudo" >&2; exit 1; }

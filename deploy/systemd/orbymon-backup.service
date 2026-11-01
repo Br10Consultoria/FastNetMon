@@ -1,5 +1,5 @@
 [Unit]
-Description=OrbyMon - backup diario da configuracao e do historico
+Description=OrbyFlow - backup diario da configuracao e do historico
 After=mariadb.service
 
 [Service]

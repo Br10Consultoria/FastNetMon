@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Painel web de administracao do OrbyMon (HTTPS, usuario + senha + 2FA TOTP).
+# Painel web de administracao do OrbyFlow (HTTPS, usuario + senha + 2FA TOTP).
 #   sudo bash scripts/setup-admin.sh [--port 8443] [--bind 0.0.0.0] [--user admin]
 # Pode ser executado de novo (atualiza sem perder usuarios, senhas nem configuracao).
 #
@@ -51,7 +51,7 @@ echo "=== Usuario de sistema ==="
 id orbymon-admin >/dev/null 2>&1 || useradd --system --no-create-home --home-dir /nonexistent \
   --shell /usr/sbin/nologin orbymon-admin
 install -d -o orbymon-admin -g orbymon-admin -m 0700 /var/lib/orbymon/admin /var/lib/orbymon/admin/backups
-# somente atravessar (sem listar) os diretorios do OrbyMon; nada de grupo orbymon (pipeline.env fica fora)
+# somente atravessar (sem listar) os diretorios do OrbyFlow; nada de grupo orbymon (pipeline.env fica fora)
 setfacl -m u:orbymon-admin:x /etc/orbymon /var/lib/orbymon
 
 echo "=== Banco de dados ==="
@@ -88,7 +88,7 @@ SECRET=/etc/orbymon/admin-secret
 [[ -s "$SECRET" ]] || { head -c 48 /dev/urandom > "$SECRET"; }
 chown root:orbymon-admin "$SECRET"; chmod 0640 "$SECRET"
 install -o root -g orbymon-admin -m 0640 /dev/stdin "$ADMIN_ENV" <<ENV
-# Painel web do OrbyMon. Somente root altera este arquivo.
+# Painel web do OrbyFlow. Somente root altera este arquivo.
 ORBYMON_ADMIN_BIND='$BIND:$PORT'
 ORBYMON_ADMIN_DB_HOST='127.0.0.1'
 ORBYMON_ADMIN_DB_USER='orbymon_admin'
@@ -170,7 +170,7 @@ TLS=/etc/orbymon/admin-tls
 if [[ ! -s $TLS/cert.pem || ! -s $TLS/key.pem ]]; then
   IP=$(hostname -I | awk '{print $1}')
   openssl req -x509 -newkey rsa:3072 -sha256 -days 1825 -nodes -keyout $TLS/key.pem -out $TLS/cert.pem \
-    -subj "/CN=OrbyMon admin" -addext "subjectAltName=IP:$IP,DNS:$(hostname -f 2>/dev/null || hostname)" 2>/dev/null
+    -subj "/CN=OrbyFlow admin" -addext "subjectAltName=IP:$IP,DNS:$(hostname -f 2>/dev/null || hostname)" 2>/dev/null
 fi
 chown root:orbymon-admin $TLS/key.pem $TLS/cert.pem; chmod 0640 $TLS/key.pem; chmod 0644 $TLS/cert.pem
 openssl x509 -in $TLS/cert.pem -noout -fingerprint -sha256

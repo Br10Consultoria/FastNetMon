@@ -243,7 +243,7 @@ dst_port=%s AND input_if=%s AND output_if=%s AND netflow_direction=%s FOR UPDATE
     }
     alert={
         "action":"alert_only",
-        "rule":"OrbyMon F3: "+rule["name"],
+        "rule":"OrbyFlow F3: "+rule["name"],
         "severity":rule["severity"],
         "kind":"flow",
         "time_unix":event["bucket"].replace(tzinfo=timezone.utc).timestamp(),
@@ -313,7 +313,7 @@ status=VALUES(status),signals=VALUES(signals),alerts=VALUES(alerts)""",
 
 
 def main(argv=None):
-    p=argparse.ArgumentParser(description="OrbyMon fase 3 passiva - sem bloqueio")
+    p=argparse.ArgumentParser(description="OrbyFlow fase 3 passiva - sem bloqueio")
     p.add_argument("--config",default=RULES_PATH)
     p.add_argument("--validate",action="store_true")
     p.add_argument("--dry-run",action="store_true")

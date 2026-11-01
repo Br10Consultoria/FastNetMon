@@ -107,7 +107,7 @@ panel("Situação das fontes", "table",
       14, 45, 10, 8)
 
 dash = {
-    "id": None, "uid": "orbymon-reputacao", "title": "OrbyMon | Reputação e ataques originados",
+    "id": None, "uid": "orbymon-reputacao", "title": "OrbyFlow | Reputação e ataques originados",
     "timezone": "browser", "schemaVersion": 40, "version": 1, "refresh": "5m",
     "time": {"from": "now-7d", "to": "now"}, "tags": ["orbymon", "reputacao", "abuso"],
     "description": "IPs do provedor em listas de bloqueio, assinante provável (CGNAT) e quem origina ataques.",

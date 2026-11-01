@@ -47,7 +47,7 @@ def render(headers, rows):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="OrbyMon F4: consulta de ataques entrada/saida")
+    ap = argparse.ArgumentParser(description="OrbyFlow F4: consulta de ataques entrada/saida")
     ap.add_argument("--hours", type=int, default=6)
     ap.add_argument("--direction", choices=("in", "out"))
     ap.add_argument("--ip", help="IP publico ou IP privado CGNAT do assinante")

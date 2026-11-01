@@ -141,7 +141,7 @@ PRESETS = {
     "orbycore": {
         "nome": "OrbyCore",
         "ajuda": "Crie um ServiceToken no OrbyCore com a permissão network.view (e, se quiser, ACL só para o IP do "
-                 "OrbyMon). Cabeçalho: Authorization: ServiceToken orby_...",
+                 "OrbyFlow). Cabeçalho: Authorization: ServiceToken orby_...",
         "header_hint": "Authorization: ServiceToken orby_...",
         "values": {"RADIUS_MODE": "http", "RADIUS_HTTP_METHOD": "GET",
                    "RADIUS_HTTP_URL": "{base}/api/v1/network/radius/accounting/?assigned_ip={ip}&from={desde_iso}"
@@ -398,7 +398,7 @@ class Radius:
         data = fill(body, lambda v: json.dumps(v)[1:-1]).encode("utf-8") if body else None
         req = urllib.request.Request(url, data=data,                    # IXC aceita corpo ate em GET
                                      method=self.cfg["RADIUS_HTTP_METHOD"],
-                                     headers={"User-Agent": "OrbyMon/1.0", "Accept": "application/json"})
+                                     headers={"User-Agent": "OrbyFlow/1.0", "Accept": "application/json"})
         if data is not None:
             req.add_header("Content-Type", "application/json")
         for line in (b64d(self.cfg["RADIUS_HTTP_PUBLIC_HEADERS_B64"]) + "\n" +

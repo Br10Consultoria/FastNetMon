@@ -1,4 +1,4 @@
-# OrbyMon — MariaDB e Grafana
+# OrbyFlow — MariaDB e Grafana
 
 ## Estado
 
@@ -12,7 +12,7 @@ Essa separação impede concluir que um IP agregado foi atacado por um único AS
 ## Requisitos
 
 - Grafana com datasource nativo MySQL (compatível com MariaDB).
-- MariaDB com banco **separado** (recomendado) e usuário com permissões somente SELECT, INSERT e UPDATE nas tabelas OrbyMon.
+- MariaDB com banco **separado** (recomendado) e usuário com permissões somente SELECT, INSERT e UPDATE nas tabelas OrbyFlow.
 - Python 3.10+ e `pip install -e '.[full]'` em virtualenv.
 - GeoLite2-ASN.mmdb e GeoLite2-City.mmdb obtidos na conta MaxMind e atualizados por `geoipupdate` (aceitar licença e cumprir termos de uso).
 - Exportador NetFlow/IPFIX configurado em porta UDP isolada e restrito aos roteadores de confiança.
