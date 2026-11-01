@@ -119,6 +119,50 @@ ON DUPLICATE KEY UPDATE if_name=VALUES(if_name)""", (if_index, name), fetch=Fals
     def delete_interface(self, if_index):
         self._q("DELETE FROM orby_interface_names WHERE source='huawei' AND if_index=%s", (if_index,), fetch=False)
 
+    # ---------- clientes
+    def customers(self):
+        try:
+            rows = self._q("SELECT c.id,c.name,c.code,c.contact,c.note,c.updated_by,c.updated_at,"
+                           "GROUP_CONCAT(p.cidr ORDER BY p.cidr SEPARATOR ' ') FROM orby_customers c LEFT JOIN "
+                           "orby_customer_prefixes p ON p.customer_id=c.id GROUP BY c.id ORDER BY c.name")
+        except Exception:
+            return None
+        keys = ("id", "name", "code", "contact", "note", "updated_by", "updated_at", "prefixes")
+        return [dict(zip(keys, r), prefixes=(r[7] or "").split()) for r in rows]
+
+    def save_customer(self, cid, c, user):
+        db = self.conn_factory()
+        try:
+            with db.cursor() as cur:
+                if cid:
+                    cur.execute("UPDATE orby_customers SET name=%s,code=%s,contact=%s,note=%s,updated_by=%s WHERE id=%s",
+                                (c["name"], c["code"], c["contact"], c["note"], user, cid))
+                else:
+                    cur.execute("INSERT INTO orby_customers (name,code,contact,note,updated_by) VALUES (%s,%s,%s,%s,%s)",
+                                (c["name"], c["code"], c["contact"], c["note"], user))
+                    cid = cur.lastrowid
+                cur.execute("DELETE FROM orby_customer_prefixes WHERE customer_id=%s", (cid,))
+                for cidr in c["prefixes"]:
+                    cur.execute("INSERT INTO orby_customer_prefixes (customer_id,cidr) VALUES (%s,%s)", (cid, cidr))
+            db.commit()
+            return cid
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
+    def delete_customer(self, cid):
+        db = self.conn_factory()
+        try:
+            with db.cursor() as cur:
+                cur.execute("DELETE FROM orby_customer_prefixes WHERE customer_id=%s", (cid,))
+                n = cur.execute("DELETE FROM orby_customers WHERE id=%s", (cid,))
+            db.commit()
+            return n
+        finally:
+            db.close()
+
     # ---------- saude
     def health(self):
         out = {}

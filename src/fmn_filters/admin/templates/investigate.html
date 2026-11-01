@@ -31,6 +31,9 @@
   {% if r.query.line %}<p class="muted"><code class="detail">{{ r.query.line }}</code></p>{% endif %}
   <p><b>{{ r.verdict }}</b></p>
   {% for n in r.notes %}<p class="warn">{{ n }}</p>{% endfor %}
+  {% if r.query.port is not none and r.subscribers|selectattr('identificacao')|list %}
+  <p>{% for s in r.subscribers if s.identificacao %}Assinante <code>{{ s.ip }}</code>: <b>{{ s.identificacao }}</b><br>{% endfor %}</p>
+  {% endif %}
   {% if r.query.port is not none and r.mappings %}
   <h3>Log NAT (A10)</h3>
   <div class="scroll"><table><tr><th>Assinante</th><th>Porta interna</th><th>Público</th><th>Proto</th><th>Alocada</th><th>Liberada</th></tr>
@@ -39,7 +42,7 @@
   {% elif r.subscribers %}
   <h3>Assinantes que usaram o IP na janela</h3>
   <div class="scroll"><table><tr><th>Assinante</th><th class="num">Portas</th><th>Proto</th><th>Primeira alocação</th><th>Última liberação</th></tr>
-    {% for s in r.subscribers[:60] %}<tr><td><code>{{ s.ip }}</code></td><td class="num">{{ s.portas }}</td><td>{{ s.protocolos }}</td><td>{{ ts(s.inicio, tz) }}</td><td>{{ ts(s.fim, tz) }}</td></tr>{% endfor %}
+    {% for s in r.subscribers[:60] %}<tr><td><code>{{ s.ip }}</code>{% if s.identificacao %}<br><small>{{ s.identificacao }}</small>{% endif %}</td><td class="num">{{ s.portas }}</td><td>{{ s.protocolos }}</td><td>{{ ts(s.inicio, tz) }}</td><td>{{ ts(s.fim, tz) }}</td></tr>{% endfor %}
   </table></div>
   {% endif %}
   {% if r.flows %}

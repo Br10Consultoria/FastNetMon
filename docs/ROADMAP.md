@@ -16,12 +16,13 @@ Ordem pensada para deixar **detecção e alarmes certeiros antes da mitigação*
 
 - **Saúde** ([SAUDE.md](SAUDE.md)): coleta, atrasos, disco, serviços e tempo de execução, com aviso no Telegram.
 
-## 3. Clientes — próxima
-- Cadastro "Meus clientes" (prefixos dedicados, nome) e consulta ao RADIUS/BRAS para transformar
-  100.64.x + horário em login PPPoE.
+- **Clientes e RADIUS** ([CLIENTES.md](CLIENTES.md)): clientes com prefixos dedicados e login PPPoE pelo `radacct`
+  nos avisos e na investigação.
+
+## 3. Clientes (restante)
 - Relatório por cliente (o que ele originou/recebeu) para enviar junto com a notificação de abuso.
 
-## 4. Ferramentas
+## 4. Ferramentas — próxima
 - RDAP/whois, busca de AS por nome (base GeoLite2-ASN local), prefixos anunciados por AS (RIPEstat),
   ping/traceroute e diagnóstico DNS a partir do servidor.
 

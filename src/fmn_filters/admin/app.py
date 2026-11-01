@@ -519,9 +519,19 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
                 for q in queries:
                     if q.protocol not in (None, "tcp", "udp", "icmp"):
                         raise ValueError("protocolo inválido")
-                results = store.with_connection(lambda db: [
-                    (r, al.render_text(r, tz)) for r in
-                    (al.investigate(q, scopes, cfg["source"], db, str(config.p.nat_dir)) for q in queries)])
+                from ..customers import build_identifier
+                radius_path = config.p.radius if config.p.radius.exists() else None
+
+                def run_all(db):
+                    ident = build_identifier(db, radius_path)
+                    try:
+                        return [(r, al.render_text(r, tz)) for r in
+                                (al.identify_result(al.investigate(q, scopes, cfg["source"], db,
+                                                                   str(config.p.nat_dir)), ident) for q in queries)]
+                    finally:
+                        if ident is not None and ident.radius is not None:
+                            ident.radius.close()
+                results = store.with_connection(run_all)
                 audit("investigacao", "; ".join("%s %s porta %s" % (q.ip, q.when, q.port) for q in queries)
                       or "historico " + form["ip"].strip())
             except (ValueError, IndexError) as exc:
@@ -694,6 +704,84 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
                                metrics=fr.METRICS, ops=fr.OPS, aggs=fr.AGGS, human=fq.human,
                                describe=fr.describe)
 
+    # ---------------------------------------------------------------- clientes e RADIUS
+    @app.route("/clientes", methods=["GET", "POST"])
+    def customers_page():
+        from zoneinfo import ZoneInfo
+        from .. import customers as cu
+        from ..abuse_lookup import fmt_ts, parse_time
+        f = request.form
+        current = config.radius()
+        edit = None
+        lookup = None
+        if request.method == "POST":
+            action = f.get("action", "")
+            try:
+                if action == "radius":
+                    values = {k: f.get(k, "").strip() for k in cu.RADIUS_KEYS}
+                    if not values["RADIUS_DB_PASSWORD"]:
+                        values["RADIUS_DB_PASSWORD"] = current.get("RADIUS_DB_PASSWORD", "")   # vazio = manter
+                    clean = cu.validate_radius(values)
+                    config.save_radius(clean)
+                    audit("radius_salvo", "%s@%s:%s/%s.%s" % (clean["RADIUS_DB_USER"], clean["RADIUS_DB_HOST"],
+                                                             clean["RADIUS_DB_PORT"], clean["RADIUS_DB_NAME"],
+                                                             clean["RADIUS_TABLE"]) if clean["RADIUS_DB_HOST"]
+                          else "desativado")
+                    flash("RADIUS salvo. Os avisos passam a mostrar o login na próxima execução.")
+                    return redirect(url_for("customers_page"))
+                if action == "excluir":
+                    cid = int(f.get("id", 0))
+                    item = next((c for c in store.customers() or [] if c["id"] == cid), None)
+                    if item and store.delete_customer(cid):
+                        audit("cliente_excluido", item["name"])
+                        flash("Cliente removido.")
+                    return redirect(url_for("customers_page"))
+                if action == "consultar":
+                    tz = ZoneInfo(current.get("RADIUS_TZ") or "America/Sao_Paulo")
+                    ip = str(parse_ips(f.get("ip", ""))[0])
+                    when = parse_time(f.get("when", ""), tz) if f.get("when", "").strip() else \
+                        dt_now_utc()
+                    if when is None:
+                        raise ValueError("horário não reconhecido (use 2026-10-30 14:05)")
+                    lookup = {"ip": ip, "when": fmt_ts(when, tz), "customer": None, "sessions": [], "error": ""}
+                    lookup["customer"] = store.with_connection(lambda db: cu.load_index(db.cursor()).lookup(ip))
+                    radius = cu.Radius(current)
+                    if radius.enabled:
+                        try:
+                            lookup["sessions"] = [dict(x, inicio=fmt_ts(x["inicio"], tz), fim=fmt_ts(x["fim"], tz))
+                                                  for x in radius.sessions(ip, when)]
+                        except cu.RadiusError as exc:
+                            lookup["error"] = str(exc)
+                        finally:
+                            radius.close()
+                    audit("cliente_consulta", "%s %s" % (ip, lookup["when"]))
+                else:
+                    cid = int(f.get("id") or 0)
+                    c = cu.validate_customer(f.get("name"), f.get("code"), f.get("prefixes"), f.get("contact"),
+                                             f.get("note"))
+                    try:
+                        store.save_customer(cid, c, g.user["username"])
+                    except Exception as exc:
+                        if "Duplicate" in str(exc) or "1062" in str(exc):
+                            raise cu.CustomerError("já existe cliente com esse nome")
+                        raise
+                    audit("cliente_salvo", "%s: %s" % (c["name"], " ".join(c["prefixes"])))
+                    flash("Cliente salvo.")
+                    return redirect(url_for("customers_page"))
+            except (cu.CustomerError, ValueError, IndexError) as exc:
+                flash("Não salvo: %s" % exc)
+                if f.get("action") == "salvar":
+                    edit = {k: f.get(k, "") for k in ("id", "name", "code", "prefixes", "contact", "note")}
+        items = store.customers()
+        if edit is None and request.args.get("edit"):
+            got = next((c for c in items or [] if str(c["id"]) == request.args.get("edit")), None)
+            if got:
+                edit = dict(got, prefixes="\n".join(got["prefixes"]))
+        radius_view = {k: current.get(k, "") for k in cu.RADIUS_KEYS if k != "RADIUS_DB_PASSWORD"}
+        return render_template("customers.html", items=items or [], installed=items is not None, edit=edit or {},
+                               radius=radius_view, has_password=bool(current.get("RADIUS_DB_PASSWORD")),
+                               lookup=lookup, tz_choices=TZ_CHOICES)
+
     # ---------------------------------------------------------------- saude
     @app.route("/saude")
     def health_page():
@@ -805,6 +893,11 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
 
 TZ_CHOICES = ("America/Sao_Paulo", "UTC", "America/Bahia", "America/Manaus", "Europe/Berlin", "Europe/London",
               "Europe/Paris", "America/New_York", "America/Chicago", "America/Los_Angeles", "Asia/Tokyo")
+
+
+def dt_now_utc():
+    from datetime import datetime as dt, timezone as dt_timezone
+    return dt.now(dt_timezone.utc).replace(tzinfo=None, microsecond=0)
 
 
 def _svg_hours(hours, metric, width=720, height=150):

@@ -25,6 +25,7 @@ class Paths:
         self.calibration = Path(env.get("ORBYMON_CALIBRATION_DIR", "/var/lib/orbymon/calibration"))
         self.backups = Path(env.get("ORBYMON_ADMIN_BACKUP_DIR", "/var/lib/orbymon/admin/backups"))
         self.reputation = Path(env.get("ORBYMON_REPUTATION_ENV", "/etc/orbymon/reputation.env"))
+        self.radius = Path(env.get("ORBYMON_RADIUS_ENV", "/etc/orbymon/radius.env"))
         self.nat_dir = Path(env.get("ORBYMON_NAT_DIR", "/var/log/orbymon/a10nat"))
         self.flow_root = Path(env.get("ORBYMON_FLOW_ROOT", "/var/lib/orbymon/flows"))
         self.query_lock = Path(env.get("ORBYMON_QUERY_LOCK", "/var/lib/orbymon/admin/query.lock"))
@@ -151,6 +152,12 @@ class ConfigStore:
         self._write(self.p.retention, render_env(
             {"ORBYMON_LOG_RETENTION_DAYS": log_days, "ORBYMON_FLOW_RETENTION_DAYS": flow_days},
             "Retencao de arquivos do OrbyMon"))
+
+    def radius(self) -> dict:
+        return read_env(self.p.radius)
+
+    def save_radius(self, values: dict):
+        self._write(self.p.radius, render_env(values, "RADIUS (radacct) para login PPPoE - contem senha: nao compartilhe"))
 
     def save_reputation(self, values: dict):
         self._write(self.p.reputation, render_env(values, "Reputacao dos IPs do provedor (contem chave de API: nao compartilhe)"))

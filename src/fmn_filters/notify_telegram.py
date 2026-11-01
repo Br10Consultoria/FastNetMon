@@ -140,9 +140,18 @@ def incident_key(ev):
 
 
 class Formatter:
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, identify=None):
         self.s = settings
         self.zone = ZoneInfo(settings.tz)
+        self.identify = identify          # customers.Identifier: login PPPoE / cliente (opcional)
+
+    def ident(self, ip, when):
+        if not self.identify or not ip:
+            return ""
+        try:
+            return self.identify(ip, when) or ""
+        except Exception:
+            return ""
 
     def local(self, when):
         return when.replace(tzinfo=timezone.utc).astimezone(self.zone).strftime("%d/%m %H:%M")
@@ -171,6 +180,10 @@ class Formatter:
             lines.append("Assinante: <code>%s</code> (CGNAT, antes do NAT)" % e(ev["local_ip"]))
         else:
             lines.append("IP: <code>%s</code> (%s)" % (e(ev["local_ip"]), SCOPE_PT.get(ev["scope"], ev["scope"])))
+        target = ev["local_ip"] if ev["scope"] in ("cgnat_private", "dedicated") else ev["subscriber_ip"]
+        who = self.ident(target, ev.get("event_time"))
+        if who:
+            lines.append("Identificação: %s" % e(who))
         return lines
 
     def opened(self, ev):
@@ -257,10 +270,10 @@ def _incident(cur, key):
     return dict(zip(INCIDENT_FIELDS, row)) if row else None
 
 
-def process(db, telegram, settings, now=None):
+def process(db, telegram, settings, now=None, identify=None):
     """Uma rodada. Retorna contadores. Sempre faz commit do que foi enviado."""
     now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc).replace(tzinfo=None, microsecond=0)
-    fmt = Formatter(settings)
+    fmt = Formatter(settings, identify)
     stats = {"enviadas": 0, "ignoradas_severidade": 0, "agrupadas": 0, "encerradas": 0, "excedentes": 0}
     budget = MAX_MESSAGES_PER_RUN
     with db.cursor() as cur:
@@ -341,6 +354,8 @@ def main(argv=None):
     ap.add_argument("--find-chat", action="store_true",
                     help="lista chats que falaram com o bot (mande uma mensagem ao bot antes)")
     ap.add_argument("--env-file", help="le TELEGRAM_* deste arquivo KEY='valor' (o arquivo nunca e executado)")
+    ap.add_argument("--radius-env", default="/etc/orbymon/radius.env",
+                    help="RADIUS para mostrar o login PPPoE (lido como dados; ignorado se nao existir)")
     args = ap.parse_args(argv)
     try:
         env = dict(os.environ)
@@ -374,8 +389,10 @@ def main(argv=None):
             return 0
         from .mysql_sink import connection_from_env
         db = connection_from_env()
+        from .customers import build_identifier
+        identify = build_identifier(db, args.radius_env if os.path.exists(args.radius_env) else None)
         try:
-            stats = process(db, telegram, settings)
+            stats = process(db, telegram, settings, identify=identify)
         except Exception:
             db.rollback()
             raise

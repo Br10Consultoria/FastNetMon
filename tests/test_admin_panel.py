@@ -126,6 +126,24 @@ class FakeStore:
         self.saved = [x for x in self.saved if not (x["id"] == fid and not x["builtin"])]
         return before - len(self.saved)
 
+    custs = None
+
+    def customers(self):
+        if self.custs is None:
+            self.custs = {}
+        return [dict(c) for c in self.custs.values()]
+
+    def save_customer(self, cid, c, user):
+        self.customers()
+        if not cid and any(x["name"] == c["name"] for x in self.custs.values()):
+            raise Exception("(1062, Duplicate entry)")
+        cid = cid or len(self.custs) + 1
+        self.custs[cid] = dict(c, id=cid, updated_by=user, updated_at=None)
+        return cid
+
+    def delete_customer(self, cid):
+        return 1 if self.custs.pop(cid, None) else 0
+
     health_rows = None
 
     def health_items(self):
@@ -262,7 +280,7 @@ def make_tree(tmp: Path):
     return {"ORBYMON_ADMIN_TESTING": "1", "ORBYMON_CONFIG": str(etc / "bidir.json"),
             "ORBYMON_TELEGRAM_ENV": str(etc / "telegram.env"), "ORBYMON_RETENTION_ENV": str(etc / "retention.env"),
             "ORBYMON_CALIBRATION_DIR": str(calib), "ORBYMON_ADMIN_BACKUP_DIR": str(tmp / "backups"),
-            "ORBYMON_REPUTATION_ENV": str(etc / "reputation.env"), "ORBYMON_NAT_DIR": str(tmp / "nat"),
+            "ORBYMON_REPUTATION_ENV": str(etc / "reputation.env"), "ORBYMON_RADIUS_ENV": str(etc / "radius.env"), "ORBYMON_NAT_DIR": str(tmp / "nat"),
             "ORBYMON_FLOW_ROOT": str(tmp / "flows"), "ORBYMON_QUERY_LOCK": str(tmp / "query.lock")}
 
 
@@ -773,6 +791,42 @@ class PanelTests(unittest.TestCase):
         self.assertNotIn(b"parado?", page.data)
         self.db.health_rows[0]["updated_at"] = now - timedelta(minutes=30)
         self.assertIn(b"parado?", self.c.get("/saude").data)
+
+
+    def test_customers_and_radius(self):
+        from fmn_filters.admin.config_store import read_env
+        self.login()
+        self.assertEqual(self.c.get("/clientes").status_code, 200)
+        r = self.post("/clientes", action="salvar", id="", name="Padaria Central", code="C-9",
+                      prefixes="187.87.201.40/30\n187.87.201.50", contact="noc@padaria.example", note="")
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(self.db.custs[1]["prefixes"], ["187.87.201.40/30", "187.87.201.50/32"])
+        self.assertEqual(self.db.audits[-1][1], "cliente_salvo")
+        r = self.post("/clientes", action="salvar", id="", name="Padaria Central", prefixes="187.87.201.60")
+        self.assertIn("já existe".encode(), r.data)
+        self.assertIn(b'value="Padaria Central"', r.data)                   # formulario preservado
+        r = self.post("/clientes", action="salvar", id="", name="Ruim", prefixes="10.0.0.0/8")
+        self.assertEqual(len(self.db.custs), 1)
+        self.assertIn(b"Padaria Central", self.c.get("/clientes?edit=1").data)
+        r = self.post("/clientes", action="radius", RADIUS_DB_HOST="10.0.0.5", RADIUS_DB_PORT="3306",
+                      RADIUS_DB_NAME="radius", RADIUS_TABLE="radacct", RADIUS_DB_USER="orby",
+                      RADIUS_DB_PASSWORD="s3cr3t-radius", RADIUS_TZ="America/Bahia")
+        self.assertEqual(r.status_code, 302)
+        path = Path(self.env["ORBYMON_RADIUS_ENV"])
+        self.assertEqual(read_env(path)["RADIUS_DB_PASSWORD"], "s3cr3t-radius")
+        page = self.c.get("/clientes")
+        self.assertNotIn(b"s3cr3t-radius", page.data)                       # senha nunca volta para a pagina
+        self.assertIn("mantida".encode(), page.data)
+        self.assertNotIn(b"s3cr3t", self.db.audits[-1][2].encode())
+        self.post("/clientes", action="radius", RADIUS_DB_HOST="10.0.0.6", RADIUS_DB_PORT="3306",
+                  RADIUS_DB_NAME="radius", RADIUS_TABLE="radacct", RADIUS_DB_USER="orby", RADIUS_DB_PASSWORD="",
+                  RADIUS_TZ="America/Bahia")
+        self.assertEqual(read_env(path)["RADIUS_DB_PASSWORD"], "s3cr3t-radius")   # vazio = manter
+        self.post("/clientes", action="radius", RADIUS_DB_HOST="10.0.0.6", RADIUS_DB_NAME="radius",
+                  RADIUS_TABLE="radacct`;x", RADIUS_DB_USER="orby")
+        self.assertEqual(read_env(path)["RADIUS_TABLE"], "radacct")
+        self.post("/clientes", action="excluir", id="1")
+        self.assertEqual(self.db.custs, {})
 
 
 class CliTests(unittest.TestCase):

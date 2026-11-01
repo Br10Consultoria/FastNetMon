@@ -1,0 +1,71 @@
+{% extends "base.html" %}{% block title %}Clientes{% endblock %}
+{% block body %}
+<h1>Clientes e RADIUS</h1>
+<p class="muted">Usados para identificar quem está por trás de um IP nos avisos do Telegram e na página Investigar:
+clientes com IP/prefixo dedicado pelo cadastro abaixo; assinantes PPPoE (inclusive 100.64.x do CGNAT) pelo login no RADIUS
+no horário do evento. Os dados ficam só no servidor e nos chats privados configurados.</p>
+{% if not installed %}<p class="flash">Tabelas de clientes não instaladas: rode <code>sudo bash scripts/setup-customers.sh</code>.</p>{% endif %}
+
+<section class="card">
+  <h2>Consultar</h2>
+  <form method="post" class="inline" autocomplete="off">{% include "_csrf.html" %}<input type="hidden" name="action" value="consultar">
+    <label>IP <input name="ip" required placeholder="100.64.70.12 ou 187.87.201.40"></label>
+    <label>Horário ({{ radius.RADIUS_TZ or 'America/Sao_Paulo' }}) <input name="when" placeholder="agora, ou 2026-10-30 14:05"></label>
+    <button>Consultar</button>
+  </form>
+  {% if lookup %}
+    <p><code>{{ lookup.ip }}</code> em {{ lookup.when }}:
+      {% if lookup.customer %}cliente <b>{{ lookup.customer.name }}</b>{% if lookup.customer.code %} ({{ lookup.customer.code }}){% endif %} · prefixo {{ lookup.customer.cidr }}{% else %}nenhum cliente cadastrado{% endif %}</p>
+    {% if lookup.error %}<p class="warn">{{ lookup.error }}</p>{% endif %}
+    {% if lookup.sessions %}<div class="scroll"><table><tr><th>Login</th><th>Início</th><th>Fim</th><th>MAC</th><th>NAS</th></tr>
+      {% for s in lookup.sessions %}<tr><td><b>{{ s.login }}</b></td><td>{{ s.inicio }}</td><td>{{ s.fim }}</td><td>{{ s.mac }}</td><td>{{ s.nas }}</td></tr>{% endfor %}
+    </table></div>{% elif radius.RADIUS_DB_HOST and not lookup.error %}<p class="muted">Nenhuma sessão RADIUS com esse IP no horário.</p>{% endif %}
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>{{ 'Editar cliente' if edit.id else 'Novo cliente' }}</h2>
+  <form method="post" autocomplete="off">{% include "_csrf.html" %}<input type="hidden" name="action" value="salvar"><input type="hidden" name="id" value="{{ edit.id or '' }}">
+    <div class="grid">
+      <label>Nome <input name="name" value="{{ edit.name }}" maxlength="120" required></label>
+      <label>Código no sistema de gestão <input name="code" value="{{ edit.code }}" maxlength="40"></label>
+      <label>Contato técnico/abuse <input name="contact" value="{{ edit.contact }}" maxlength="200"></label>
+    </div>
+    <label>IPs / prefixos dedicados (um por linha) <textarea name="prefixes" rows="3" class="mono">{{ edit.prefixes }}</textarea></label>
+    <label>Observação <input name="note" value="{{ edit.note }}" maxlength="300"></label>
+    <button>Salvar cliente</button>{% if edit.id %} <a href="{{ url_for('customers_page') }}">cancelar</a>{% endif %}
+  </form>
+</section>
+
+<section class="card">
+  <h2>Clientes ({{ items|length }})</h2>
+  {% if items %}<div class="scroll"><table>
+    <tr><th>Cliente</th><th>Prefixos</th><th>Contato</th><th></th></tr>
+    {% for c in items %}<tr>
+      <td><b>{{ c.name }}</b>{% if c.code %} <small class="muted">{{ c.code }}</small>{% endif %}{% if c.note %}<br><small class="muted">{{ c.note }}</small>{% endif %}</td>
+      <td><small class="mono">{{ c.prefixes|join(', ') }}</small></td><td><small>{{ c.contact }}</small></td>
+      <td class="nowrap"><a href="{{ url_for('customers_page', edit=c.id) }}">editar</a>
+        <form method="post" class="inlineform">{% include "_csrf.html" %}<input type="hidden" name="id" value="{{ c.id }}"><button name="action" value="excluir" class="secondary small">Remover</button></form></td>
+    </tr>{% endfor %}
+  </table></div>{% else %}<p class="muted">Nenhum cliente cadastrado.</p>{% endif %}
+</section>
+
+<section class="card">
+  <h2>RADIUS (somente leitura)</h2>
+  <p class="muted">Banco MySQL/MariaDB com a tabela de contabilidade do FreeRADIUS (<code>radacct</code>: username, framedipaddress,
+  acctstarttime, acctstoptime, callingstationid, nasipaddress). Crie um usuário só com <code>SELECT</code> nessa tabela e
+  libere o acesso a partir deste servidor. Deixe o servidor vazio para desativar.</p>
+  <form method="post" autocomplete="off">{% include "_csrf.html" %}<input type="hidden" name="action" value="radius">
+    <div class="grid">
+      <label>Servidor <input name="RADIUS_DB_HOST" value="{{ radius.RADIUS_DB_HOST }}" placeholder="10.0.0.5"></label>
+      <label>Porta <input name="RADIUS_DB_PORT" value="{{ radius.RADIUS_DB_PORT or '3306' }}"></label>
+      <label>Banco <input name="RADIUS_DB_NAME" value="{{ radius.RADIUS_DB_NAME }}" placeholder="radius"></label>
+      <label>Tabela <input name="RADIUS_TABLE" value="{{ radius.RADIUS_TABLE or 'radacct' }}"></label>
+      <label>Usuário <input name="RADIUS_DB_USER" value="{{ radius.RADIUS_DB_USER }}"></label>
+      <label>Senha <input name="RADIUS_DB_PASSWORD" type="password" placeholder="{{ 'mantida (preencha para trocar)' if has_password else '' }}" autocomplete="new-password"></label>
+      <label>Fuso das datas no radacct <select name="RADIUS_TZ">{% for z in tz_choices %}<option {{ 'selected' if (radius.RADIUS_TZ or 'America/Sao_Paulo')==z }}>{{ z }}</option>{% endfor %}</select></label>
+    </div>
+    <button>Salvar RADIUS</button>
+  </form>
+</section>
+{% endblock %}

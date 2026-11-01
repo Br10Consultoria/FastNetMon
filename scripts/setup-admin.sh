@@ -57,6 +57,8 @@ mariadb orbymon < "$BASE/sql/saved_filters.sql"
 mariadb orbymon < "$BASE/sql/net_prefixes.sql"
 mariadb orbymon < "$BASE/sql/filter_rules.sql"
 mariadb orbymon < "$BASE/sql/baseline.sql"
+mariadb orbymon < "$BASE/sql/customers.sql"
+mariadb orbymon < "$BASE/sql/health.sql"
 ADMIN_ENV=/etc/orbymon/admin.env
 DB_PASS=""
 [[ -s "$ADMIN_ENV" ]] && DB_PASS=$(sed -n "s/^ORBYMON_ADMIN_DB_PASSWORD='\(.*\)'$/\1/p" "$ADMIN_ENV")
@@ -74,6 +76,8 @@ GRANT INSERT, DELETE ON orbymon.orby_net_prefixes TO 'orbymon_admin'@'127.0.0.1'
 GRANT INSERT, UPDATE, DELETE ON orbymon.orby_filter_rules TO 'orbymon_admin'@'127.0.0.1';
 GRANT INSERT, UPDATE, DELETE ON orbymon.orby_exceptions TO 'orbymon_admin'@'127.0.0.1';
 GRANT INSERT, DELETE ON orbymon.orby_exception_prefixes TO 'orbymon_admin'@'127.0.0.1';
+GRANT INSERT, UPDATE, DELETE ON orbymon.orby_customers TO 'orbymon_admin'@'127.0.0.1';
+GRANT INSERT, UPDATE, DELETE ON orbymon.orby_customer_prefixes TO 'orbymon_admin'@'127.0.0.1';
 SQL
 install -d -o root -g orbymon-admin -m 0750 /etc/orbymon/admin-tls
 SECRET=/etc/orbymon/admin-secret
@@ -93,6 +97,7 @@ ORBYMON_RETENTION_ENV='/etc/orbymon/retention.env'
 ORBYMON_CALIBRATION_DIR='/var/lib/orbymon/calibration'
 ORBYMON_ADMIN_BACKUP_DIR='/var/lib/orbymon/admin/backups'
 ORBYMON_REPUTATION_ENV='/etc/orbymon/reputation.env'
+ORBYMON_RADIUS_ENV='/etc/orbymon/radius.env'
 ORBYMON_NAT_DIR='/var/log/orbymon/a10nat'
 ORBYMON_FLOW_ROOT='/var/lib/orbymon/flows'
 ORBYMON_QUERY_LOCK='/var/lib/orbymon/admin/query.lock'
@@ -115,6 +120,7 @@ fi
 [[ -e /etc/orbymon/retention.env ]] || printf "ORBYMON_LOG_RETENTION_DAYS='15'\nORBYMON_FLOW_RETENTION_DAYS='15'\n" > /etc/orbymon/retention.env
 [[ -e /etc/orbymon/telegram.env ]] || printf "TELEGRAM_BOT_TOKEN=''\nTELEGRAM_CHAT_IDS=''\n" > /etc/orbymon/telegram.env
 EXTRA=""; [[ -e /etc/orbymon/reputation.env ]] && EXTRA=/etc/orbymon/reputation.env
+[[ -e /etc/orbymon/radius.env ]] && EXTRA="$EXTRA /etc/orbymon/radius.env"
 for file in /etc/orbymon/bidir.json "$PROFILE" /etc/orbymon/telegram.env /etc/orbymon/retention.env $EXTRA; do
   [[ "$file" == /etc/orbymon/* && "$file" != /etc/orbymon/managed/* ]] || { echo "ignorado (fora de /etc/orbymon): $file"; continue; }
   name=$(basename "$file")

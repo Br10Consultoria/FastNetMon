@@ -464,6 +464,19 @@ def fmt_ts(value, tz=timezone.utc):
     return value.astimezone(tz).strftime("%d/%m/%Y %H:%M:%S")
 
 
+def identify_result(r: Result, identify, limit=60):
+    """Login PPPoE / cliente de cada assinante (e do IP denunciado, quando dedicado)."""
+    if not identify:
+        return r
+    for s in r.subscribers[:limit]:
+        s["identificacao"] = identify(s["ip"], r.query.when) or ""
+    if r.scope not in ("cgnat_pool",):
+        who = identify(r.query.ip, r.query.when)
+        if who:
+            r.notes.insert(0, "Identificação de %s: %s" % (r.query.ip, who))
+    return r
+
+
 def render_text(r: Result, tz=timezone.utc):
     q = r.query
     zone = getattr(tz, "key", "UTC")
@@ -472,14 +485,19 @@ def render_text(r: Result, tz=timezone.utc):
         " destino %s" % q.remote if q.remote else "", ":%d" % q.remote_port if q.remote_port is not None else "")]
     lines.append("Tipo do IP: %s%s" % (r.scope, " (%s)" % r.pool if r.pool else ""))
     lines.append("Resultado [%s]: %s" % (r.confidence, r.verdict))
+    if q.port is not None and r.subscribers:
+        for s in r.subscribers:
+            if s.get("identificacao"):
+                lines.append("  assinante %s: %s" % (s["ip"], s["identificacao"]))
     for m in r.mappings[:20]:
         if q.port is not None or len(r.mappings) <= 20:
             lines.append("  NAT %s %s:%d <- %s:%d  de %s até %s" % (
                 m.protocol, m.public_ip, m.public_port, m.inside_ip, m.inside_port, fmt_ts(m.start, tz), fmt_ts(m.end, tz)))
     if q.port is None and r.subscribers:
         for s in r.subscribers[:40]:
-            lines.append("  assinante %-16s %4d porta(s) %s  %s - %s" % (
-                s["ip"], s["portas"], s.get("protocolos", ""), fmt_ts(s.get("inicio"), tz), fmt_ts(s.get("fim"), tz)))
+            lines.append("  assinante %-16s %4d porta(s) %s  %s - %s%s" % (
+                s["ip"], s["portas"], s.get("protocolos", ""), fmt_ts(s.get("inicio"), tz), fmt_ts(s.get("fim"), tz),
+                ("  [%s]" % s["identificacao"]) if s.get("identificacao") else ""))
     for f in r.flows[:15]:
         lines.append("  fluxo %s -> %s:%s %s  %d fluxos  %s a %s" % (
             f["assinante"] or f["ip_publico"], f["remoto"], f["porta_remota"], f["protocolo"], f["fluxos"],

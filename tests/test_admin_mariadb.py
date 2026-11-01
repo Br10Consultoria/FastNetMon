@@ -68,6 +68,19 @@ class AdminStoreTests(unittest.TestCase):
         finally:
             self.assertEqual(self.s.delete_exception(eid), 1)
 
+    def test_customers_crud(self):
+        from fmn_filters import customers as cu
+        c = cu.validate_customer("teste " + self.name, "X1", "198.51.100.8/30\n2001:db8:5::/48")
+        cid = self.s.save_customer(0, c, self.name)
+        try:
+            got = [x for x in self.s.customers() if x["id"] == cid][0]
+            self.assertEqual(got["prefixes"], ["198.51.100.8/30", "2001:db8:5::/48"])
+            self.s.save_customer(cid, dict(c, prefixes=["198.51.100.12/30"]), self.name)
+            got = [x for x in self.s.customers() if x["id"] == cid][0]
+            self.assertEqual(got["prefixes"], ["198.51.100.12/30"])
+        finally:
+            self.assertEqual(self.s.delete_customer(cid), 1)
+
     def test_fails_audit_interfaces_health(self):
         for _ in range(3):
             self.s.fail("192.0.2.77", self.name)

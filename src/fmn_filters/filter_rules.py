@@ -399,7 +399,7 @@ def prune(db, rules):
 
 
 # ------------------------------------------------------------------ Telegram
-def fmt_item(it):
+def fmt_item(it, identify=None, when=None):
     e = html.escape
     extra = ""
     if it.get("pool"):
@@ -407,8 +407,12 @@ def fmt_item(it):
     elif it.get("scope") == "dedicated":
         extra = " (dedicado)"
     subs = it.get("assinantes") or []
+    ident = (lambda ip: identify(ip, when) if identify and when else "")
     if subs:
-        extra += " · assinante%s %s" % ("s" if len(subs) > 1 else "", ", ".join("<code>%s</code>" % e(s) for s in subs))
+        extra += " · assinante%s %s" % ("s" if len(subs) > 1 else "", ", ".join(
+            "<code>%s</code>%s" % (e(s), (" (%s)" % e(ident(s))) if ident(s) else "") for s in subs))
+    elif it.get("scope") == "dedicated" and ident(str(it["key"])):
+        extra += " · %s" % e(ident(str(it["key"])))
     return "• <code>%s</code>%s — %s · %s" % (e(str(it["key"])), extra, fq.human(it["bps"], "bps"),
                                              fq.human(it["pps"], "pps"))
 
@@ -444,7 +448,8 @@ def notify(db, telegram, formatter, rules_by_id, now, reminder_min=30, budget=10
                                                          "%.0f" % inc["peak_flows"])]
             if top:
                 lines.append("Top %s:" % AGGS[d["report"]["agg"]])
-                lines += [fmt_item(it) for it in top[:d["report"]["top"]]]
+                lines += [fmt_item(it, getattr(formatter, "identify", None), inc["last_match_at"])
+                          for it in top[:d["report"]["top"]]]
             lines.append("Filtro: <code>%s</code>" % e(rule["expr"][:300]))
             lines.append("Início: %s" % formatter.local(inc["started_at"]))
             first = top[0]["key"] if top and d["report"]["agg"] in ("dstip", "srcip") else None
@@ -510,6 +515,8 @@ def main(argv=None):
     ap.add_argument("--config", default="/etc/orbymon/bidir.json")
     ap.add_argument("--flow-root", default="/var/lib/orbymon/flows")
     ap.add_argument("--telegram-env", help="telegram.env para avisar (lido como dados)")
+    ap.add_argument("--radius-env", default="/etc/orbymon/radius.env",
+                    help="RADIUS para mostrar o login PPPoE (lido como dados; ignorado se nao existir)")
     args = ap.parse_args(argv)
     try:
         from .admin.config_store import read_env
@@ -527,6 +534,9 @@ def main(argv=None):
                 s = Settings.from_env(env)
                 telegram, formatter, reminder = Telegram(s.token, s.chats), Formatter(s), s.reminder_min
         db = connection_from_env()
+        if formatter is not None:
+            from .customers import build_identifier
+            formatter.identify = build_identifier(db, args.radius_env if os.path.exists(args.radius_env) else None)
         try:
             actions, sent = run(db, cfg, profile, args.flow_root, telegram=telegram, formatter=formatter,
                                 reminder_min=reminder)
