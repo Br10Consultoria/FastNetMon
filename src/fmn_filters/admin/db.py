@@ -194,6 +194,16 @@ description=IF(builtin=0,VALUES(description),description)""", (name, expr, descr
         finally:
             db.close()
 
+    # ---------- saude
+    def health_items(self):
+        try:
+            rows = self._q("SELECT check_key,label,status,value,detail,since,updated_at FROM orby_health "
+                           "ORDER BY FIELD(status,'crit','warn','unknown','ok'),check_key")
+        except Exception:
+            return None
+        keys = ("key", "label", "status", "value", "detail", "since", "updated_at")
+        return [dict(zip(keys, r)) for r in rows]
+
     # ---------- excecoes e linha de base
     def exceptions(self):
         try:

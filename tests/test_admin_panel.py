@@ -1,5 +1,5 @@
 """Painel web: login com senha + 2FA, CSRF, bloqueio, gravacao validada das configuracoes."""
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
 import os
 from pathlib import Path
@@ -125,6 +125,11 @@ class FakeStore:
         before = len(self.saved)
         self.saved = [x for x in self.saved if not (x["id"] == fid and not x["builtin"])]
         return before - len(self.saved)
+
+    health_rows = None
+
+    def health_items(self):
+        return self.health_rows
 
     excs = None
     synced_ids = ()
@@ -752,6 +757,22 @@ class PanelTests(unittest.TestCase):
         self.assertIn(b"America/Bahia", page.data)
         r = self.post("/base", enabled="1", factor="50", floor_pct="20", min_days="3", timezone="America/Bahia")
         self.assertIn("Não salvo".encode(), self.c.get("/base").data)
+
+
+    def test_health_page(self):
+        self.login()
+        page = self.c.get("/saude")
+        self.assertIn(b"setup-health.sh", page.data)
+        now = datetime.now(timezone.utc).replace(tzinfo=None).replace(microsecond=0)
+        self.db.health_rows = [{"key": "nfcapd", "label": "Coleta NetStream (nfcapd)", "status": "crit",
+                                "value": "último arquivo há 12 min", "detail": "o roteador parou", "since": now,
+                                "updated_at": now}]
+        page = self.c.get("/saude")
+        self.assertIn("crítico".encode(), page.data)
+        self.assertIn("último arquivo há 12 min".encode(), page.data)
+        self.assertNotIn(b"parado?", page.data)
+        self.db.health_rows[0]["updated_at"] = now - timedelta(minutes=30)
+        self.assertIn(b"parado?", self.c.get("/saude").data)
 
 
 class CliTests(unittest.TestCase):

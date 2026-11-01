@@ -29,7 +29,7 @@ METRICS = (("min_pps", "Pacotes/s", float), ("min_mbps", "Mbps", float), ("min_r
 SERVICES = ("orbymon-nfcapd@huawei.service", "orbymon-a10-nat.service", "orbymon-flow-rollup-huawei.timer",
             "orbymon-bidir-huawei.timer", "orbymon-ip-huawei.timer", "orbymon-telegram.timer",
             "orbymon-retention.timer", "orbymon-calibrate.timer", "orbymon-filter-rules.timer",
-            "orbymon-exceptions.timer", "grafana-server.service", "mariadb.service")
+            "orbymon-exceptions.timer", "orbymon-health.timer", "grafana-server.service", "mariadb.service")
 
 
 def _secret_key(env):
@@ -693,6 +693,17 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
                                error=error, history=history, hist_chart=hist_chart, incidents=incidents,
                                metrics=fr.METRICS, ops=fr.OPS, aggs=fr.AGGS, human=fq.human,
                                describe=fr.describe)
+
+    # ---------------------------------------------------------------- saude
+    @app.route("/saude")
+    def health_page():
+        from datetime import datetime as dt, timezone as dt_timezone
+        items = store.health_items()
+        now = dt.now(dt_timezone.utc).replace(tzinfo=None)
+        updated = max((i["updated_at"] for i in items), default=None) if items else None
+        stale = updated is None or (now - updated).total_seconds() > 600
+        return render_template("health.html", items=items or [], updated=updated, stale=stale, now=now,
+                               installed=items is not None)
 
     # ---------------------------------------------------------------- etapa 2: excecoes e linha de base
     @app.route("/excecoes", methods=["GET", "POST"])

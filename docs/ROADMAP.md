@@ -14,6 +14,8 @@ Ordem pensada para deixar **detecção e alarmes certeiros antes da mitigação*
   semana, nunca acima do fixo), exceções por IP/rede/ASN com validade, limite próprio por IP, “acima do habitual”
   nos alarmes por filtro. Pendente do lado do roteador: active timeout do NetStream em 1 minuto.
 
+- **Saúde** ([SAUDE.md](SAUDE.md)): coleta, atrasos, disco, serviços e tempo de execução, com aviso no Telegram.
+
 ## 3. Clientes — próxima
 - Cadastro "Meus clientes" (prefixos dedicados, nome) e consulta ao RADIUS/BRAS para transformar
   100.64.x + horário em login PPPoE.
@@ -24,8 +26,7 @@ Ordem pensada para deixar **detecção e alarmes certeiros antes da mitigação*
   ping/traceroute e diagnóstico DNS a partir do servidor.
 
 ## 5. Operação
-- Várias fontes (outros roteadores), e-mail e webhook, página de saúde (atraso de coleta, disco,
-  serviços), exportar/importar configuração.
+- Várias fontes (outros roteadores), e-mail e webhook, exportar/importar configuração.
 
 ## 6. Mitigação (última)
 - Blackhole (RTBH) e FlowSpec para o NE8000 a partir dos incidentes, com aprovação manual primeiro,

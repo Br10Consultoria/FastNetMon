@@ -1,0 +1,20 @@
+[Unit]
+Description=OrbyMon - verificacao de saude (coleta, atrasos, disco, servicos)
+After=network-online.target mariadb.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=orbymon
+Group=orbymon
+WorkingDirectory=/opt/orbymon
+EnvironmentFile=/etc/orbymon/pipeline.env
+Environment=PYTHONPATH=/opt/orbymon/src
+# telegram.env e editado pelo painel: lido como dados (--telegram-env), nunca como ambiente do processo
+ExecStart=/opt/orbymon/.venv/bin/python -m fmn_filters.health --config /etc/orbymon/bidir.json --flow-root /var/lib/orbymon/flows --telegram-env /etc/orbymon/telegram.env
+TimeoutStartSec=90
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX

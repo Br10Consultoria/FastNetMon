@@ -1,0 +1,19 @@
+{% extends "base.html" %}{% block title %}Saúde{% endblock %}
+{% block body %}
+<h1>Saúde do sistema</h1>
+{% if not installed %}
+  <p class="flash">Verificação de saúde não instalada. Rode <code>sudo bash scripts/setup-health.sh</code>.</p>
+{% else %}
+  {% if stale %}<p class="flash">Sem verificação recente{% if updated %} (última em {{ updated }} UTC){% endif %}: o <code>orbymon-health.timer</code> está parado?</p>
+  {% else %}<p class="muted">Verificado em {{ updated }} UTC (a cada 2 min). Problemas confirmados em 2 verificações seguidas vão para o Telegram, assim como a volta ao normal.</p>{% endif %}
+  {% set st = {'ok': ('normal','ok'), 'warn': ('atenção','sev-high'), 'crit': ('crítico','bad'), 'unknown': ('sem dados','idle')} %}
+  <section class="card"><div class="scroll"><table>
+    <tr><th>Item</th><th>Situação</th><th>Medida</th><th>Desde (UTC)</th></tr>
+    {% for i in items %}<tr>
+      <td><b>{{ i.label }}</b>{% if i.detail %}<br><small class="muted">{{ i.detail }}</small>{% endif %}</td>
+      <td><span class="pill {{ st[i.status][1] }}">{{ st[i.status][0] }}</span></td>
+      <td>{{ i.value }}</td><td class="nowrap">{{ i.since }}</td>
+    </tr>{% endfor %}
+  </table></div></section>
+{% endif %}
+{% endblock %}
