@@ -78,6 +78,21 @@ os eventos que o rsyslog fragmentou.
 
 ### Pontos de observação no Huawei (importante para não duplicar)
 
+Interfaces de borda do NE8000 (VS Bgp) já preenchidas em `rules/bidir.example.json`:
+
+| ifIndex | Interface | Vizinho |
+|---|---|---|
+| 334 | Vlanif460 | 10.5.50.6, AS 48674 (trânsito, tabela completa) |
+| 336 | Vlanif462 | 10.5.50.10, AS 48674 |
+| 369 | Vlanif2511 | PTT (187.16.216.x) — ~5 Gbps de entrada |
+| 368 | Vlanif2401 | 10.101.101.9, AS 52979 |
+| 348 | Vlanif53 | 10.5.50.2, AS 46197 |
+| 86 | Vlanif712 | CDN |
+| 85 | Vlanif1358 | backup (desligada) |
+
+Ao criar uma nova interface de borda, ligue o NetStream nela **e** acrescente o ifIndex nas duas listas;
+caso contrário o tráfego dela é descartado pelo filtro.
+
 O mesmo pacote pode ser visto em mais de uma interface (antes e depois do A10). Em `observation_ifindexes`
 liste os ifIndex dos **uplinks de internet** (trânsito, CDN, IX) nas duas chaves:
 

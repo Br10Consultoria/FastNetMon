@@ -4,7 +4,7 @@
   "cgnat_profile_path": "/etc/orbymon/cgnat-profiles.json",
   "extra_infrastructure_cidrs": ["187.87.201.193/32", "187.87.201.198/32"],
   "nat_socket": "/run/orbymon/nat.sock",
-  "observation_ifindexes": {"in": [], "out": []},
+  "observation_ifindexes": {"in": [334, 336, 369, 368, 348, 86, 85], "out": [334, 336, 369, 368, 348, 86, 85]},
   "keep_ports": {"below": 1024, "extra": [1900, 3702, 5353, 5060, 8080, 8443, 11211, 3389, 3306, 6379, 27017]},
   "counter_multiplier": 1.0,
   "settle_minutes": 2,
