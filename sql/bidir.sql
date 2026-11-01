@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS orby_flow_minute (
  packets DOUBLE NOT NULL DEFAULT 0,
  bytes DOUBLE NOT NULL DEFAULT 0,
  syn_packets DOUBLE NOT NULL DEFAULT 0,
+ zero_port_packets DOUBLE NOT NULL DEFAULT 0,
  flows BIGINT UNSIGNED NOT NULL DEFAULT 0,
  PRIMARY KEY(source,bucket_utc,direction,scope,local_ip,subscriber_ip,remote_ip,
              protocol,local_port,remote_port,input_if,output_if),
@@ -28,6 +29,9 @@ CREATE TABLE IF NOT EXISTS orby_flow_minute (
  INDEX ix_flow_local_time(local_ip,bucket_utc),
  INDEX ix_flow_bucket(bucket_utc,direction,scope)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Migracao para instalacoes anteriores (idempotente no MariaDB).
+ALTER TABLE orby_flow_minute ADD COLUMN IF NOT EXISTS zero_port_packets DOUBLE NOT NULL DEFAULT 0 AFTER syn_packets;
 
 CREATE TABLE IF NOT EXISTS orby_flow_ingested_files (
  source VARCHAR(32) NOT NULL,

@@ -1,0 +1,10 @@
+[Unit]
+Description=OrbyMon - retencao de arquivos a cada hora
+
+[Timer]
+OnCalendar=*-*-* *:07:00
+Persistent=true
+Unit=orbymon-retention.service
+
+[Install]
+WantedBy=timers.target

@@ -36,7 +36,7 @@ def run(records, cfg=None, resolve=None):
 
 COLS = ("source", "bucket", "direction", "scope", "pool", "local_ip", "subscriber_ip", "remote_ip",
         "protocol", "local_port", "remote_port", "input_if", "output_if", "packets", "bytes",
-        "syn_packets", "flows")
+        "syn_packets", "zero_port_packets", "flows")
 
 
 def as_dicts(rows):
@@ -116,6 +116,15 @@ class RollupTests(unittest.TestCase):
             cfg)
         self.assertEqual(sorted(r["direction"] for r in as_dicts(rows)), ["in", "out"])
         self.assertEqual(stats["filtrado_por_ifindex"], 1)
+
+    def test_port_zero_and_fragments_are_counted_not_discarded(self):
+        rows = as_dicts(run([flow("1.2.3.4", "45.238.170.10", 0, 0, "udp", packets=100),      # porta 0 / fragmento
+                             flow("1.2.3.5", "45.238.170.10", 53, 0, "udp", packets=50),
+                             flow("1.2.3.6", "45.238.170.10", 53, 40000, "udp", packets=70),
+                             flow("1.2.3.7", "45.238.170.10", 0, 0, "icmp", packets=30)])[0])
+        zero = {r["remote_ip"]: r["zero_port_packets"] for r in rows}
+        self.assertEqual(zero, {"1.2.3.4": 100.0, "1.2.3.5": 50.0, "1.2.3.6": 0.0, "1.2.3.7": 0.0})
+        self.assertEqual(sum(r["packets"] for r in rows), 250.0)
 
     def test_same_key_sums_and_multiplier_applies(self):
         cfg = config(counter_multiplier=2.0)

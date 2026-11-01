@@ -118,7 +118,8 @@ def parse_events(message: str, scopes: ScopeMap, *, received: float,
     for mapping in MAPPING.finditer(message):
         inside_port = int(mapping.group("inside_port"))
         public_port = int(mapping.group("public_port"))
-        if not (1 <= inside_port <= 65535 and 1 <= public_port <= 65535):
+        # Porta 0 e valida (ICMP id 0 e trafego de ataque com porta 0); so rejeita fora de 0..65535.
+        if not (0 <= inside_port <= 65535 and 0 <= public_port <= 65535):
             reason = "porta_invalida"
             continue
         inside_ip, public_ip = mapping.group("inside"), mapping.group("public")
@@ -230,7 +231,7 @@ class NatTable:
 
 
 class EventLog:
-    """Log compacto em TSV por dia: ts, kind, proto, inside, in_port, public, pub_port, a10_ts."""
+    """Log compacto em TSV por hora: ts, kind, proto, inside, in_port, public, pub_port, a10_ts."""
 
     def __init__(self, directory):
         self.dir = Path(directory) if directory else None
@@ -240,7 +241,7 @@ class EventLog:
     def write(self, ev: NatEvent):
         if self.dir is None:
             return
-        day = datetime.fromtimestamp(ev.ts, timezone.utc).strftime("%Y%m%d")
+        day = datetime.fromtimestamp(ev.ts, timezone.utc).strftime("%Y%m%d%H")   # um arquivo por hora
         if day != self._day:
             self.close()
             self.dir.mkdir(parents=True, exist_ok=True)
@@ -552,9 +553,11 @@ def main(argv=None):
                              time_source=args.time_source, log_dir=args.log_dir,
                              retention_seconds=args.retention_seconds)
         now = time.time()
-        today = datetime.fromtimestamp(now, timezone.utc).strftime("%Y%m%d")
-        restored = replay_log(Path(args.log_dir) / ("nat-events-%s.tsv" % today),
-                              service.table, now - args.retention_seconds)
+        restored = 0
+        for hour in (now - 3600, now):                    # hora anterior e hora atual
+            name = "nat-events-%s.tsv" % datetime.fromtimestamp(hour, timezone.utc).strftime("%Y%m%d%H")
+            restored += replay_log(Path(args.log_dir) / name, service.table,
+                                   now - args.retention_seconds)
         print("estado restaurado do log: %d eventos" % restored, flush=True)
         asyncio.run(serve(service, args.listen, args.port, cfg["nat_socket"], use_db=not args.no_db))
         return 0

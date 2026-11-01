@@ -27,13 +27,27 @@ class DeployTests(unittest.TestCase):
         subprocess.run(["bash", "-n", str(script)], check=True)
         text = script.read_text()
         for name in ("orbymon-a10-nat.service", "orbymon-flow-rollup-huawei.timer",
-                     "orbymon-bidir-huawei.timer", "orbymon-a10nat-compress.timer"):
+                     "orbymon-bidir-huawei.timer", "orbymon-retention.timer",
+                     "orbymon-retention.service"):
             self.assertIn(name, text)
             self.assertTrue((ROOT / "deploy/systemd" / name).exists())
 
     def test_receiver_only_accepts_the_a10_by_default(self):
         text = (ROOT / "deploy/systemd/orbymon-a10-nat.service").read_text()
         self.assertIn("--allow 10.100.10.10", text)
+
+    def test_operational_scripts_are_valid_bash(self):
+        for name in ("orbymon-retention.sh", "a10-receiver-cutover.sh"):
+            subprocess.run(["bash", "-n", str(ROOT / "scripts" / name)], check=True)
+        cut = (ROOT / "scripts/a10-receiver-cutover.sh").read_text()
+        self.assertIn("--rollback", cut)
+        self.assertIn("rsyslogd -N1", cut)
+
+    def test_retention_service_runs_the_script_with_limited_write_paths(self):
+        unit = (ROOT / "deploy/systemd/orbymon-retention.service").read_text()
+        self.assertIn("/opt/orbymon/scripts/orbymon-retention.sh", unit)
+        self.assertIn("ProtectSystem=strict", unit)
+        self.assertIn("ReadWritePaths=", unit)
 
 
 if __name__ == "__main__":

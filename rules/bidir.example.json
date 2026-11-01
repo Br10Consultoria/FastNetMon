@@ -10,112 +10,102 @@
   "settle_minutes": 2,
   "cooldown_minutes": 15,
   "max_query_rows": 500000,
-  "retention_days": 14,
+  "retention_days": 2,
   "rules": [
-    {
-      "name": "IN UDP volumetrico", "enabled": true, "severity": "high",
-      "direction": "in", "protocols": ["udp"], "consecutive_minutes": 2,
+    {"name": "IN UDP volumetrico", "enabled": true, "severity": "high", "direction": "in", "protocols": ["udp"], "consecutive_minutes": 2,
       "limits": {
-        "dedicated":        {"min_pps": 50000,  "min_mbps": 400, "min_remote_ips": 8},
-        "cgnat_pool":       {"min_pps": 100000, "min_mbps": 800, "min_remote_ips": 8},
-        "cgnat_subscriber": {"min_pps": 30000,  "min_mbps": 200, "min_remote_ips": 5},
-        "cgnat_private":    {"min_pps": 30000,  "min_mbps": 200, "min_remote_ips": 5}
+        "dedicated": {"min_pps": 50000, "min_mbps": 400, "min_remote_ips": 8},
+        "cgnat_pool": {"min_pps": 100000, "min_mbps": 800, "min_remote_ips": 8},
+        "cgnat_subscriber": {"min_pps": 30000, "min_mbps": 200, "min_remote_ips": 5},
+        "cgnat_private": {"min_pps": 30000, "min_mbps": 200, "min_remote_ips": 5}
       }
     },
-    {
-      "name": "IN TCP volumetrico", "enabled": true, "severity": "high",
-      "direction": "in", "protocols": ["tcp"], "consecutive_minutes": 2,
+    {"name": "IN TCP volumetrico", "enabled": true, "severity": "high", "direction": "in", "protocols": ["tcp"], "consecutive_minutes": 2,
       "limits": {
-        "dedicated":        {"min_pps": 80000,  "min_mbps": 600, "min_remote_ips": 8},
-        "cgnat_pool":       {"min_pps": 160000, "min_mbps": 1200, "min_remote_ips": 8},
-        "cgnat_subscriber": {"min_pps": 50000,  "min_mbps": 300, "min_remote_ips": 5},
-        "cgnat_private":    {"min_pps": 50000,  "min_mbps": 300, "min_remote_ips": 5}
+        "dedicated": {"min_pps": 80000, "min_mbps": 600, "min_remote_ips": 8},
+        "cgnat_pool": {"min_pps": 160000, "min_mbps": 1200, "min_remote_ips": 8},
+        "cgnat_subscriber": {"min_pps": 50000, "min_mbps": 300, "min_remote_ips": 5},
+        "cgnat_private": {"min_pps": 50000, "min_mbps": 300, "min_remote_ips": 5}
       }
     },
-    {
-      "name": "IN SYN flood", "enabled": true, "severity": "high",
-      "direction": "in", "protocols": ["tcp"], "consecutive_minutes": 2,
+    {"name": "IN SYN flood", "enabled": true, "severity": "high", "direction": "in", "protocols": ["tcp"], "consecutive_minutes": 2,
       "limits": {
-        "dedicated":        {"min_pps": 20000, "min_syn_ratio": 0.7, "min_remote_ips": 8},
-        "cgnat_pool":       {"min_pps": 40000, "min_syn_ratio": 0.7, "min_remote_ips": 8},
+        "dedicated": {"min_pps": 20000, "min_syn_ratio": 0.7, "min_remote_ips": 8},
+        "cgnat_pool": {"min_pps": 40000, "min_syn_ratio": 0.7, "min_remote_ips": 8},
         "cgnat_subscriber": {"min_pps": 10000, "min_syn_ratio": 0.7, "min_remote_ips": 5}
       }
     },
-    {
-      "name": "IN reflexao/amplificacao UDP", "enabled": true, "severity": "high",
-      "direction": "in", "protocols": ["udp"], "consecutive_minutes": 2,
-      "remote_ports": [19, 53, 123, 161, 389, 1900, 3702, 5353, 11211],
-      "split_by": ["remote_port"],
+    {"name": "IN reflexao/amplificacao UDP", "enabled": true, "severity": "high", "direction": "in", "protocols": ["udp"], "consecutive_minutes": 2, "remote_ports": [19, 53, 123, 161, 389, 1900, 3702, 5353, 11211], "split_by": ["remote_port"],
       "limits": {
-        "dedicated":        {"min_pps": 8000,  "min_mbps": 60, "min_remote_ips": 3},
-        "cgnat_pool":       {"min_pps": 20000, "min_mbps": 150, "min_remote_ips": 3},
-        "cgnat_subscriber": {"min_pps": 5000,  "min_mbps": 40, "min_remote_ips": 3},
-        "cgnat_private":    {"min_pps": 5000,  "min_mbps": 40, "min_remote_ips": 3}
+        "dedicated": {"min_pps": 8000, "min_mbps": 60, "min_remote_ips": 3},
+        "cgnat_pool": {"min_pps": 20000, "min_mbps": 150, "min_remote_ips": 3},
+        "cgnat_subscriber": {"min_pps": 5000, "min_mbps": 40, "min_remote_ips": 3},
+        "cgnat_private": {"min_pps": 5000, "min_mbps": 40, "min_remote_ips": 3}
       }
     },
-    {
-      "name": "IN ICMP anomalo", "enabled": true, "severity": "warning",
-      "direction": "in", "protocols": ["icmp", "icmpv6"], "consecutive_minutes": 2,
+    {"name": "IN ICMP anomalo", "enabled": true, "severity": "warning", "direction": "in", "protocols": ["icmp", "icmpv6"], "consecutive_minutes": 2,
       "limits": {
-        "dedicated":        {"min_pps": 15000, "min_mbps": 80, "min_remote_ips": 5},
-        "cgnat_pool":       {"min_pps": 30000, "min_mbps": 160, "min_remote_ips": 5}
+        "dedicated": {"min_pps": 15000, "min_mbps": 80, "min_remote_ips": 5},
+        "cgnat_pool": {"min_pps": 30000, "min_mbps": 160, "min_remote_ips": 5}
       }
     },
-    {
-      "name": "OUT UDP flood", "enabled": true, "severity": "high",
-      "direction": "out", "protocols": ["udp"], "consecutive_minutes": 2,
+    {"name": "OUT UDP flood", "enabled": true, "severity": "high", "direction": "out", "protocols": ["udp"], "consecutive_minutes": 2,
       "limits": {
-        "dedicated":        {"min_pps": 30000, "min_mbps": 200},
-        "cgnat_pool":       {"min_pps": 60000, "min_mbps": 400},
+        "dedicated": {"min_pps": 30000, "min_mbps": 200},
+        "cgnat_pool": {"min_pps": 60000, "min_mbps": 400},
         "cgnat_subscriber": {"min_pps": 15000, "min_mbps": 100},
-        "cgnat_private":    {"min_pps": 15000, "min_mbps": 100}
+        "cgnat_private": {"min_pps": 15000, "min_mbps": 100}
       }
     },
-    {
-      "name": "OUT TCP flood", "enabled": true, "severity": "high",
-      "direction": "out", "protocols": ["tcp"], "consecutive_minutes": 2,
+    {"name": "OUT TCP flood", "enabled": true, "severity": "high", "direction": "out", "protocols": ["tcp"], "consecutive_minutes": 2,
       "limits": {
-        "dedicated":        {"min_pps": 50000, "min_mbps": 300},
-        "cgnat_pool":       {"min_pps": 100000, "min_mbps": 600},
+        "dedicated": {"min_pps": 50000, "min_mbps": 300},
+        "cgnat_pool": {"min_pps": 100000, "min_mbps": 600},
         "cgnat_subscriber": {"min_pps": 25000, "min_mbps": 150},
-        "cgnat_private":    {"min_pps": 25000, "min_mbps": 150}
+        "cgnat_private": {"min_pps": 25000, "min_mbps": 150}
       }
     },
-    {
-      "name": "OUT SYN flood ou varredura", "enabled": true, "severity": "high",
-      "direction": "out", "protocols": ["tcp"], "consecutive_minutes": 2,
+    {"name": "OUT SYN flood ou varredura", "enabled": true, "severity": "high", "direction": "out", "protocols": ["tcp"], "consecutive_minutes": 2,
       "limits": {
-        "dedicated":        {"min_pps": 3000, "min_syn_ratio": 0.8, "min_remote_ips": 20},
-        "cgnat_pool":       {"min_pps": 10000, "min_syn_ratio": 0.8, "min_remote_ips": 50},
+        "dedicated": {"min_pps": 3000, "min_syn_ratio": 0.8, "min_remote_ips": 20},
+        "cgnat_pool": {"min_pps": 10000, "min_syn_ratio": 0.8, "min_remote_ips": 50},
         "cgnat_subscriber": {"min_pps": 2000, "min_syn_ratio": 0.8, "min_remote_ips": 20},
-        "cgnat_private":    {"min_pps": 2000, "min_syn_ratio": 0.8, "min_remote_ips": 20}
+        "cgnat_private": {"min_pps": 2000, "min_syn_ratio": 0.8, "min_remote_ips": 20}
       }
     },
-    {
-      "name": "OUT ICMP anomalo", "enabled": true, "severity": "warning",
-      "direction": "out", "protocols": ["icmp", "icmpv6"], "consecutive_minutes": 2,
+    {"name": "OUT ICMP anomalo", "enabled": true, "severity": "warning", "direction": "out", "protocols": ["icmp", "icmpv6"], "consecutive_minutes": 2,
       "limits": {
-        "dedicated":        {"min_pps": 10000, "min_mbps": 50},
+        "dedicated": {"min_pps": 10000, "min_mbps": 50},
         "cgnat_subscriber": {"min_pps": 5000, "min_mbps": 25},
-        "cgnat_private":    {"min_pps": 5000, "min_mbps": 25}
+        "cgnat_private": {"min_pps": 5000, "min_mbps": 25}
       }
     },
-    {
-      "name": "OUT IP usado como refletor", "enabled": true, "severity": "high",
-      "direction": "out", "protocols": ["udp"], "consecutive_minutes": 2,
-      "local_ports": [19, 53, 123, 161, 389, 1900, 3702, 5353, 11211],
-      "split_by": ["local_port"],
+    {"name": "OUT IP usado como refletor", "enabled": true, "severity": "high", "direction": "out", "protocols": ["udp"], "consecutive_minutes": 2, "local_ports": [19, 53, 123, 161, 389, 1900, 3702, 5353, 11211], "split_by": ["local_port"],
       "limits": {
-        "dedicated":        {"min_pps": 5000, "min_mbps": 40, "min_remote_ips": 3},
+        "dedicated": {"min_pps": 5000, "min_mbps": 40, "min_remote_ips": 3},
         "cgnat_subscriber": {"min_pps": 3000, "min_mbps": 25, "min_remote_ips": 3},
-        "cgnat_private":    {"min_pps": 3000, "min_mbps": 25, "min_remote_ips": 3}
+        "cgnat_private": {"min_pps": 3000, "min_mbps": 25, "min_remote_ips": 3}
+      }
+    },
+    {"name": "IN porta 0 / fragmentos", "enabled": true, "severity": "high", "direction": "in", "protocols": ["udp", "tcp"], "split_by": ["protocol"], "consecutive_minutes": 2,
+      "limits": {
+        "dedicated": {"min_pps": 10000, "min_zero_port_ratio": 0.5, "min_remote_ips": 3},
+        "cgnat_pool": {"min_pps": 20000, "min_zero_port_ratio": 0.5, "min_remote_ips": 3},
+        "cgnat_subscriber": {"min_pps": 5000, "min_zero_port_ratio": 0.5, "min_remote_ips": 3},
+        "cgnat_private": {"min_pps": 5000, "min_zero_port_ratio": 0.5, "min_remote_ips": 3}
+      }
+    },
+    {"name": "OUT porta 0 / fragmentos", "enabled": true, "severity": "high", "direction": "out", "protocols": ["udp", "tcp"], "split_by": ["protocol"], "consecutive_minutes": 2,
+      "limits": {
+        "dedicated": {"min_pps": 5000, "min_zero_port_ratio": 0.5},
+        "cgnat_pool": {"min_pps": 10000, "min_zero_port_ratio": 0.5},
+        "cgnat_subscriber": {"min_pps": 3000, "min_zero_port_ratio": 0.5},
+        "cgnat_private": {"min_pps": 3000, "min_zero_port_ratio": 0.5}
       }
     }
   ],
   "nat_rules": [
-    {"name": "NAT taxa de alocacao de portas", "enabled": true, "severity": "warning",
-     "min_allocs_per_min": 6000, "consecutive_minutes": 2},
-    {"name": "NAT portas ativas por assinante", "enabled": true, "severity": "warning",
-     "min_active_ports": 20000, "consecutive_minutes": 2}
+    {"name": "NAT taxa de alocacao de portas", "enabled": true, "severity": "warning", "min_allocs_per_min": 6000, "consecutive_minutes": 2},
+    {"name": "NAT portas ativas por assinante", "enabled": true, "severity": "warning", "min_active_ports": 20000, "consecutive_minutes": 2}
   ]
 }

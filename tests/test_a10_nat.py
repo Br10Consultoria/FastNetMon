@@ -79,8 +79,12 @@ class ParseTests(unittest.TestCase):
         self.assertIsNone(self.parse(msg(inside="10.0.0.5")))
         self.assertIsNone(self.parse(msg(public="45.238.170.10")))    # dedicado, nao pool
         self.assertIsNone(self.parse(msg(public="8.8.8.8")))
-        self.assertIsNone(self.parse(msg(pub_port=0)))
+        self.assertIsNone(self.parse(msg(pub_port=99999)))
         self.assertIsNone(self.parse(msg(ip_port=70000)))
+
+    def test_port_zero_is_valid(self):
+        ev = self.parse(msg(proto="ICMP", ip_port=0, pub_port=0))
+        self.assertEqual((ev.protocol, ev.inside_port, ev.public_port), ("icmp", 0, 0))
         self.assertIsNone(self.parse("<134>1 2026-10-30T12:00:00Z h - - - - sem mapeamento"))
 
 
@@ -206,7 +210,7 @@ class ReasonAndReplayTests(unittest.TestCase):
                          "sem_marcador_nat")
         self.assertEqual(reason(msg(inside="10.9.9.9")), "interno_fora_da_rede")
         self.assertEqual(reason(msg(public="187.87.201.50")), "publico_fora_dos_pools")
-        self.assertEqual(reason(msg(pub_port=0)), "porta_invalida")
+        self.assertEqual(reason(msg(pub_port=99999)), "porta_invalida")
         self.assertIsNone(reason(msg()))
 
     def test_several_mappings_after_one_header_are_all_kept(self):

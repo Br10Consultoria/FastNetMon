@@ -25,7 +25,7 @@ from .mysql_sink import ALERT_SQL, alert_to_row, connection_from_env
 
 COLUMNS = ("bucket_utc", "direction", "scope", "pool", "local_ip", "subscriber_ip",
            "remote_ip", "protocol", "local_port", "remote_port", "input_if",
-           "output_if", "packets", "bytes", "syn_packets")
+           "output_if", "packets", "bytes", "syn_packets", "zero_port_packets")
 SQL_ROWS = ("SELECT " + ",".join(COLUMNS) + """ FROM orby_flow_minute
 WHERE source=%s AND bucket_utc >= %s AND bucket_utc < %s
 ORDER BY bucket_utc LIMIT %s""")
@@ -39,10 +39,10 @@ STATE_KEY = "source=%s AND rule_name=%s AND direction=%s AND scope=%s AND entity
 
 
 class _Acc:
-    __slots__ = ("packets", "bytes", "syn", "remotes", "ifaces", "subs", "pubs", "pool")
+    __slots__ = ("packets", "bytes", "syn", "zero", "remotes", "ifaces", "subs", "pubs", "pool")
 
     def __init__(self):
-        self.packets = self.bytes = self.syn = 0.0
+        self.packets = self.bytes = self.syn = self.zero = 0.0
         self.remotes, self.ifaces, self.subs, self.pubs = Counter(), Counter(), Counter(), Counter()
         self.pool = ""
 
@@ -62,11 +62,13 @@ def _minute_ok(acc, limits):
     mbps = acc.bytes * 8 / 60e6
     remote_ips = len(acc.remotes)
     ratio = acc.syn / acc.packets if acc.packets else 0.0
+    zero = acc.zero / acc.packets if acc.packets else 0.0
     ok = ((("min_pps" not in limits) or pps >= limits["min_pps"]) and
           (("min_mbps" not in limits) or mbps >= limits["min_mbps"]) and
           (("min_remote_ips" not in limits) or remote_ips >= limits["min_remote_ips"]) and
-          (("min_syn_ratio" not in limits) or ratio >= limits["min_syn_ratio"]))
-    return ok, pps, mbps, remote_ips, ratio
+          (("min_syn_ratio" not in limits) or ratio >= limits["min_syn_ratio"]) and
+          (("min_zero_port_ratio" not in limits) or zero >= limits["min_zero_port_ratio"]))
+    return ok, pps, mbps, remote_ips, ratio, zero
 
 
 def evaluate(rows, rule, start):
@@ -94,6 +96,7 @@ def evaluate(rows, rule, start):
             acc.packets += float(row["packets"])
             acc.bytes += float(row["bytes"])
             acc.syn += float(row["syn_packets"])
+            acc.zero += float(row.get("zero_port_packets") or 0.0)
             acc.remotes[row["remote_ip"]] += float(row["packets"])
             acc.ifaces[(int(row["input_if"]), int(row["output_if"]))] += float(row["packets"])
             acc.pool = row["pool"] or acc.pool
@@ -133,6 +136,7 @@ def evaluate(rows, rule, start):
                                     for ip, v in subs.most_common(5)],
                 "public_ips": [ip for ip, _ in last.pubs.most_common(3)],
                 "interfaces": [{"in": i, "out": o} for (i, o), _ in last.ifaces.most_common(3)],
+                "zero_port_ratio": round(max(c[5] for c in checks), 4),
                 "minutes": n},
         })
     return events

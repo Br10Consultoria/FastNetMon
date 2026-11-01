@@ -26,9 +26,10 @@ from .scopes import SCOPE_POOL
 
 INSERT_SQL = """INSERT INTO orby_flow_minute (source,bucket_utc,direction,scope,pool,local_ip,
 subscriber_ip,remote_ip,protocol,local_port,remote_port,input_if,output_if,
-packets,bytes,syn_packets,flows) VALUES (""" + ",".join(["%s"] * 17) + """)
+packets,bytes,syn_packets,zero_port_packets,flows) VALUES (""" + ",".join(["%s"] * 18) + """)
 ON DUPLICATE KEY UPDATE packets=packets+VALUES(packets),bytes=bytes+VALUES(bytes),
-syn_packets=syn_packets+VALUES(syn_packets),flows=flows+VALUES(flows),pool=VALUES(pool)"""
+syn_packets=syn_packets+VALUES(syn_packets),zero_port_packets=zero_port_packets+VALUES(zero_port_packets),
+flows=flows+VALUES(flows),pool=VALUES(pool)"""
 
 
 def _public(ip):
@@ -105,13 +106,16 @@ def aggregate(records, source, scopes, cfg, resolve=None):
         key = (source, bucket, direction, scope, local_ip, subscriber, remote_ip,
                event.protocol[:12], local_port if local_port in keep else 0,
                remote_port if remote_port in keep else 0, event.input_if, event.output_if)
-        item = groups.setdefault(key, [pool, 0.0, 0.0, 0.0, 0])
+        item = groups.setdefault(key, [pool, 0.0, 0.0, 0.0, 0.0, 0])
         item[1] += event.packets * mult
         item[2] += event.bytes * mult
         if event.protocol == "tcp" and event.tcp_flags == "S":
             item[3] += event.packets * mult
-        item[4] += 1
-    rows = [key[:4] + (v[0],) + key[4:] + (v[1], v[2], v[3], v[4]) for key, v in groups.items()]
+        if event.protocol in ("tcp", "udp") and (event.src_port == 0 or event.dst_port == 0):
+            # Porta 0 real (ataque) ou fragmento nao inicial (sem cabecalho L4): os dois importam.
+            item[4] += event.packets * mult
+        item[5] += 1
+    rows = [key[:4] + (v[0],) + key[4:] + (v[1], v[2], v[3], v[4], v[5]) for key, v in groups.items()]
     return rows, dict(stats)
 
 

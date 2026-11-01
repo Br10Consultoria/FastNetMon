@@ -15,7 +15,7 @@ START = datetime(2026, 10, 30, 12, 0)
 
 def rows(direction="in", scope="dedicated", local="45.238.170.10", sub=None, proto="udp",
          pps=80000, mbps=800, sources=20, lport=0, rport=0, in_if=101, minutes=2, syn=0.0,
-         pool="", remote_prefix="203.0.113."):
+         pool="", remote_prefix="203.0.113.", zero=0.0):
     sub = local if sub is None and scope in ("dedicated", "cgnat_private") else (sub or "")
     out = []
     for m in range(minutes):
@@ -24,7 +24,8 @@ def rows(direction="in", scope="dedicated", local="45.238.170.10", sub=None, pro
                             pool=pool, local_ip=local, subscriber_ip=sub, remote_ip=remote_prefix + str(s + 1),
                             protocol=proto, local_port=lport, remote_port=rport, input_if=in_if, output_if=202,
                             packets=pps * 60 / sources, bytes=mbps * 60e6 / 8 / sources,
-                            syn_packets=pps * 60 / sources * syn))
+                            syn_packets=pps * 60 / sources * syn,
+                            zero_port_packets=pps * 60 / sources * zero))
     return out
 
 
@@ -110,6 +111,19 @@ class DetectionTests(unittest.TestCase):
                    rows(direction="out", pps=9000, mbps=90, sources=10, lport=123))
         self.assertEqual((len(found), found[0]["local_port"]), (1, 123))
 
+    def test_port_zero_flood_inbound_and_outbound(self):
+        found = ev("IN porta 0 / fragmentos", rows(pps=15000, mbps=150, sources=10, zero=0.9))
+        self.assertEqual(len(found), 1)
+        self.assertGreaterEqual(found[0]["details"]["zero_port_ratio"], 0.9)
+        self.assertEqual(ev("IN porta 0 / fragmentos", rows(pps=15000, mbps=150, sources=10, zero=0.1)), [])
+        out = ev("OUT porta 0 / fragmentos", rows(direction="out", scope="cgnat_private",
+                                                   local="100.64.64.9", pps=4000, mbps=40, sources=2, zero=0.8))
+        self.assertEqual((len(out), out[0]["subscriber_ip"]), (1, "100.64.64.9"))
+
+    def test_old_rows_without_zero_column_still_work(self):
+        data = [{k: v for k, v in r.items() if k != "zero_port_packets"} for r in rows(pps=80000)]
+        self.assertEqual(len(ev("IN UDP volumetrico", data)), 1)
+
     def test_infra_scope_is_not_evaluated(self):
         self.assertEqual(ev("IN UDP volumetrico", rows(scope="infra", local="187.87.201.198", pps=900000)), [])
 
@@ -181,6 +195,7 @@ class ConfigTests(unittest.TestCase):
                        lambda c: c["rules"][1].update(name=c["rules"][0]["name"]),
                        lambda c: c["rules"][0].update(consecutive_minutes=9),
                        lambda c: c["rules"][2]["limits"]["dedicated"].update(min_syn_ratio=1.5),
+                       lambda c: c["rules"][0]["limits"]["dedicated"].update(min_zero_port_ratio=2),
                        lambda c: c.update(nat_socket="relativo.sock"),
                        lambda c: c["nat_rules"][0].pop("min_allocs_per_min")):
             cfg = self.cfg()

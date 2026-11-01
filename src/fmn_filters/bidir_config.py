@@ -14,7 +14,8 @@ LIMIT_SCOPES = ("dedicated", "cgnat_pool", "cgnat_private", "cgnat_subscriber")
 SEVERITIES = frozenset({"warning", "high", "critical"})
 PROTOCOLS = frozenset({"tcp", "udp", "icmp", "icmpv6", "esp", "gre"})
 SPLIT_FIELDS = frozenset({"protocol", "local_port", "remote_port"})
-LIMIT_KEYS = frozenset({"min_pps", "min_mbps", "min_remote_ips", "min_syn_ratio"})
+LIMIT_KEYS = frozenset({"min_pps", "min_mbps", "min_remote_ips", "min_syn_ratio",
+                        "min_zero_port_ratio"})
 CONFIG_KEYS = frozenset({
     "enabled", "source", "cgnat_profile_path", "extra_infrastructure_cidrs",
     "nat_socket", "observation_ifindexes", "keep_ports", "counter_multiplier",
@@ -76,8 +77,9 @@ def _validate_rule(rule, names):
             raise ValueError("limites de " + scope + " precisam de min_pps ou min_mbps")
         for key, value in item.items():
             _positive(value, key)
-        if "min_syn_ratio" in item and not item["min_syn_ratio"] <= 1:
-            raise ValueError("min_syn_ratio deve ser <= 1")
+        for ratio in ("min_syn_ratio", "min_zero_port_ratio"):
+            if ratio in item and not item[ratio] <= 1:
+                raise ValueError(ratio + " deve ser <= 1")
         if "min_remote_ips" in item and type(item["min_remote_ips"]) is not int:
             raise ValueError("min_remote_ips deve ser inteiro")
 

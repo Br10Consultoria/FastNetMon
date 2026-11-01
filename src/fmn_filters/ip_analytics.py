@@ -152,8 +152,20 @@ VALUES (%s,%s,%s,%s,%s)""",
     return True
 
 
+def prune(db, hours, batch=50000):
+    """Retencao da Fase 2: com NetStream completo a tabela cresce dezenas de milhoes de linhas/dia."""
+    with db.cursor() as cur:
+        cur.execute("DELETE FROM orby_ip_pairs_minute WHERE bucket_utc < "
+                    "UTC_TIMESTAMP() - INTERVAL %s HOUR LIMIT %s", (hours, batch))
+        removed = cur.rowcount
+        cur.execute("DELETE FROM orby_ip_ingested_files WHERE ingested_at < "
+                    "UTC_TIMESTAMP() - INTERVAL %s HOUR LIMIT %s", (hours, batch))
+    db.commit()
+    return removed
+
+
 def run(source="huawei",*,max_files=20,max_age_hours=1,min_age=45,
-        dry_run=False,folder=None,enricher=None):
+        dry_run=False,folder=None,enricher=None,retention_hours=72):
     directory=folder if folder is not None else ROOT/source
     eligible=candidates(directory,time.time(),min_age,max_age_hours*3600)
     db=None if dry_run or not eligible else connection_from_env()
@@ -183,6 +195,10 @@ def run(source="huawei",*,max_files=20,max_age_hours=1,min_age=45,
                 failed+=1
                 if db: db.rollback()
                 print("ERRO %s: %s" % (path.name,exc),file=sys.stderr,flush=True)
+        if db and retention_hours:
+            removed=prune(db,retention_hours)
+            if removed:
+                print("RETENCAO removidas=%d linhas com mais de %dh" % (removed,retention_hours),flush=True)
     finally:
         if db: db.close()
         if enricher is None: geo.close()
@@ -198,12 +214,14 @@ def main(argv=None):
     ap.add_argument("--max-age-hours",type=int,default=1)
     ap.add_argument("--min-age",type=int,default=45)
     ap.add_argument("--dry-run",action="store_true")
+    ap.add_argument("--retention-hours",type=int,default=72,
+                    help="apaga pares IP mais antigos que N horas (0 = nunca)")
     a=ap.parse_args(argv)
-    if min(a.max_files,a.max_age_hours,a.min_age)<1:
+    if min(a.max_files,a.max_age_hours,a.min_age)<1 or a.retention_hours<0:
         ap.error("limites precisam ser positivos")
     try:
         run(source=a.source,max_files=a.max_files,max_age_hours=a.max_age_hours,
-            min_age=a.min_age,dry_run=a.dry_run)
+            min_age=a.min_age,dry_run=a.dry_run,retention_hours=a.retention_hours)
         return 0
     except Exception as exc:
         print("FALHA: %s" % exc,file=sys.stderr)

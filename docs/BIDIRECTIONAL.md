@@ -21,7 +21,7 @@ IPs públicos dos blocos que não são pool nem infraestrutura contam como **ded
 ## Arquitetura
 
 ```
-A10 --syslog TCP 5515--> orbymon-a10-nat  (framing correto, tabela NAT em memória, log TSV compacto)
+A10 --syslog TCP 5514--> orbymon-a10-nat  (framing correto, tabela NAT em memória, log TSV compacto)
                               |  socket Unix /run/orbymon/nat.sock (consulta IP público:porta -> IP privado)
                               |  agregados NÃO amostrados por assinante/minuto -> orby_nat_user_minute
 Huawei --NetFlow--> nfcapd --> orbymon-flow-rollup-huawei (a cada 30 s)
@@ -67,14 +67,47 @@ O instalador valida a configuração, cria as tabelas, instala as units e, se ex
 `a10_nat --replay-rsyslog` mostrando **somente contagens** — é a prova rápida de que o novo framing recupera
 os eventos que o rsyslog fragmentou.
 
-### Lado A10 (manual; não aplicado por este projeto)
+### Ligar o A10 ao receptor (sem mexer no A10)
 
-1. Libere TCP **5515** no firewall do servidor **somente** para `10.100.10.10`.
-2. Configure no A10 uma **segunda** destinação de log (porta 5515) mantendo a atual (5514) até validar.
-   Confirme a sintaxe da sua versão do ACOS com `?` antes de aplicar.
-3. Confirme: `journalctl -u orbymon-a10-nat -n 20 --no-pager` (eventos alocados/liberados, mensagens ignoradas).
-4. **NTP no A10** antes de trocar `--time-source received` por `a10`. Enquanto o relógio do A10 não estiver
-   sincronizado, o padrão `received` usa o horário de chegada (atraso típico ~1 s).
+Em geral o A10 **divide** os logs entre os servidores de um service-group, em vez de copiar para todos;
+por isso não se usa uma "segunda destinação". O receptor assume a porta **5514** no lugar do rsyslog:
+
+```bash
+sudo bash scripts/a10-receiver-cutover.sh            # troca (backup da conf do rsyslog)
+journalctl -u orbymon-a10-nat -f                     # "NAT estado=..." a cada minuto
+sudo bash scripts/a10-receiver-cutover.sh --rollback # volta ao rsyslog
+```
+
+O A10 reconecta sozinho; há alguns segundos sem log durante a troca. **NTP no A10** antes de trocar
+`--time-source received` por `a10`.
+
+### Retenção (arquivos e banco)
+
+| Dado | Onde | Retenção padrão |
+|---|---|---|
+| Log NAT (TSV por hora, compactado ao fim da hora) | `/var/log/orbymon/a10nat` | 15 dias (`retention.env`) |
+| Spool antigo do rsyslog do A10 | `/var/log/orbymon/a10` | 15 dias |
+| Arquivos nfcapd | `/var/lib/orbymon/flows/*` | 15 dias |
+| Rollup F4 `orby_flow_minute` | MariaDB | 2 dias (`retention_days`) |
+| Pares IP da Fase 2 `orby_ip_pairs_minute` | MariaDB | 72 h (`--retention-hours`) |
+| Eventos de ataque `orby_attack_events` | MariaDB | sem limite (pequeno) |
+
+Para enviar à nuvem antes de apagar, defina em `/etc/orbymon/retention.env`
+`ORBYMON_ARCHIVE_CMD="rclone copy {} remoto:orbymon/"`; se o envio falhar, o arquivo é mantido.
+Com o NetStream completo (~7 Gbps, 1:2048) o rollup recebe dezenas de milhões de linhas por dia: não aumente
+`retention_days` sem medir o disco.
+
+### Porta 0 e fragmentos
+
+Tráfego TCP/UDP com porta 0 **não é descartado**: o rollup soma esses pacotes em `zero_port_packets`
+(inclui fragmentos não iniciais, que chegam sem cabeçalho L4 — típico de amplificação UDP fragmentada).
+As regras `IN porta 0 / fragmentos` e `OUT porta 0 / fragmentos` usam `min_zero_port_ratio`.
+No log NAT, mapeamentos com porta 0 (ex. ICMP id 0) também são aceitos.
+
+### Detecção antiga (F3)
+
+Com o NetStream completo, a F3 excede o próprio limite de linhas a cada minuto. Desative-a depois de validar a F4:
+`sudo systemctl disable --now orbymon-ddos-huawei.timer`.
 
 ### Pontos de observação no Huawei (importante para não duplicar)
 
@@ -151,14 +184,13 @@ de serviço, pps, Mbps, IPs remotos, razão SYN, interfaces e detalhes (top remo
 - **Memória do receptor**: cada mapeamento ocupa ~450 bytes. O histórico de mapeamentos fechados fica 15 min
   em memória (`--retention-seconds 900`, ~0,6 GB a ~1500 liberações/s). Rollup atrasado mais que isso deixa
   fluxos sem assinante resolvido.
-- **Disco**: enquanto rsyslog (5514) e receptor (5515) recebem juntos, o log NAT é gravado duas vezes. O spool
-  do rsyslog já usa ~3,5–4 GB/dia compactado. Depois de validar o receptor, desligue a destinação 5514 no A10.
+- **Disco**: depois da troca (`a10-receiver-cutover.sh`) o rsyslog deixa de gravar o log do A10; só o TSV compacto do
+  receptor é gravado.
 - **Estado NAT em memória**: ao reiniciar, o receptor reconstrói a última janela a partir do log TSV; mapeamentos
   mais antigos ainda abertos (sessões longas) ficam não resolvidos. Fluxos sem mapeamento têm `subscriber_ip`
   vazio e **nunca** são atribuídos por aproximação.
-- **Volume do log NAT**: o spool atual cresce ~31 GiB/dia (~3 mil eventos/s, indica log por porta). Avalie
-  *port-batch* no A10 para reduzir. O log TSV compacto é compactado diariamente e **não é apagado**; defina
-  retenção legal e espaço em disco.
+- **Volume do log NAT**: ~2–3 mil eventos/s (log por porta). Avalie *port-batch* no A10 para reduzir.
+  O log TSV é compactado por hora e apagado após 15 dias (ver Retenção).
 - **IPv6** de assinantes não é classificado (ignorado). Informe se há tráfego IPv6 a proteger.
 - Porta de serviço mantida/zerada: portas efêmeras viram 0 no rollup (a resolução NAT usa a porta real antes de zerar).
 - Regras `nat_rules` exigem eventos em todos os minutos da janela; assinante parado por um minuto quebra a sequência.
