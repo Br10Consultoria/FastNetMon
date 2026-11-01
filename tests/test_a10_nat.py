@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from fmn_filters.a10_nat import (EventLog, NatEvent, NatService, NatTable, StreamSplitter,
+from fmn_filters.a10_nat import (LOOKUP_LIMIT, EventLog, NatEvent, NatService, NatTable, StreamSplitter,
                                  _parse_time, handle_lookup, handle_stream, lookup_many,
                                  parse_events, parse_message, replay_log, replay_rsyslog_spool)
 import gzip
@@ -166,7 +166,8 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
             svc = NatService(SCOPES, allowed_sources=["127.0.0.1"])
             sock = str(Path(d) / "nat.sock")
             tcp = await asyncio.start_server(lambda r, w: handle_stream(svc, r, w), "127.0.0.1", 0)
-            unix = await asyncio.start_unix_server(lambda r, w: handle_lookup(svc, r, w), sock)
+            unix = await asyncio.start_unix_server(lambda r, w: handle_lookup(svc, r, w), sock,
+                                                   limit=LOOKUP_LIMIT)
             port = tcp.sockets[0].getsockname()[1]
             _, writer = await asyncio.open_connection("127.0.0.1", port)
             data = stream(30).encode()
@@ -185,6 +186,12 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
             res = await asyncio.get_running_loop().run_in_executor(None, lookup_many, sock, keys)
             self.assertEqual(res[0], ["100.64.64.6", 1005])
             self.assertIsNone(res[1])
+            # consulta real do rollup: milhares de chaves numa linha (> 64 KiB)
+            many = [["45.238.170.70", 2000 + (n % 30), "tcp", time.time()] for n in range(25000)]
+            res = await asyncio.get_running_loop().run_in_executor(None, lookup_many, sock, many)
+            self.assertEqual(len(res), 25000)
+            self.assertEqual(res[5], ["100.64.64.6", 1005])
+            self.assertEqual(svc.stats.get("consultas_invalidas", 0), 0)
             tcp.close()
             unix.close()
 

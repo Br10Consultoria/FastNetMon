@@ -37,7 +37,7 @@ class DeployTests(unittest.TestCase):
         self.assertIn("--allow 10.100.10.10", text)
 
     def test_operational_scripts_are_valid_bash(self):
-        for name in ("orbymon-retention.sh", "a10-receiver-cutover.sh"):
+        for name in ("orbymon-retention.sh", "a10-receiver-cutover.sh", "tune-mariadb.sh"):
             subprocess.run(["bash", "-n", str(ROOT / "scripts" / name)], check=True)
         cut = (ROOT / "scripts/a10-receiver-cutover.sh").read_text()
         self.assertIn("--rollback", cut)
@@ -48,6 +48,11 @@ class DeployTests(unittest.TestCase):
         self.assertIn("/opt/orbymon/scripts/orbymon-retention.sh", unit)
         self.assertIn("ProtectSystem=strict", unit)
         self.assertIn("ReadWritePaths=", unit)
+
+    def test_installer_grants_delete_only_on_retention_tables(self):
+        text = (ROOT / "scripts/setup-bidir.sh").read_text()
+        self.assertIn("GRANT DELETE ON orbymon.$table", text)
+        self.assertNotIn("GRANT ALL", text)
 
 
 if __name__ == "__main__":

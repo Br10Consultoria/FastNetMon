@@ -165,7 +165,7 @@ def prune(db, hours, batch=50000):
 
 
 def run(source="huawei",*,max_files=20,max_age_hours=1,min_age=45,
-        dry_run=False,folder=None,enricher=None,retention_hours=72):
+        dry_run=False,folder=None,enricher=None,retention_hours=72,time_budget=150):
     directory=folder if folder is not None else ROOT/source
     eligible=candidates(directory,time.time(),min_age,max_age_hours*3600)
     db=None if dry_run or not eligible else connection_from_env()
@@ -178,7 +178,12 @@ def run(source="huawei",*,max_files=20,max_age_hours=1,min_age=45,
         paths=pending[:max_files]
         print("fonte=%s elegiveis=%d pendentes=%d lote=%d dry_run=%s" %
               (source,len(eligible),len(pending),len(paths),dry_run),flush=True)
+        started=time.monotonic()
         for path in paths:
+            if time_budget and time.monotonic()-started>time_budget:
+                print("ORCAMENTO de %ds atingido; restante fica para a proxima execucao" % time_budget,
+                      flush=True)
+                break
             try:
                 st,records,_=decode_file(path,time.time())
                 rows,count=aggregate(records,source,geo)
@@ -214,6 +219,8 @@ def main(argv=None):
     ap.add_argument("--max-age-hours",type=int,default=1)
     ap.add_argument("--min-age",type=int,default=45)
     ap.add_argument("--dry-run",action="store_true")
+    ap.add_argument("--time-budget",type=int,default=150,
+                    help="segundos de importacao por execucao (abaixo do TimeoutStartSec=240)")
     ap.add_argument("--retention-hours",type=int,default=72,
                     help="apaga pares IP mais antigos que N horas (0 = nunca)")
     a=ap.parse_args(argv)
@@ -221,7 +228,8 @@ def main(argv=None):
         ap.error("limites precisam ser positivos")
     try:
         run(source=a.source,max_files=a.max_files,max_age_hours=a.max_age_hours,
-            min_age=a.min_age,dry_run=a.dry_run,retention_hours=a.retention_hours)
+            min_age=a.min_age,dry_run=a.dry_run,retention_hours=a.retention_hours,
+            time_budget=a.time_budget)
         return 0
     except Exception as exc:
         print("FALHA: %s" % exc,file=sys.stderr)

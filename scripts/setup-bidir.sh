@@ -27,6 +27,19 @@ done
 echo "=== Tabelas F4 ==="
 mariadb orbymon < "$BASE/sql/bidir.sql"
 
+echo "=== Permissao de limpeza (DELETE) para o usuario do pipeline ==="
+DB_USER=$(sed -n 's/^ORBYMON_DB_USER=//p' /etc/orbymon/pipeline.env | tr -d '"'"'"' ')
+[[ "$DB_USER" =~ ^[A-Za-z0-9_]+$ ]] || { echo "ORBYMON_DB_USER invalido em pipeline.env" >&2; exit 1; }
+HOSTS=$(mariadb -NBe "SELECT Host FROM mysql.user WHERE User='$DB_USER'")
+[[ -n "$HOSTS" ]] || { echo "Usuario $DB_USER nao existe no MariaDB" >&2; exit 1; }
+for host in $HOSTS; do
+  for table in orby_flow_minute orby_nat_user_minute orby_flow_ingested_files \
+               orby_ip_pairs_minute orby_ip_ingested_files; do
+    mariadb -e "GRANT DELETE ON orbymon.$table TO '$DB_USER'@'$host'"
+  done
+  echo "DELETE concedido a $DB_USER@$host (somente tabelas com retencao)"
+done
+
 echo "=== Configuracao ==="
 if [[ -e /etc/orbymon/bidir.json && $REPLACE_CONFIG -eq 1 ]]; then
   cp -p /etc/orbymon/bidir.json "/etc/orbymon/bidir.json.bak.$(date +%Y%m%d%H%M%S)"

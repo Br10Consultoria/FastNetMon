@@ -45,6 +45,7 @@ IPV4 = re.compile(r"(?:\d{1,3}\.){3}\d{1,3}")
 from .scopes import SCOPE_POOL, SCOPE_PRIVATE, ScopeMap
 
 MAX_TAIL = 65536
+LOOKUP_LIMIT = 64 * 1024 * 1024
 FRACTION = re.compile(r"\.(\d+)")
 
 
@@ -432,7 +433,9 @@ async def serve(service: NatService, host, port, socket_path, *, use_db=True):
     Path(socket_path).parent.mkdir(parents=True, exist_ok=True)
     if os.path.exists(socket_path):
         os.unlink(socket_path)
-    unix = await asyncio.start_unix_server(lambda r, w: handle_lookup(service, r, w), socket_path)
+    # Uma consulta traz milhares de chaves numa unica linha JSON: o limite padrao (64 KiB) a rejeitava.
+    unix = await asyncio.start_unix_server(lambda r, w: handle_lookup(service, r, w), socket_path,
+                                           limit=LOOKUP_LIMIT)
     os.chmod(socket_path, 0o660)
     print("receptor NAT A10 em %s:%d, consulta em %s, fonte de tempo=%s" %
           (host, port, socket_path, service.time_source), flush=True)

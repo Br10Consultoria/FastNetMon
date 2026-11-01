@@ -274,7 +274,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT ROUND(COALESCE(SUM(total_packets),0)/300,1) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND bucket_utc >= (SELECT MAX(bucket_utc) FROM orby_ip_pairs_minute WHERE source='huawei') - INTERVAL 5 MINUTE AND bucket_utc < (SELECT MAX(bucket_utc) FROM orby_ip_pairs_minute WHERE source='huawei')",
+          "rawSql": "SELECT ROUND(COALESCE(SUM(total_packets),0)/300,1) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND bucket_utc >= UTC_TIMESTAMP() - INTERVAL 90 MINUTE AND bucket_utc >= (SELECT MAX(bucket_utc) FROM orby_ip_pairs_minute WHERE source='huawei') - INTERVAL 5 MINUTE AND bucket_utc < (SELECT MAX(bucket_utc) FROM orby_ip_pairs_minute WHERE source='huawei')",
           "format": "table",
           "editorMode": "code"
         }
@@ -320,7 +320,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT ROUND(COALESCE(SUM(total_bytes),0)*8/300,3) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND bucket_utc >= (SELECT MAX(bucket_utc) FROM orby_ip_pairs_minute WHERE source='huawei') - INTERVAL 5 MINUTE AND bucket_utc < (SELECT MAX(bucket_utc) FROM orby_ip_pairs_minute WHERE source='huawei')",
+          "rawSql": "SELECT ROUND(COALESCE(SUM(total_bytes),0)*8/300,3) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND bucket_utc >= UTC_TIMESTAMP() - INTERVAL 90 MINUTE AND bucket_utc >= (SELECT MAX(bucket_utc) FROM orby_ip_pairs_minute WHERE source='huawei') - INTERVAL 5 MINUTE AND bucket_utc < (SELECT MAX(bucket_utc) FROM orby_ip_pairs_minute WHERE source='huawei')",
           "format": "table",
           "editorMode": "code"
         }
