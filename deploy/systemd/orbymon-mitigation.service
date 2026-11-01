@@ -1,0 +1,18 @@
+[Unit]
+Description=OrbyFlow - mitigacao por blackhole (decide, anuncia, retira, reconcilia)
+After=mariadb.service orbymon-gobgpd.service
+
+[Service]
+Type=oneshot
+User=orbymon
+Group=orbymon
+WorkingDirectory=/opt/orbymon
+EnvironmentFile=/etc/orbymon/pipeline.env
+Environment=PYTHONPATH=/opt/orbymon/src
+ExecStart=/opt/orbymon/.venv/bin/python -m fmn_filters.mitigation --config /etc/orbymon/bidir.json --mitigation /etc/orbymon/mitigation.json --telegram-env /etc/orbymon/telegram.env
+TimeoutStartSec=60
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX

@@ -1,0 +1,91 @@
+{% extends "base.html" %}{% block title %}Mitigação{% endblock %}
+{% block body %}
+<h1>Mitigação por blackhole (RTBH)</h1>
+<p class="muted">Anuncia o IP atacado (/32 ou /128) ao roteador de borda com next-hop de descarte e community de blackhole, e retira
+quando o ataque acaba. Nunca bloqueia infraestrutura, rede privada ou IPs protegidos; IP de pool CGNAT só se permitido (derruba
+todos os assinantes do IP). Siga o roteiro de validação (docs/MITIGACAO.md) antes de sair da simulação.</p>
+{% if cfg_error %}<p class="flash">Configuração inválida ({{ cfg_error }}): usando a padrão (simulação).</p>{% endif %}
+{% set st = {'simulate':'sev-warning','off':'idle','manual':'sev-high','auto':'bad'} %}
+<section class="card">
+  <p>Modo: <span class="pill {{ st.get(cfg.mode, 'idle') }}">{{ modes[cfg.mode] }}</span>
+     · BGP: <b>{{ (status.bgp or ['—'])[0] }}</b>
+     · anunciados: {{ (status.anunciados or ['0'])[0] }}
+     · controlador: {{ (status.ultima_execucao or ['nunca'])[0] }} UTC</p>
+</section>
+
+{% if items is none %}<p class="flash">Mitigação não instalada: rode <code>sudo bash scripts/setup-mitigation.sh</code>.</p>{% else %}
+{% set open_items = items|selectattr('status', 'in', ['proposed','approved','active','withdrawing','simulated'])|list %}
+<section class="card">
+  <h2>Em andamento ({{ open_items|length }})</h2>
+  {% if open_items %}<div class="scroll"><table>
+    <tr><th>IP</th><th>Situação</th><th>Motivo</th><th>Pico</th><th>Desde (UTC)</th><th>Vence (UTC)</th><th></th></tr>
+    {% for m in open_items %}<tr>
+      <td><code>{{ m.prefix }}</code><br><small class="muted">{{ m.origin }} · {{ m.requested_by }}</small></td>
+      <td><span class="pill {{ {'proposed':'sev-high','approved':'sev-high','active':'bad','withdrawing':'idle','simulated':'sev-warning'}[m.status] }}">{{ {'proposed':'aguarda aprovação','approved':'aprovado','active':'anunciado','withdrawing':'retirando','simulated':'simulado'}[m.status] }}</span>
+        {% if m.error %}<br><small class="warn">{{ m.error }}</small>{% endif %}</td>
+      <td><small>{{ m.rule_name }}{% if m.rule_name and m.reason %} · {% endif %}{{ m.reason }}</small></td>
+      <td class="num">{{ '%.0f'|format(m.peak_mbps) }} Mbps<br><small>{{ '%.0f'|format(m.peak_pps) }} pps</small></td>
+      <td class="nowrap">{{ m.created_at }}</td><td class="nowrap">{{ m.expires_at or '—' }}</td>
+      <td class="nowrap"><form method="post" class="inlineform">{% include "_csrf.html" %}<input type="hidden" name="id" value="{{ m.id }}">
+        {% if m.status == 'proposed' %}<button name="action" value="aprovar">Aprovar</button> <button name="action" value="rejeitar" class="secondary small">Rejeitar</button>
+        {% elif m.status in ('active', 'simulated') %}<button name="action" value="retirar" class="secondary small">Retirar</button>{% endif %}</form></td>
+    </tr>{% endfor %}
+  </table></div>{% else %}<p class="muted">Nenhum bloqueio em andamento.</p>{% endif %}
+</section>
+
+<section class="card">
+  <h2>Bloqueio manual e teste de validação</h2>
+  <form method="post" class="inline" autocomplete="off">{% include "_csrf.html" %}
+    <label>IP <input name="ip" required placeholder="187.87.201.40"></label>
+    <label>Minutos <input name="duration" type="number" min="2" max="1440" value="30"></label>
+    <label>Motivo <input name="reason" maxlength="300" placeholder="ex.: ataque em curso, chamado #123"></label>
+    <button name="action" value="bloquear">Bloquear</button>
+    <button name="action" value="testar" class="secondary">Teste de validação (no-advertise, 2–30 min)</button>
+  </form>
+  <p class="muted">O teste anuncia o /32 com NO_ADVERTISE (o roteador instala, mas não repassa a ninguém) mesmo em simulação —
+    use um IP sem cliente e confira no NE8000 com <code>display bgp routing-table IP</code> e <code>display ip routing-table IP</code>.
+    Em simulação, o bloqueio manual só é registrado.</p>
+</section>
+{% endif %}
+
+<form method="post" class="card" autocomplete="off">{% include "_csrf.html" %}<input type="hidden" name="action" value="configurar">
+  <h2>Configuração</h2>
+  <div class="grid">
+    <label>Modo <select name="mode">{% for k, l in modes.items() %}<option value="{{ k }}" {{ 'selected' if cfg.mode==k }}>{{ l }}</option>{% endfor %}</select></label>
+    <label>Severidade mínima <select name="min_severity">{% for s, l in (('warning','aviso'),('high','alta'),('critical','crítica')) %}<option value="{{ s }}" {{ 'selected' if cfg.trigger.min_severity==s }}>{{ l }}</option>{% endfor %}</select></label>
+    <label>Disparar a partir de (Mbps) <input name="min_mbps" value="{{ '%g'|format(cfg.trigger.min_mbps) }}"></label>
+    <label>ou (pacotes/s) <input name="min_pps" value="{{ '%g'|format(cfg.trigger.min_pps) }}"></label>
+    <label>Duração mínima (min) <input name="duration_min" type="number" min="5" max="1440" value="{{ cfg.duration_min }}"></label>
+    <label>Retirar após (min sem ataque) <input name="release_after_min" type="number" min="2" max="240" value="{{ cfg.release_after_min }}"></label>
+    <label>Proposta expira em (min) <input name="approval_timeout_min" type="number" min="2" max="240" value="{{ cfg.approval_timeout_min }}"></label>
+    <label>Máximo de bloqueios simultâneos <input name="max_active" type="number" min="1" max="200" value="{{ cfg.max_active }}"></label>
+  </div>
+  <p>Tipos de IP: <label class="check"><input type="checkbox" name="scopes" value="dedicated" {{ 'checked' if 'dedicated' in cfg.trigger.scopes }}> dedicado</label>
+     <label class="check"><input type="checkbox" name="scopes" value="cgnat_pool" {{ 'checked' if 'cgnat_pool' in cfg.trigger.scopes }}> pool CGNAT</label>
+     <label class="check"><input type="checkbox" name="allow_cgnat_pool" value="1" {{ 'checked' if cfg.allow_cgnat_pool }}> permitir bloquear IP de pool (derruba todos os assinantes do IP)</label></p>
+  <label>Só estas regras (nenhuma marcada = todas as de entrada)
+    <select name="rules" multiple size="5">{% for r in rule_names %}<option {{ 'selected' if r in cfg.trigger.rules }}>{{ r }}</option>{% endfor %}</select></label>
+  <label>Nunca bloquear (IPs/prefixos, um por linha) <textarea name="protected" rows="3" class="mono">{{ cfg.protected|join('\n') }}</textarea></label>
+  <h3>BGP</h3>
+  <div class="grid">
+    <label>Next-hop IPv4 de descarte <input name="next_hop" value="{{ cfg.bgp.next_hop }}"></label>
+    <label>Next-hop IPv6 de descarte <input name="next_hop_v6" value="{{ cfg.bgp.next_hop_v6 }}"></label>
+    <label>Communities (vírgula) <input name="communities" value="{{ cfg.bgp.communities|join(', ') }}"></label>
+  </div>
+  <label class="check"><input type="checkbox" name="no_export" value="1" {{ 'checked' if cfg.bgp.no_export }}> NO_EXPORT (não sai do AS)</label>
+  <label class="check"><input type="checkbox" name="bgp_enabled" value="1" {{ 'checked' if cfg.bgp.enabled }}> BGP ligado (só depois de a sessão estar estabelecida e o teste validado)</label>
+  <label class="check"><input type="checkbox" name="notify" value="1" {{ 'checked' if cfg.notify }}> Avisar no Telegram/e-mail/webhook</label>
+  <label class="check"><input type="checkbox" name="confirm_auto" value="1"> Confirmo que a calibração e a linha de base estão estáveis (exigido para o modo automático)</label>
+  <button>Salvar configuração</button>
+</form>
+
+{% if items %}
+<section class="card">
+  <h2>Histórico</h2>
+  <div class="scroll"><table><tr><th>IP</th><th>Situação</th><th>Origem</th><th>Criado (UTC)</th><th>Anunciado</th><th>Fim</th><th>Decidido por</th></tr>
+    {% for m in items if m.status not in ('proposed','approved','active','withdrawing','simulated') %}<tr><td><code>{{ m.ip }}</code></td><td>{{ m.status }}{% if m.error %} <small class="warn">{{ m.error }}</small>{% endif %}</td>
+      <td>{{ m.origin }}</td><td class="nowrap">{{ m.created_at }}</td><td class="nowrap">{{ m.announced_at or '—' }}</td><td class="nowrap">{{ m.ended_at or '—' }}</td><td>{{ m.decided_by }}</td></tr>{% endfor %}
+  </table></div>
+</section>
+{% endif %}
+{% endblock %}

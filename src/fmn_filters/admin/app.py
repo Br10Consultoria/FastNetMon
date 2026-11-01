@@ -29,7 +29,8 @@ METRICS = (("min_pps", "Pacotes/s", float), ("min_mbps", "Mbps", float), ("min_r
 SERVICES = ("orbymon-nfcapd@huawei.service", "orbymon-a10-nat.service", "orbymon-flow-rollup-huawei.timer",
             "orbymon-bidir-huawei.timer", "orbymon-ip-huawei.timer", "orbymon-telegram.timer",
             "orbymon-retention.timer", "orbymon-calibrate.timer", "orbymon-filter-rules.timer",
-            "orbymon-exceptions.timer", "orbymon-health.timer", "orbymon-backup.timer", "grafana-server.service", "mariadb.service")
+            "orbymon-exceptions.timer", "orbymon-health.timer", "orbymon-backup.timer", "orbymon-mitigation.timer",
+            "orbymon-gobgpd.service", "grafana-server.service", "mariadb.service")
 
 
 def _secret_key(env):
@@ -860,6 +861,100 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
             except Exception as exc:                        # rede, RDAP fora do ar, JSON inesperado
                 error = "consulta falhou: %s" % (str(exc)[:200] or type(exc).__name__)
         return render_template("tools.html", form=form, result=result, error=error, dns_types=tl.DNS_TYPES)
+
+    # ---------------------------------------------------------------- mitigacao (blackhole)
+    @app.route("/mitigacao", methods=["GET", "POST"])
+    def mitigation_page():
+        from .. import mitigation as mt
+        from ..bidir_config import build_scopes
+        try:
+            cfg = config.mitigation()
+            cfg_error = None
+        except (ValueError, OSError) as exc:
+            cfg, cfg_error = mt.validate({}), str(exc)
+        if request.method == "POST":
+            f = request.form
+            action = f.get("action", "")
+            try:
+                if action == "configurar":
+                    new = copy.deepcopy(cfg)
+                    mode = f.get("mode", "simulate")
+                    new["mode"] = mode
+                    new["bgp"].update(enabled=f.get("bgp_enabled") == "1", next_hop=f.get("next_hop", "").strip(),
+                                      next_hop_v6=f.get("next_hop_v6", "").strip(), no_export=f.get("no_export") == "1",
+                                      communities=[c.strip() for c in f.get("communities", "").split(",") if c.strip()])
+                    new["trigger"].update(min_severity=f.get("min_severity", "critical"),
+                                          min_mbps=float(f.get("min_mbps", "0").replace(",", ".") or 0),
+                                          min_pps=float(f.get("min_pps", "0").replace(",", ".") or 0),
+                                          scopes=f.getlist("scopes") or ["dedicated"],
+                                          rules=[r for r in f.getlist("rules") if r])
+                    for k in ("duration_min", "release_after_min", "approval_timeout_min", "max_active"):
+                        new[k] = int(f.get(k) or cfg[k])
+                    new["allow_cgnat_pool"] = f.get("allow_cgnat_pool") == "1"
+                    new["notify"] = f.get("notify") == "1"
+                    new["protected"] = [x for x in re.split(r"[\s,]+", f.get("protected", "")) if x]
+                    if mode in ("manual", "auto") and not new["bgp"]["enabled"]:
+                        raise mt.MitigationError("ligue o BGP (depois de validar a sessão) antes do modo %s" % mt.MODES[mode])
+                    if mode == "auto" and cfg["mode"] != "auto" and f.get("confirm_auto") != "1":
+                        raise mt.MitigationError("confirme que a calibração e a linha de base estão estáveis para o modo automático")
+                    saved = config.save_mitigation(new)
+                    audit("mitigacao_config", json.dumps({"modo": saved["mode"], "bgp": saved["bgp"]["enabled"],
+                                                          "gatilho": saved["trigger"], "max": saved["max_active"]},
+                                                         ensure_ascii=False))
+                    flash("Mitigação: modo %s." % mt.MODES[saved["mode"]])
+                elif action in ("aprovar", "rejeitar", "retirar"):
+                    mid = int(f.get("id", 0))
+                    frm, to = {"aprovar": ("proposed", "approved"), "rejeitar": ("proposed", "rejected"),
+                               "retirar": ("active", "withdrawing")}[action]
+                    item = next((m for m in store.mitigations(500) or [] if m["id"] == mid), None)
+                    if action == "aprovar" and item:
+                        bidir = config.bidir()
+                        ok, why = mt.eligible(item["ip"], cfg, bidir, build_scopes(bidir, config.profile(bidir)))
+                        if not ok:
+                            raise mt.MitigationError(why)
+                    if not item or not store.mitigation_decide(mid, frm, to, g.user["username"]):
+                        if action == "retirar" and item and item["status"] == "simulated":
+                            store.mitigation_decide(mid, "simulated", "ended", g.user["username"])
+                        else:
+                            raise mt.MitigationError("o pedido mudou de estado; recarregue a página")
+                    audit("mitigacao_" + action, "%s (#%d)" % (item["ip"], mid))
+                    flash({"aprovar": "Aprovado: será anunciado em até 30 s.", "rejeitar": "Rejeitado.",
+                           "retirar": "Retirada pedida: sai em até 30 s."}[action])
+                elif action in ("bloquear", "testar"):
+                    bidir = config.bidir()
+                    ip = str(parse_ips(f.get("ip", ""))[0])
+                    scopes = build_scopes(bidir, config.profile(bidir))
+                    if scopes.classify(ip)[0] == "external":
+                        raise mt.MitigationError("o IP precisa estar nos blocos do provedor")
+                    dur = int(f.get("duration") or 30)
+                    if action == "testar":
+                        if not cfg["bgp"]["enabled"]:
+                            raise mt.MitigationError("ligue o BGP para o teste de validação")
+                        if not 2 <= dur <= 30:
+                            raise mt.MitigationError("teste de 2 a 30 minutos")
+                        status, origin = "approved", "test"
+                    else:
+                        ok, why = mt.eligible(ip, cfg, bidir, scopes)
+                        if not ok:
+                            raise mt.MitigationError(why)
+                        if not 5 <= dur <= 1440:
+                            raise mt.MitigationError("duração de 5 a 1440 minutos")
+                        status = "simulated" if cfg["mode"] in ("simulate", "off") or not cfg["bgp"]["enabled"] else "approved"
+                        origin = "manual"
+                    reason = (f.get("reason", "").strip() or ("teste de validação (no-advertise)" if origin == "test"
+                                                               else "bloqueio manual"))[:300]
+                    store.mitigation_create(ip, mt.prefix_of(ip), status, origin, reason, dur, g.user["username"])
+                    audit("mitigacao_" + action, "%s %d min: %s" % (ip, dur, reason))
+                    flash("%s %s por %d min%s." % ("Teste de anúncio de" if origin == "test" else "Bloqueio de", ip, dur,
+                                                   " (simulado: nada será anunciado)" if status == "simulated" else
+                                                   ": anúncio em até 30 s"))
+                return redirect(url_for("mitigation_page"))
+            except (mt.MitigationError, ValueError, IndexError) as exc:
+                flash("Não aplicado: %s" % exc)
+                return redirect(url_for("mitigation_page"))
+        rule_names = [r["name"] for r in config.bidir()["rules"] if r["direction"] == "in"]
+        return render_template("mitigation.html", cfg=cfg, cfg_error=cfg_error, items=store.mitigations(),
+                               status=store.mitigation_status(), modes=mt.MODES, rule_names=rule_names)
 
     # ---------------------------------------------------------------- relatorio por cliente
     @app.route("/relatorio")

@@ -1,0 +1,21 @@
+[Unit]
+Description=OrbyFlow - GoBGP (sessao BGP com o roteador de borda para blackhole/RTBH)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=orbymon
+Group=orbymon
+# nao escuta a porta 179 (port = -1 no arquivo): so conecta ativamente ao roteador; API gRPC apenas local
+ExecStart=/usr/bin/gobgpd -f /etc/orbymon/gobgpd.toml -t toml --api-hosts 127.0.0.1:50051 --log-plain
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

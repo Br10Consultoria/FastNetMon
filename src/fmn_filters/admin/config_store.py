@@ -27,6 +27,7 @@ class Paths:
         self.reputation = Path(env.get("ORBYMON_REPUTATION_ENV", "/etc/orbymon/reputation.env"))
         self.radius = Path(env.get("ORBYMON_RADIUS_ENV", "/etc/orbymon/radius.env"))
         self.notify = Path(env.get("ORBYMON_NOTIFY_ENV", "/etc/orbymon/notify.env"))
+        self.mitigation = Path(env.get("ORBYMON_MITIGATION_CONFIG", "/etc/orbymon/mitigation.json"))
         self.backups_dir = Path(env.get("ORBYMON_BACKUP_DIR", "/var/lib/orbymon/backups"))
         self.nat_dir = Path(env.get("ORBYMON_NAT_DIR", "/var/log/orbymon/a10nat"))
         self.flow_root = Path(env.get("ORBYMON_FLOW_ROOT", "/var/lib/orbymon/flows"))
@@ -154,6 +155,16 @@ class ConfigStore:
         self._write(self.p.retention, render_env(
             {"ORBYMON_LOG_RETENTION_DAYS": log_days, "ORBYMON_FLOW_RETENTION_DAYS": flow_days},
             "Retencao de arquivos do OrbyFlow"))
+
+    def mitigation(self) -> dict:
+        from ..mitigation import load
+        return load(str(self.p.mitigation))
+
+    def save_mitigation(self, cfg: dict):
+        from ..mitigation import validate
+        cfg = validate(copy.deepcopy(cfg))
+        self._write(self.p.mitigation, json.dumps(cfg, ensure_ascii=False, indent=2) + "\n")
+        return cfg
 
     def notify(self) -> dict:
         return read_env(self.p.notify)

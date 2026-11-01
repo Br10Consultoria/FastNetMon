@@ -252,6 +252,23 @@ def check_db(cur, cfg, now, telegram_on=False, a10_on=True):
             st = WARN if stuck else OK
             out.append(item("telegram", "Avisos pendentes no Telegram", st, "%d evento(s) sem aviso" % stuck,
                             "" if st == OK else "orbymon-telegram parado ou sem acesso à API do Telegram"))
+    try:
+        cur.execute("SELECT name,value,updated_at FROM orby_mitigation_status")
+        mit = {r[0]: (r[1], r[2]) for r in cur.fetchall()}
+    except Exception:
+        mit = {}
+    if mit.get("modo") and mit["modo"][0] != "off":
+        age = _age(now, mit["modo"][1])
+        bgp = (mit.get("bgp") or ("", None))[0]
+        if age is None or age > 300:
+            out.append(item("mitigation", "Mitigação (controlador)", WARN, "sem execução há %s" % fmt_age(age),
+                            "veja journalctl -u orbymon-mitigation -n 30"))
+        elif bgp.startswith("desativado"):
+            out.append(item("mitigation", "Mitigação (BGP)", OK, "modo %s, BGP desligado" % mit["modo"][0]))
+        else:
+            st = OK if "Establ" in bgp else CRIT
+            out.append(item("mitigation", "Mitigação (BGP)", st, bgp[:120],
+                            "" if st == OK else "sessão BGP com o roteador fora: blackholes não serão anunciados"))
     oldest = _one(cur, "SELECT MIN(bucket_utc) FROM orby_flow_minute WHERE source=%s", (src,))
     if oldest is not None:
         keep = timedelta(days=cfg["retention_days"])

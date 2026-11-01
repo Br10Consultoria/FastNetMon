@@ -119,6 +119,38 @@ ON DUPLICATE KEY UPDATE if_name=VALUES(if_name)""", (if_index, name), fetch=Fals
     def delete_interface(self, if_index):
         self._q("DELETE FROM orby_interface_names WHERE source='huawei' AND if_index=%s", (if_index,), fetch=False)
 
+    # ---------- mitigacao
+    MIT_KEYS = ("id", "ip", "prefix", "status", "origin", "rule_name", "reason", "peak_mbps", "peak_pps", "duration_min",
+                "created_at", "requested_by", "decided_by", "decided_at", "announced_at", "last_seen_at", "expires_at",
+                "ended_at", "error")
+
+    def mitigations(self, limit=80):
+        try:
+            rows = self._q("SELECT " + ",".join(self.MIT_KEYS) + " FROM orby_mitigations ORDER BY "
+                           "FIELD(status,'simulated','withdrawing','active','approved','proposed') DESC, id DESC LIMIT %s",
+                           (limit,))
+        except Exception:
+            return None
+        return [dict(zip(self.MIT_KEYS, r)) for r in rows]
+
+    def mitigation_status(self):
+        try:
+            return {r[0]: (r[1], r[2]) for r in self._q("SELECT name,value,updated_at FROM orby_mitigation_status")}
+        except Exception:
+            return {}
+
+    def mitigation_create(self, ip, prefix, status, origin, reason, duration, user):
+        return self._q("INSERT INTO orby_mitigations (ip,prefix,status,origin,reason,duration_min,created_at,last_seen_at,"
+                       "expires_at,requested_by,decided_by,decided_at) VALUES (%s,%s,%s,%s,%s,%s,UTC_TIMESTAMP(),"
+                       "UTC_TIMESTAMP(),UTC_TIMESTAMP()+INTERVAL %s MINUTE,%s,%s,UTC_TIMESTAMP())",
+                       (ip, prefix, status, origin, reason[:300], duration, duration, user, user), fetch=False)
+
+    def mitigation_decide(self, mid, from_status, to_status, user):
+        """Muda o estado so se ainda estiver no estado esperado (dois operadores ao mesmo tempo)."""
+        ended = ", ended_at=UTC_TIMESTAMP()" if to_status in ("rejected", "ended") else ""
+        return self._q("UPDATE orby_mitigations SET status=%s,decided_by=%s,decided_at=UTC_TIMESTAMP()" + ended +
+                       " WHERE id=%s AND status=%s", (to_status, user, mid, from_status), fetch=False)
+
     # ---------- clientes
     def customers(self):
         try:

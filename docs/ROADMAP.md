@@ -30,9 +30,10 @@ Ordem pensada para deixar **detecção e alarmes certeiros antes da mitigação*
 ## 5. Operação
 - Várias fontes (outros roteadores).
 
-## 6. Mitigação (última)
-- Blackhole (RTBH) e FlowSpec para o NE8000 a partir dos incidentes, com aprovação manual primeiro,
-  whitelist/blacklist, retirada automática ao resolver.
+## 6. Mitigação
+- **RTBH implementado** ([MITIGACAO.md](MITIGACAO.md)): simulação → validação da sessão BGP → aprovação manual →
+  automático (só com calibração estável). Travas, reconciliação, painel e avisos.
+- Próximo: FlowSpec (descartar/limitar só o tráfego do ataque) depois de o RTBH estar validado em produção.
 
 ## Renomear para OrbyFlow
 1. ~~Nome visível (painel, Grafana, Telegram, e-mail, documentação)~~ — feito.

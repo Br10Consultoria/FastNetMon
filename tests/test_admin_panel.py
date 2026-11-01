@@ -144,6 +144,32 @@ class FakeStore:
     def delete_customer(self, cid):
         return 1 if self.custs.pop(cid, None) else 0
 
+    mits = None
+
+    def mitigations(self, limit=80):
+        if self.mits is None:
+            self.mits = []
+        return [dict(m) for m in self.mits]
+
+    def mitigation_status(self):
+        return {"bgp": ("10.0.0.1 262687 Establ", None), "modo": ("simulate", None)}
+
+    def mitigation_create(self, ip, prefix, status, origin, reason, duration, user):
+        self.mitigations()
+        self.mits.append({"id": len(self.mits) + 1, "ip": ip, "prefix": prefix, "status": status, "origin": origin,
+                          "rule_name": "", "reason": reason, "peak_mbps": 0.0, "peak_pps": 0.0, "duration_min": duration,
+                          "created_at": datetime(2026, 11, 1), "requested_by": user, "decided_by": user,
+                          "decided_at": None, "announced_at": None, "last_seen_at": None, "expires_at": None,
+                          "ended_at": None, "error": ""})
+        return 1
+
+    def mitigation_decide(self, mid, from_status, to_status, user):
+        for m in self.mits or []:
+            if m["id"] == mid and m["status"] == from_status:
+                m.update(status=to_status, decided_by=user)
+                return 1
+        return 0
+
     health_rows = None
 
     def health_items(self):
@@ -280,7 +306,7 @@ def make_tree(tmp: Path):
     return {"ORBYMON_ADMIN_TESTING": "1", "ORBYMON_CONFIG": str(etc / "bidir.json"),
             "ORBYMON_TELEGRAM_ENV": str(etc / "telegram.env"), "ORBYMON_RETENTION_ENV": str(etc / "retention.env"),
             "ORBYMON_CALIBRATION_DIR": str(calib), "ORBYMON_ADMIN_BACKUP_DIR": str(tmp / "backups"),
-            "ORBYMON_REPUTATION_ENV": str(etc / "reputation.env"), "ORBYMON_RADIUS_ENV": str(etc / "radius.env"), "ORBYMON_BACKUP_DIR": str(tmp / "backups"), "ORBYMON_NOTIFY_ENV": str(etc / "notify.env"), "ORBYMON_NAT_DIR": str(tmp / "nat"),
+            "ORBYMON_REPUTATION_ENV": str(etc / "reputation.env"), "ORBYMON_RADIUS_ENV": str(etc / "radius.env"), "ORBYMON_BACKUP_DIR": str(tmp / "backups"), "ORBYMON_NOTIFY_ENV": str(etc / "notify.env"), "ORBYMON_MITIGATION_CONFIG": str(etc / "mitigation.json"), "ORBYMON_NAT_DIR": str(tmp / "nat"),
             "ORBYMON_FLOW_ROOT": str(tmp / "flows"), "ORBYMON_QUERY_LOCK": str(tmp / "query.lock")}
 
 
@@ -969,6 +995,48 @@ class PanelTests(unittest.TestCase):
         self.assertEqual(self.db.audits[-1][1], "relatorio")
         r = self.c.get("/relatorio?alvo=10.0.0.0/8")
         self.assertIn("amplo demais".encode(), r.data)
+
+
+    def test_mitigation_page(self):
+        self.login()
+        page = self.c.get("/mitigacao")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("simulação".encode(), page.data)
+        cfgp = Path(self.env["ORBYMON_MITIGATION_CONFIG"])
+        base = dict(action="configurar", mode="simulate", min_severity="critical", min_mbps="1000", min_pps="300000",
+                    scopes="dedicated", duration_min="30", release_after_min="15", approval_timeout_min="20",
+                    max_active="10", protected="187.87.201.50", next_hop="192.0.2.1", next_hop_v6="100::1",
+                    communities="65535:666, 262687:0:666", no_export="1", notify="1")
+        self.post("/mitigacao", **dict(base, mode="manual"))                        # sem BGP: recusa
+        self.assertFalse(cfgp.exists())
+        self.post("/mitigacao", **dict(base, mode="manual", bgp_enabled="1"))
+        cfg = json.loads(cfgp.read_text())
+        self.assertEqual((cfg["mode"], cfg["bgp"]["communities"], cfg["protected"]),
+                         ("manual", ["65535:666", "262687:0:666"], ["187.87.201.50/32"]))
+        self.post("/mitigacao", **dict(base, mode="auto", bgp_enabled="1"))          # sem confirmar: recusa
+        self.assertEqual(json.loads(cfgp.read_text())["mode"], "manual")
+        self.post("/mitigacao", **dict(base, mode="auto", bgp_enabled="1", confirm_auto="1"))
+        self.assertEqual(json.loads(cfgp.read_text())["mode"], "auto")
+        self.assertEqual(self.db.audits[-1][1], "mitigacao_config")
+        # bloqueio manual: travas
+        self.post("/mitigacao", action="bloquear", ip="8.8.8.8", duration="30")
+        self.post("/mitigacao", action="bloquear", ip="45.238.170.70", duration="30")     # pool
+        self.post("/mitigacao", action="bloquear", ip="187.87.201.50", duration="30")    # protegido
+        self.assertEqual(self.db.mits or [], [])
+        self.post("/mitigacao", action="bloquear", ip="187.87.201.40", duration="30", reason="chamado 1")
+        self.assertEqual((self.db.mits[0]["status"], self.db.mits[0]["prefix"]), ("approved", "187.87.201.40/32"))
+        self.post("/mitigacao", action="testar", ip="187.87.201.60", duration="5")
+        self.assertEqual(self.db.mits[1]["origin"], "test")
+        self.db.mits[0]["status"] = "active"
+        self.post("/mitigacao", action="retirar", id="1")
+        self.assertEqual(self.db.mits[0]["status"], "withdrawing")
+        self.db.mits.append(dict(self.db.mits[0], id=3, status="proposed", ip="187.87.201.41", prefix="187.87.201.41/32"))
+        self.post("/mitigacao", action="aprovar", id="3")
+        self.assertEqual(self.db.mits[2]["status"], "approved")
+        self.assertEqual(self.db.audits[-1][1], "mitigacao_aprovar")
+        page = self.c.get("/mitigacao")
+        self.assertIn(b"187.87.201.41/32", page.data)
+        self.assertIn(b"Establ", page.data)
 
 
 class CliTests(unittest.TestCase):
