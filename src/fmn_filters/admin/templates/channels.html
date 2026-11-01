@@ -1,0 +1,36 @@
+{% extends "base.html" %}{% block title %}E-mail e webhook{% endblock %}
+{% block body %}
+<h1>Avisos por e-mail e webhook</h1>
+<p class="muted">Complementam o Telegram: todo aviso que vai ao Telegram (ataques, alarmes por filtro, saúde e reputação) também
+vai para os canais abaixo. O Telegram continua sendo o canal principal — se ele falhar, o aviso é tentado de novo; falha de
+e-mail/webhook só fica no log do serviço. Senha e URL do webhook nunca voltam para a página (vazio = manter).</p>
+<form method="post" autocomplete="off">{% include "_csrf.html" %}
+<section class="card">
+  <h2>E-mail (SMTP)</h2>
+  <div class="grid">
+    <label>Servidor SMTP <input name="SMTP_HOST" value="{{ v.SMTP_HOST }}" placeholder="smtp.exemplo.com.br (vazio = desligado)"></label>
+    <label>Segurança <select name="SMTP_SECURITY">{% for k, l in (('starttls','STARTTLS (587)'),('ssl','SSL/TLS (465)'),('none','sem criptografia (25)')) %}<option value="{{ k }}" {{ 'selected' if (v.SMTP_SECURITY or 'starttls')==k }}>{{ l }}</option>{% endfor %}</select></label>
+    <label>Porta <input name="SMTP_PORT" value="{{ v.SMTP_PORT }}" placeholder="padrão da segurança"></label>
+    <label>Usuário <input name="SMTP_USER" value="{{ v.SMTP_USER }}"></label>
+    <label>Senha <input name="SMTP_PASSWORD" type="password" autocomplete="new-password" placeholder="{{ 'mantida (preencha para trocar)' if has_password else '' }}"></label>
+    <label>Remetente <input name="SMTP_FROM" value="{{ v.SMTP_FROM }}" placeholder="noc@provedor.com.br"></label>
+  </div>
+  <label>Destinatários (separados por vírgula) <input name="SMTP_TO" value="{{ v.SMTP_TO }}" placeholder="noc@provedor.com.br, abuse@provedor.com.br"></label>
+  {% if v.SMTP_HOST %}<label class="check"><input type="checkbox" name="remover_email" value="1"> Desligar e-mail</label>{% endif %}
+</section>
+<section class="card">
+  <h2>Webhook</h2>
+  <div class="grid">
+    <label>URL {% if webhook_host %}<small>(configurada: {{ webhook_host }}; vazio = manter)</small>{% endif %}
+      <input name="WEBHOOK_URL" type="password" autocomplete="off" placeholder="https://hooks.slack.com/... ou https://seu-sistema/api/alertas"></label>
+    <label>Formato <select name="WEBHOOK_FORMAT">{% for k, l in formats.items() %}<option value="{{ k }}" {{ 'selected' if (v.WEBHOOK_FORMAT or 'json')==k }}>{{ l }}</option>{% endfor %}</select></label>
+  </div>
+  <p class="muted">JSON genérico: <code>{"origem": "orbymon", "site": "...", "texto": "...", "html": "..."}</code> por POST.</p>
+  {% if webhook_host %}<label class="check"><input type="checkbox" name="remover_webhook" value="1"> Desligar webhook</label>{% endif %}
+</section>
+<div class="inline">
+  <button name="action" value="testar" class="secondary">Enviar teste (sem salvar)</button>
+  <button name="action" value="salvar">Salvar</button>
+</div>
+</form>
+{% endblock %}

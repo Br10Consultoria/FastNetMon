@@ -508,7 +508,8 @@ def main(argv=None):
                 tenv.update(read_env(Path(args.telegram_env)))
                 if tenv.get("TELEGRAM_BOT_TOKEN") and tenv.get("TELEGRAM_CHAT_IDS"):
                     ts = Settings.from_env(tenv)
-                    stats = notify(db, Telegram(ts.token, ts.chats), Formatter(ts))
+                    from .channels import wrap
+                    stats = notify(db, wrap(Telegram(ts.token, ts.chats), os.environ.get("ORBYMON_NOTIFY_ENV", "/etc/orbymon/notify.env"), ts.site), Formatter(ts))
                     if any(stats.values()):
                         print("telegram: %s" % stats)
         finally:

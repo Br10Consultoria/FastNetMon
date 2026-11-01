@@ -102,6 +102,8 @@ ORBYMON_CALIBRATION_DIR='/var/lib/orbymon/calibration'
 ORBYMON_ADMIN_BACKUP_DIR='/var/lib/orbymon/admin/backups'
 ORBYMON_REPUTATION_ENV='/etc/orbymon/reputation.env'
 ORBYMON_RADIUS_ENV='/etc/orbymon/radius.env'
+ORBYMON_NOTIFY_ENV='/etc/orbymon/notify.env'
+ORBYMON_BACKUP_DIR='/var/lib/orbymon/backups'
 ORBYMON_NAT_DIR='/var/log/orbymon/a10nat'
 ORBYMON_FLOW_ROOT='/var/lib/orbymon/flows'
 ORBYMON_QUERY_LOCK='/var/lib/orbymon/admin/query.lock'
@@ -123,9 +125,10 @@ ENV
 fi
 [[ -e /etc/orbymon/retention.env ]] || printf "ORBYMON_LOG_RETENTION_DAYS='15'\nORBYMON_FLOW_RETENTION_DAYS='15'\n" > /etc/orbymon/retention.env
 [[ -e /etc/orbymon/telegram.env ]] || printf "TELEGRAM_BOT_TOKEN=''\nTELEGRAM_CHAT_IDS=''\n" > /etc/orbymon/telegram.env
+[[ -e /etc/orbymon/notify.env ]] || printf "# Avisos por e-mail e webhook (pagina E-mail/Webhook do painel)\nSMTP_HOST=''\nWEBHOOK_URL=''\n" > /etc/orbymon/notify.env
 EXTRA=""; [[ -e /etc/orbymon/reputation.env ]] && EXTRA=/etc/orbymon/reputation.env
 [[ -e /etc/orbymon/radius.env ]] && EXTRA="$EXTRA /etc/orbymon/radius.env"
-for file in /etc/orbymon/bidir.json "$PROFILE" /etc/orbymon/telegram.env /etc/orbymon/retention.env $EXTRA; do
+for file in /etc/orbymon/bidir.json "$PROFILE" /etc/orbymon/telegram.env /etc/orbymon/retention.env /etc/orbymon/notify.env $EXTRA; do
   [[ "$file" == /etc/orbymon/* && "$file" != /etc/orbymon/managed/* ]] || { echo "ignorado (fora de /etc/orbymon): $file"; continue; }
   name=$(basename "$file")
   if [[ -L "$file" ]]; then

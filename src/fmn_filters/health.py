@@ -373,7 +373,8 @@ def main(argv=None):
             env = read_env(Path(args.telegram_env))
             if env.get("TELEGRAM_BOT_TOKEN") and env.get("TELEGRAM_CHAT_IDS"):
                 s = Settings.from_env(env)
-                telegram, site = Telegram(s.token, s.chats), s.site
+                from .channels import wrap
+                telegram, site = wrap(Telegram(s.token, s.chats), os.environ.get("ORBYMON_NOTIFY_ENV", "/etc/orbymon/notify.env"), s.site), s.site
         now = datetime.now(timezone.utc).replace(tzinfo=None, microsecond=0)
         db = connection_from_env()
         try:

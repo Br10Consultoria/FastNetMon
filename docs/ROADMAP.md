@@ -14,6 +14,7 @@ Ordem pensada para deixar **detecção e alarmes certeiros antes da mitigação*
   semana, nunca acima do fixo), exceções por IP/rede/ASN com validade, limite próprio por IP, “acima do habitual”
   nos alarmes por filtro. Active timeout do NetStream em 1 minuto aplicado no NE8000.
 
+- **E-mail e webhook** ([AVISOS.md](AVISOS.md)): todos os avisos também por SMTP e webhook.
 - **Backup** ([BACKUP.md](BACKUP.md)): diário, cifrado, com cópia externa opcional e restauração assistida.
 - **Saúde** ([SAUDE.md](SAUDE.md)): coleta, atrasos, disco, serviços e tempo de execução, com aviso no Telegram.
 

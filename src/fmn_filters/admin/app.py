@@ -859,6 +859,57 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
                 error = "consulta falhou: %s" % (str(exc)[:200] or type(exc).__name__)
         return render_template("tools.html", form=form, result=result, error=error, dns_types=tl.DNS_TYPES)
 
+    # ---------------------------------------------------------------- e-mail e webhook
+    @app.route("/avisos", methods=["GET", "POST"])
+    def channels_page():
+        from urllib.parse import urlsplit
+        from .. import channels as chn
+        current = config.notify()
+        f = request.form
+        shown = current
+        if request.method == "POST":
+            try:
+                values = {k: f.get(k, "").strip() for k in chn.NOTIFY_KEYS}
+                for secret in chn.SECRET_KEYS:                      # vazio = manter
+                    if not values[secret]:
+                        values[secret] = current.get(secret, "")
+                if f.get("remover_email") == "1":
+                    values["SMTP_HOST"] = ""
+                if f.get("remover_webhook") == "1":
+                    values["WEBHOOK_URL"] = ""
+                clean = chn.validate(values)
+                clean["SMTP_PASSWORD"] = values["SMTP_PASSWORD"] if clean["SMTP_HOST"] else ""
+                clean["WEBHOOK_URL"] = values["WEBHOOK_URL"]
+                if f.get("action") == "testar":
+                    sent, failed = [], []
+                    site = config.telegram().get("ORBYMON_SITE_NAME", "")
+                    for ch in chn.extras_from_env(clean, site):
+                        try:
+                            ch.send("🛡️ <b>Teste de aviso do OrbyMon</b>\nEnviado por %s pelo painel." % g.user["username"])
+                            sent.append(repr(ch))
+                        except Exception as exc:
+                            failed.append("%r: %s" % (ch, (str(exc) if repr(ch) == "e-mail" else type(exc).__name__)[:200]))
+                    audit("avisos_teste", "ok: %s; falha: %s" % (", ".join(sent) or "-", "; ".join(failed) or "-"))
+                    flash("Teste: %s%s" % (("enviado por " + ", ".join(sent)) if sent else "nada enviado",
+                                           (" · falhou " + "; ".join(failed)) if failed else ""))
+                    shown = clean
+                else:
+                    config.save_notify(clean)
+                    audit("avisos_salvos", "e-mail: %s; webhook: %s" % (
+                        ("%s:%s -> %s" % (clean["SMTP_HOST"], clean["SMTP_PORT"], clean["SMTP_TO"])) if clean["SMTP_HOST"]
+                        else "desligado", ("%s (%s)" % (urlsplit(clean["WEBHOOK_URL"]).hostname, clean["WEBHOOK_FORMAT"]))
+                        if clean["WEBHOOK_URL"] else "desligado"))
+                    flash("Avisos salvos. Valem a partir da próxima execução de cada serviço.")
+                    return redirect(url_for("channels_page"))
+            except chn.ChannelError as exc:
+                flash("Não salvo: %s" % exc)
+                shown = {k: f.get(k, "") for k in chn.NOTIFY_KEYS}
+        view = {k: shown.get(k, "") for k in chn.NOTIFY_KEYS if k not in chn.SECRET_KEYS}
+        hook = current.get("WEBHOOK_URL", "")
+        return render_template("channels.html", v=view, formats=chn.FORMATS,
+                               has_password=bool(current.get("SMTP_PASSWORD")),
+                               webhook_host=urlsplit(hook).hostname if hook else "")
+
     # ---------------------------------------------------------------- backup
     @app.route("/backup")
     def backup_page():

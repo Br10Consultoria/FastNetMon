@@ -532,7 +532,9 @@ def main(argv=None):
             env.update(read_env(Path(args.telegram_env)))
             if env.get("TELEGRAM_BOT_TOKEN") and env.get("TELEGRAM_CHAT_IDS"):
                 s = Settings.from_env(env)
-                telegram, formatter, reminder = Telegram(s.token, s.chats), Formatter(s), s.reminder_min
+                from .channels import wrap
+                telegram, formatter, reminder = (wrap(Telegram(s.token, s.chats), os.environ.get("ORBYMON_NOTIFY_ENV", "/etc/orbymon/notify.env"), s.site),
+                                                 Formatter(s), s.reminder_min)
         db = connection_from_env()
         if formatter is not None:
             from .customers import build_identifier

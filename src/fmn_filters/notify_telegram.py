@@ -381,6 +381,9 @@ def main(argv=None):
             return 0
         settings = Settings.from_env(env)
         telegram = Telegram(settings.token, settings.chats)
+        if not args.test:
+            from .channels import wrap
+            telegram = wrap(telegram, os.environ.get("ORBYMON_NOTIFY_ENV", "/etc/orbymon/notify.env"), settings.site)
         if args.test:
             telegram.send(Formatter(settings).header("🛡️", "OrbyMon conectado ao Telegram") +
                           "\nAlertas de severidade %s ou maior serão enviados aqui."

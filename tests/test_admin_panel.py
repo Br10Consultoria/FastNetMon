@@ -280,7 +280,7 @@ def make_tree(tmp: Path):
     return {"ORBYMON_ADMIN_TESTING": "1", "ORBYMON_CONFIG": str(etc / "bidir.json"),
             "ORBYMON_TELEGRAM_ENV": str(etc / "telegram.env"), "ORBYMON_RETENTION_ENV": str(etc / "retention.env"),
             "ORBYMON_CALIBRATION_DIR": str(calib), "ORBYMON_ADMIN_BACKUP_DIR": str(tmp / "backups"),
-            "ORBYMON_REPUTATION_ENV": str(etc / "reputation.env"), "ORBYMON_RADIUS_ENV": str(etc / "radius.env"), "ORBYMON_BACKUP_DIR": str(tmp / "backups"), "ORBYMON_NAT_DIR": str(tmp / "nat"),
+            "ORBYMON_REPUTATION_ENV": str(etc / "reputation.env"), "ORBYMON_RADIUS_ENV": str(etc / "radius.env"), "ORBYMON_BACKUP_DIR": str(tmp / "backups"), "ORBYMON_NOTIFY_ENV": str(etc / "notify.env"), "ORBYMON_NAT_DIR": str(tmp / "nat"),
             "ORBYMON_FLOW_ROOT": str(tmp / "flows"), "ORBYMON_QUERY_LOCK": str(tmp / "query.lock")}
 
 
@@ -906,6 +906,39 @@ class PanelTests(unittest.TestCase):
         page = self.c.get("/backup")
         self.assertIn(b"orbymon-backup-20261101-033700.tar.gz.enc", page.data)
         self.assertIn("cifrado".encode(), page.data)
+
+
+    def test_email_webhook_page(self):
+        from fmn_filters import channels as chn
+        from fmn_filters.admin.config_store import read_env
+        self.login()
+        self.assertEqual(self.c.get("/avisos").status_code, 200)
+        form = dict(SMTP_HOST="smtp.exemplo.com.br", SMTP_SECURITY="starttls", SMTP_PORT="", SMTP_USER="noc@exemplo.com.br",
+                    SMTP_PASSWORD="senha-smtp-123", SMTP_FROM="", SMTP_TO="noc@exemplo.com.br",
+                    WEBHOOK_URL="https://hooks.exemplo/T000/SEGREDO", WEBHOOK_FORMAT="slack")
+        self.assertEqual(self.post("/avisos", action="salvar", **form).status_code, 302)
+        env = read_env(Path(self.env["ORBYMON_NOTIFY_ENV"]))
+        self.assertEqual((env["SMTP_PORT"], env["SMTP_PASSWORD"], env["WEBHOOK_URL"]),
+                         ("587", "senha-smtp-123", "https://hooks.exemplo/T000/SEGREDO"))
+        page = self.c.get("/avisos")
+        self.assertNotIn(b"senha-smtp-123", page.data)
+        self.assertNotIn(b"SEGREDO", page.data)
+        self.assertIn(b"hooks.exemplo", page.data)
+        self.assertNotIn(b"SEGREDO", self.db.audits[-1][2].encode())
+        self.post("/avisos", action="salvar", **dict(form, SMTP_PASSWORD="", WEBHOOK_URL=""))
+        env = read_env(Path(self.env["ORBYMON_NOTIFY_ENV"]))
+        self.assertEqual((env["SMTP_PASSWORD"], env["WEBHOOK_URL"]), ("senha-smtp-123", "https://hooks.exemplo/T000/SEGREDO"))
+        sent = []
+        with mock.patch.object(chn.Email, "send", lambda self, t: sent.append(("email", t))), \
+                mock.patch.object(chn.Webhook, "send", side_effect=OSError("https://hooks.exemplo/T000/SEGREDO")):
+            r = self.post("/avisos", action="testar", **dict(form, SMTP_PASSWORD="", WEBHOOK_URL=""))
+        self.assertIn("enviado por e-mail".encode(), r.data)
+        self.assertIn(b"webhook: OSError", r.data)
+        self.assertNotIn(b"SEGREDO", r.data)
+        self.post("/avisos", action="salvar", **dict(form, SMTP_PASSWORD="", WEBHOOK_URL="", remover_webhook="1"))
+        self.assertEqual(read_env(Path(self.env["ORBYMON_NOTIFY_ENV"]))["WEBHOOK_URL"], "")
+        r = self.post("/avisos", action="salvar", **dict(form, SMTP_TO="nao-e-email"))
+        self.assertIn("Não salvo".encode(), r.data)
 
 
 class CliTests(unittest.TestCase):

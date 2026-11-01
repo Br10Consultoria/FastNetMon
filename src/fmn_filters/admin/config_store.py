@@ -26,6 +26,7 @@ class Paths:
         self.backups = Path(env.get("ORBYMON_ADMIN_BACKUP_DIR", "/var/lib/orbymon/admin/backups"))
         self.reputation = Path(env.get("ORBYMON_REPUTATION_ENV", "/etc/orbymon/reputation.env"))
         self.radius = Path(env.get("ORBYMON_RADIUS_ENV", "/etc/orbymon/radius.env"))
+        self.notify = Path(env.get("ORBYMON_NOTIFY_ENV", "/etc/orbymon/notify.env"))
         self.backups_dir = Path(env.get("ORBYMON_BACKUP_DIR", "/var/lib/orbymon/backups"))
         self.nat_dir = Path(env.get("ORBYMON_NAT_DIR", "/var/log/orbymon/a10nat"))
         self.flow_root = Path(env.get("ORBYMON_FLOW_ROOT", "/var/lib/orbymon/flows"))
@@ -153,6 +154,12 @@ class ConfigStore:
         self._write(self.p.retention, render_env(
             {"ORBYMON_LOG_RETENTION_DAYS": log_days, "ORBYMON_FLOW_RETENTION_DAYS": flow_days},
             "Retencao de arquivos do OrbyMon"))
+
+    def notify(self) -> dict:
+        return read_env(self.p.notify)
+
+    def save_notify(self, values: dict):
+        self._write(self.p.notify, render_env(values, "Avisos por e-mail e webhook - contem senha/URL secreta: nao compartilhe"))
 
     def radius(self) -> dict:
         return read_env(self.p.radius)
