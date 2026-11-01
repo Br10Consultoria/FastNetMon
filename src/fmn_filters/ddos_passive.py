@@ -16,6 +16,7 @@ import sys
 
 from .engine import validate_match
 from .mysql_sink import connection_from_env, ALERT_SQL, alert_to_row
+from .protocols import NAMES
 
 RULES_PATH = "/etc/orbymon/ddos-rules.json"
 SUPPORTED_MATCH = frozenset({
@@ -24,7 +25,7 @@ SUPPORTED_MATCH = frozenset({
     "dst_countries", "input_interfaces", "output_interfaces",
     "all_of", "any_of", "not"
 })
-ALLOWED_PROTOCOLS = frozenset({"tcp", "udp", "icmp", "icmpv6", "esp", "gre", "47", "50"})
+ALLOWED_PROTOCOLS = NAMES | frozenset(str(n) for n in range(256))
 SEVERITIES = frozenset({"warning", "high", "critical"})
 
 

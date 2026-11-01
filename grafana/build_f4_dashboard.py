@@ -14,6 +14,14 @@ EV = ("$__timeFilter(event_time)"
       f" AND ({DIR}='all' OR direction={DIR})"
       f" AND ({PROTO}='all' OR protocol={PROTO})"
       f" AND ({PORT}='' OR local_port={PORT} OR remote_port={PORT})")
+# todos os protocolos IP (IANA) pelo nome gravado no rollup; os mais comuns primeiro. Lista fixa: sem custo
+# de consulta (um SELECT DISTINCT em 2 dias de fluxos seria lento a cada abertura do painel).
+import sys
+sys.path.insert(0, "src")
+from fmn_filters.protocols import NUMBER_TO_NAME
+COMMON = ["tcp", "udp", "icmp", "icmpv6", "gre", "esp", "ah", "ipv6", "ipip", "sctp", "ospf", "pim", "vrrp", "igmp", "l2tp"]
+PROTO_OPTS = [("Todos", "all")] + [(n, n) for n in COMMON] + \
+    [("%s (%d)" % (n, k), n) for k, n in sorted(NUMBER_TO_NAME.items()) if n not in COMMON]
 DIRNAME = "CASE direction WHEN 'in' THEN 'recebido' ELSE 'originado' END"
 panels = []
 pid = [0]
@@ -142,10 +150,11 @@ dash = {
          "current": {"text": "Todos", "value": "all"},
          "options": [{"text": "Todos", "value": "all", "selected": True}, {"text": "Recebido", "value": "in", "selected": False},
                      {"text": "Originado", "value": "out", "selected": False}]},
-        {"name": "proto", "label": "Protocolo", "type": "custom", "query": "Todos : all,tcp : tcp,udp : udp,icmp : icmp,gre : gre,esp : esp",
+        {"name": "proto", "label": "Protocolo", "type": "custom",
+         "query": ",".join("%s : %s" % (t.replace(",", " "), v) for t, v in PROTO_OPTS),
          "current": {"text": "Todos", "value": "all"},
-         "options": [{"text": t, "value": v, "selected": v == "all"} for t, v in
-                     (("Todos", "all"), ("tcp", "tcp"), ("udp", "udp"), ("icmp", "icmp"), ("gre", "gre"), ("esp", "esp"))]},
+         "options": [{"text": t, "value": v, "selected": v == "all"} for t, v in PROTO_OPTS],
+         "description": "Todos os protocolos IP (IANA). Digite para buscar: gre, ah, ospf, sctp..."},
     ]},
     "panels": panels,
 }

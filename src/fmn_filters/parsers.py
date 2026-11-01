@@ -3,6 +3,7 @@ import json
 import re
 from typing import Iterator, TextIO
 from .models import Event, timestamp, positive_number
+from .protocols import proto_name
 
 
 def _first(obj: dict, *keys: str, default=None):
@@ -36,8 +37,7 @@ def parse_record(raw: dict, assume_utc: bool = False) -> Event | None:
     start = timestamp(_first(raw, 'start', 'first', 'timestamp', 'time'), assume_utc)
     end = timestamp(_first(raw, 'end', 'last', 'timestamp', 'time', default=start), assume_utc)
     proto_raw = _first(raw, 'protocol', 'proto', default='tcp' if kind == 'http' else '')
-    proto_aliases = {'6': 'tcp', '17': 'udp', '1': 'icmp', '58': 'icmpv6', '50': 'esp'}
-    proto = proto_aliases.get(str(proto_raw).lower(), str(proto_raw).lower())
+    proto = proto_name(proto_raw) if str(proto_raw) != '' else ''
     if kind == 'http' and proto != 'tcp':
         raise ValueError('evento HTTP deve ser TCP')
     packets = positive_number(_first(raw, 'packets', 'in_packets', 'pkt', default=1 if kind == 'http' else 0), 'packets')

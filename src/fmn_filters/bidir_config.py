@@ -8,11 +8,12 @@ from pathlib import Path
 
 from .cgnat_baseline import validate_config as validate_profile
 from .scopes import ScopeMap
+from .protocols import NAMES
 
 DEFAULT_CONFIG = "/etc/orbymon/bidir.json"
 LIMIT_SCOPES = ("dedicated", "cgnat_pool", "cgnat_private", "cgnat_subscriber")
 SEVERITIES = frozenset({"warning", "high", "critical"})
-PROTOCOLS = frozenset({"tcp", "udp", "icmp", "icmpv6", "esp", "gre"})
+PROTOCOLS = NAMES                     # qualquer protocolo IANA pelo nome (tcp, udp, gre, ah, ospf...)
 SPLIT_FIELDS = frozenset({"protocol", "local_port", "remote_port"})
 LIMIT_KEYS = frozenset({"min_pps", "min_mbps", "min_remote_ips", "min_syn_ratio",
                         "min_zero_port_ratio"})

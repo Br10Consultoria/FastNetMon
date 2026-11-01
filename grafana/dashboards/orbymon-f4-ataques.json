@@ -79,7 +79,7 @@
         "name": "proto",
         "label": "Protocolo",
         "type": "custom",
-        "query": "Todos : all,tcp : tcp,udp : udp,icmp : icmp,gre : gre,esp : esp",
+        "query": "Todos : all,tcp : tcp,udp : udp,icmp : icmp,icmpv6 : icmpv6,gre : gre,esp : esp,ah : ah,ipv6 : ipv6,ipip : ipip,sctp : sctp,ospf : ospf,pim : pim,vrrp : vrrp,igmp : igmp,l2tp : l2tp,hopopt (0) : hopopt,ggp (3) : ggp,st (5) : st,cbt (7) : cbt,egp (8) : egp,igp (9) : igp,bbn-rcc-mon (10) : bbn-rcc-mon,nvp-ii (11) : nvp-ii,pup (12) : pup,argus (13) : argus,emcon (14) : emcon,xnet (15) : xnet,chaos (16) : chaos,mux (18) : mux,dcn-meas (19) : dcn-meas,hmp (20) : hmp,prm (21) : prm,xns-idp (22) : xns-idp,trunk-1 (23) : trunk-1,trunk-2 (24) : trunk-2,leaf-1 (25) : leaf-1,leaf-2 (26) : leaf-2,rdp (27) : rdp,irtp (28) : irtp,iso-tp4 (29) : iso-tp4,netblt (30) : netblt,mfe-nsp (31) : mfe-nsp,merit-inp (32) : merit-inp,dccp (33) : dccp,3pc (34) : 3pc,idpr (35) : idpr,xtp (36) : xtp,ddp (37) : ddp,idpr-cmtp (38) : idpr-cmtp,tp++ (39) : tp++,il (40) : il,sdrp (42) : sdrp,ipv6-route (43) : ipv6-route,ipv6-frag (44) : ipv6-frag,idrp (45) : idrp,rsvp (46) : rsvp,dsr (48) : dsr,bna (49) : bna,i-nlsp (52) : i-nlsp,swipe (53) : swipe,narp (54) : narp,mobile (55) : mobile,tlsp (56) : tlsp,skip (57) : skip,ipv6-nonxt (59) : ipv6-nonxt,ipv6-opts (60) : ipv6-opts,cftp (62) : cftp,sat-expak (64) : sat-expak,kryptolan (65) : kryptolan,rvd (66) : rvd,ippc (67) : ippc,sat-mon (69) : sat-mon,visa (70) : visa,ipcu (71) : ipcu,cpnx (72) : cpnx,cphb (73) : cphb,wsn (74) : wsn,pvp (75) : pvp,br-sat-mon (76) : br-sat-mon,sun-nd (77) : sun-nd,wb-mon (78) : wb-mon,wb-expak (79) : wb-expak,iso-ip (80) : iso-ip,vmtp (81) : vmtp,secure-vmtp (82) : secure-vmtp,vines (83) : vines,iptm (84) : iptm,nsfnet-igp (85) : nsfnet-igp,dgp (86) : dgp,tcf (87) : tcf,eigrp (88) : eigrp,sprite-rpc (90) : sprite-rpc,larp (91) : larp,mtp (92) : mtp,ax.25 (93) : ax.25,os (94) : os,micp (95) : micp,scc-sp (96) : scc-sp,etherip (97) : etherip,encap (98) : encap,gmtp (100) : gmtp,ifmp (101) : ifmp,pnni (102) : pnni,aris (104) : aris,scps (105) : scps,qnx (106) : qnx,a/n (107) : a/n,ipcomp (108) : ipcomp,snp (109) : snp,compaq-peer (110) : compaq-peer,ipx-in-ip (111) : ipx-in-ip,pgm (113) : pgm,ddx (116) : ddx,iatp (117) : iatp,stp (118) : stp,srp (119) : srp,uti (120) : uti,smp (121) : smp,sm (122) : sm,ptp (123) : ptp,isis (124) : isis,fire (125) : fire,crtp (126) : crtp,crudp (127) : crudp,sscopmce (128) : sscopmce,iplt (129) : iplt,sps (130) : sps,pipe (131) : pipe,fc (133) : fc,rsvp-e2e-ignore (134) : rsvp-e2e-ignore,mobility (135) : mobility,udplite (136) : udplite,mpls-in-ip (137) : mpls-in-ip,manet (138) : manet,hip (139) : hip,shim6 (140) : shim6,wesp (141) : wesp,rohc (142) : rohc,ethernet (143) : ethernet,aggfrag (144) : aggfrag,nsh (145) : nsh",
         "current": {
           "text": "Todos",
           "value": "all"
@@ -106,6 +106,11 @@
             "selected": false
           },
           {
+            "text": "icmpv6",
+            "value": "icmpv6",
+            "selected": false
+          },
+          {
             "text": "gre",
             "value": "gre",
             "selected": false
@@ -114,8 +119,684 @@
             "text": "esp",
             "value": "esp",
             "selected": false
+          },
+          {
+            "text": "ah",
+            "value": "ah",
+            "selected": false
+          },
+          {
+            "text": "ipv6",
+            "value": "ipv6",
+            "selected": false
+          },
+          {
+            "text": "ipip",
+            "value": "ipip",
+            "selected": false
+          },
+          {
+            "text": "sctp",
+            "value": "sctp",
+            "selected": false
+          },
+          {
+            "text": "ospf",
+            "value": "ospf",
+            "selected": false
+          },
+          {
+            "text": "pim",
+            "value": "pim",
+            "selected": false
+          },
+          {
+            "text": "vrrp",
+            "value": "vrrp",
+            "selected": false
+          },
+          {
+            "text": "igmp",
+            "value": "igmp",
+            "selected": false
+          },
+          {
+            "text": "l2tp",
+            "value": "l2tp",
+            "selected": false
+          },
+          {
+            "text": "hopopt (0)",
+            "value": "hopopt",
+            "selected": false
+          },
+          {
+            "text": "ggp (3)",
+            "value": "ggp",
+            "selected": false
+          },
+          {
+            "text": "st (5)",
+            "value": "st",
+            "selected": false
+          },
+          {
+            "text": "cbt (7)",
+            "value": "cbt",
+            "selected": false
+          },
+          {
+            "text": "egp (8)",
+            "value": "egp",
+            "selected": false
+          },
+          {
+            "text": "igp (9)",
+            "value": "igp",
+            "selected": false
+          },
+          {
+            "text": "bbn-rcc-mon (10)",
+            "value": "bbn-rcc-mon",
+            "selected": false
+          },
+          {
+            "text": "nvp-ii (11)",
+            "value": "nvp-ii",
+            "selected": false
+          },
+          {
+            "text": "pup (12)",
+            "value": "pup",
+            "selected": false
+          },
+          {
+            "text": "argus (13)",
+            "value": "argus",
+            "selected": false
+          },
+          {
+            "text": "emcon (14)",
+            "value": "emcon",
+            "selected": false
+          },
+          {
+            "text": "xnet (15)",
+            "value": "xnet",
+            "selected": false
+          },
+          {
+            "text": "chaos (16)",
+            "value": "chaos",
+            "selected": false
+          },
+          {
+            "text": "mux (18)",
+            "value": "mux",
+            "selected": false
+          },
+          {
+            "text": "dcn-meas (19)",
+            "value": "dcn-meas",
+            "selected": false
+          },
+          {
+            "text": "hmp (20)",
+            "value": "hmp",
+            "selected": false
+          },
+          {
+            "text": "prm (21)",
+            "value": "prm",
+            "selected": false
+          },
+          {
+            "text": "xns-idp (22)",
+            "value": "xns-idp",
+            "selected": false
+          },
+          {
+            "text": "trunk-1 (23)",
+            "value": "trunk-1",
+            "selected": false
+          },
+          {
+            "text": "trunk-2 (24)",
+            "value": "trunk-2",
+            "selected": false
+          },
+          {
+            "text": "leaf-1 (25)",
+            "value": "leaf-1",
+            "selected": false
+          },
+          {
+            "text": "leaf-2 (26)",
+            "value": "leaf-2",
+            "selected": false
+          },
+          {
+            "text": "rdp (27)",
+            "value": "rdp",
+            "selected": false
+          },
+          {
+            "text": "irtp (28)",
+            "value": "irtp",
+            "selected": false
+          },
+          {
+            "text": "iso-tp4 (29)",
+            "value": "iso-tp4",
+            "selected": false
+          },
+          {
+            "text": "netblt (30)",
+            "value": "netblt",
+            "selected": false
+          },
+          {
+            "text": "mfe-nsp (31)",
+            "value": "mfe-nsp",
+            "selected": false
+          },
+          {
+            "text": "merit-inp (32)",
+            "value": "merit-inp",
+            "selected": false
+          },
+          {
+            "text": "dccp (33)",
+            "value": "dccp",
+            "selected": false
+          },
+          {
+            "text": "3pc (34)",
+            "value": "3pc",
+            "selected": false
+          },
+          {
+            "text": "idpr (35)",
+            "value": "idpr",
+            "selected": false
+          },
+          {
+            "text": "xtp (36)",
+            "value": "xtp",
+            "selected": false
+          },
+          {
+            "text": "ddp (37)",
+            "value": "ddp",
+            "selected": false
+          },
+          {
+            "text": "idpr-cmtp (38)",
+            "value": "idpr-cmtp",
+            "selected": false
+          },
+          {
+            "text": "tp++ (39)",
+            "value": "tp++",
+            "selected": false
+          },
+          {
+            "text": "il (40)",
+            "value": "il",
+            "selected": false
+          },
+          {
+            "text": "sdrp (42)",
+            "value": "sdrp",
+            "selected": false
+          },
+          {
+            "text": "ipv6-route (43)",
+            "value": "ipv6-route",
+            "selected": false
+          },
+          {
+            "text": "ipv6-frag (44)",
+            "value": "ipv6-frag",
+            "selected": false
+          },
+          {
+            "text": "idrp (45)",
+            "value": "idrp",
+            "selected": false
+          },
+          {
+            "text": "rsvp (46)",
+            "value": "rsvp",
+            "selected": false
+          },
+          {
+            "text": "dsr (48)",
+            "value": "dsr",
+            "selected": false
+          },
+          {
+            "text": "bna (49)",
+            "value": "bna",
+            "selected": false
+          },
+          {
+            "text": "i-nlsp (52)",
+            "value": "i-nlsp",
+            "selected": false
+          },
+          {
+            "text": "swipe (53)",
+            "value": "swipe",
+            "selected": false
+          },
+          {
+            "text": "narp (54)",
+            "value": "narp",
+            "selected": false
+          },
+          {
+            "text": "mobile (55)",
+            "value": "mobile",
+            "selected": false
+          },
+          {
+            "text": "tlsp (56)",
+            "value": "tlsp",
+            "selected": false
+          },
+          {
+            "text": "skip (57)",
+            "value": "skip",
+            "selected": false
+          },
+          {
+            "text": "ipv6-nonxt (59)",
+            "value": "ipv6-nonxt",
+            "selected": false
+          },
+          {
+            "text": "ipv6-opts (60)",
+            "value": "ipv6-opts",
+            "selected": false
+          },
+          {
+            "text": "cftp (62)",
+            "value": "cftp",
+            "selected": false
+          },
+          {
+            "text": "sat-expak (64)",
+            "value": "sat-expak",
+            "selected": false
+          },
+          {
+            "text": "kryptolan (65)",
+            "value": "kryptolan",
+            "selected": false
+          },
+          {
+            "text": "rvd (66)",
+            "value": "rvd",
+            "selected": false
+          },
+          {
+            "text": "ippc (67)",
+            "value": "ippc",
+            "selected": false
+          },
+          {
+            "text": "sat-mon (69)",
+            "value": "sat-mon",
+            "selected": false
+          },
+          {
+            "text": "visa (70)",
+            "value": "visa",
+            "selected": false
+          },
+          {
+            "text": "ipcu (71)",
+            "value": "ipcu",
+            "selected": false
+          },
+          {
+            "text": "cpnx (72)",
+            "value": "cpnx",
+            "selected": false
+          },
+          {
+            "text": "cphb (73)",
+            "value": "cphb",
+            "selected": false
+          },
+          {
+            "text": "wsn (74)",
+            "value": "wsn",
+            "selected": false
+          },
+          {
+            "text": "pvp (75)",
+            "value": "pvp",
+            "selected": false
+          },
+          {
+            "text": "br-sat-mon (76)",
+            "value": "br-sat-mon",
+            "selected": false
+          },
+          {
+            "text": "sun-nd (77)",
+            "value": "sun-nd",
+            "selected": false
+          },
+          {
+            "text": "wb-mon (78)",
+            "value": "wb-mon",
+            "selected": false
+          },
+          {
+            "text": "wb-expak (79)",
+            "value": "wb-expak",
+            "selected": false
+          },
+          {
+            "text": "iso-ip (80)",
+            "value": "iso-ip",
+            "selected": false
+          },
+          {
+            "text": "vmtp (81)",
+            "value": "vmtp",
+            "selected": false
+          },
+          {
+            "text": "secure-vmtp (82)",
+            "value": "secure-vmtp",
+            "selected": false
+          },
+          {
+            "text": "vines (83)",
+            "value": "vines",
+            "selected": false
+          },
+          {
+            "text": "iptm (84)",
+            "value": "iptm",
+            "selected": false
+          },
+          {
+            "text": "nsfnet-igp (85)",
+            "value": "nsfnet-igp",
+            "selected": false
+          },
+          {
+            "text": "dgp (86)",
+            "value": "dgp",
+            "selected": false
+          },
+          {
+            "text": "tcf (87)",
+            "value": "tcf",
+            "selected": false
+          },
+          {
+            "text": "eigrp (88)",
+            "value": "eigrp",
+            "selected": false
+          },
+          {
+            "text": "sprite-rpc (90)",
+            "value": "sprite-rpc",
+            "selected": false
+          },
+          {
+            "text": "larp (91)",
+            "value": "larp",
+            "selected": false
+          },
+          {
+            "text": "mtp (92)",
+            "value": "mtp",
+            "selected": false
+          },
+          {
+            "text": "ax.25 (93)",
+            "value": "ax.25",
+            "selected": false
+          },
+          {
+            "text": "os (94)",
+            "value": "os",
+            "selected": false
+          },
+          {
+            "text": "micp (95)",
+            "value": "micp",
+            "selected": false
+          },
+          {
+            "text": "scc-sp (96)",
+            "value": "scc-sp",
+            "selected": false
+          },
+          {
+            "text": "etherip (97)",
+            "value": "etherip",
+            "selected": false
+          },
+          {
+            "text": "encap (98)",
+            "value": "encap",
+            "selected": false
+          },
+          {
+            "text": "gmtp (100)",
+            "value": "gmtp",
+            "selected": false
+          },
+          {
+            "text": "ifmp (101)",
+            "value": "ifmp",
+            "selected": false
+          },
+          {
+            "text": "pnni (102)",
+            "value": "pnni",
+            "selected": false
+          },
+          {
+            "text": "aris (104)",
+            "value": "aris",
+            "selected": false
+          },
+          {
+            "text": "scps (105)",
+            "value": "scps",
+            "selected": false
+          },
+          {
+            "text": "qnx (106)",
+            "value": "qnx",
+            "selected": false
+          },
+          {
+            "text": "a/n (107)",
+            "value": "a/n",
+            "selected": false
+          },
+          {
+            "text": "ipcomp (108)",
+            "value": "ipcomp",
+            "selected": false
+          },
+          {
+            "text": "snp (109)",
+            "value": "snp",
+            "selected": false
+          },
+          {
+            "text": "compaq-peer (110)",
+            "value": "compaq-peer",
+            "selected": false
+          },
+          {
+            "text": "ipx-in-ip (111)",
+            "value": "ipx-in-ip",
+            "selected": false
+          },
+          {
+            "text": "pgm (113)",
+            "value": "pgm",
+            "selected": false
+          },
+          {
+            "text": "ddx (116)",
+            "value": "ddx",
+            "selected": false
+          },
+          {
+            "text": "iatp (117)",
+            "value": "iatp",
+            "selected": false
+          },
+          {
+            "text": "stp (118)",
+            "value": "stp",
+            "selected": false
+          },
+          {
+            "text": "srp (119)",
+            "value": "srp",
+            "selected": false
+          },
+          {
+            "text": "uti (120)",
+            "value": "uti",
+            "selected": false
+          },
+          {
+            "text": "smp (121)",
+            "value": "smp",
+            "selected": false
+          },
+          {
+            "text": "sm (122)",
+            "value": "sm",
+            "selected": false
+          },
+          {
+            "text": "ptp (123)",
+            "value": "ptp",
+            "selected": false
+          },
+          {
+            "text": "isis (124)",
+            "value": "isis",
+            "selected": false
+          },
+          {
+            "text": "fire (125)",
+            "value": "fire",
+            "selected": false
+          },
+          {
+            "text": "crtp (126)",
+            "value": "crtp",
+            "selected": false
+          },
+          {
+            "text": "crudp (127)",
+            "value": "crudp",
+            "selected": false
+          },
+          {
+            "text": "sscopmce (128)",
+            "value": "sscopmce",
+            "selected": false
+          },
+          {
+            "text": "iplt (129)",
+            "value": "iplt",
+            "selected": false
+          },
+          {
+            "text": "sps (130)",
+            "value": "sps",
+            "selected": false
+          },
+          {
+            "text": "pipe (131)",
+            "value": "pipe",
+            "selected": false
+          },
+          {
+            "text": "fc (133)",
+            "value": "fc",
+            "selected": false
+          },
+          {
+            "text": "rsvp-e2e-ignore (134)",
+            "value": "rsvp-e2e-ignore",
+            "selected": false
+          },
+          {
+            "text": "mobility (135)",
+            "value": "mobility",
+            "selected": false
+          },
+          {
+            "text": "udplite (136)",
+            "value": "udplite",
+            "selected": false
+          },
+          {
+            "text": "mpls-in-ip (137)",
+            "value": "mpls-in-ip",
+            "selected": false
+          },
+          {
+            "text": "manet (138)",
+            "value": "manet",
+            "selected": false
+          },
+          {
+            "text": "hip (139)",
+            "value": "hip",
+            "selected": false
+          },
+          {
+            "text": "shim6 (140)",
+            "value": "shim6",
+            "selected": false
+          },
+          {
+            "text": "wesp (141)",
+            "value": "wesp",
+            "selected": false
+          },
+          {
+            "text": "rohc (142)",
+            "value": "rohc",
+            "selected": false
+          },
+          {
+            "text": "ethernet (143)",
+            "value": "ethernet",
+            "selected": false
+          },
+          {
+            "text": "aggfrag (144)",
+            "value": "aggfrag",
+            "selected": false
+          },
+          {
+            "text": "nsh (145)",
+            "value": "nsh",
+            "selected": false
           }
-        ]
+        ],
+        "description": "Todos os protocolos IP (IANA). Digite para buscar: gre, ah, ospf, sctp..."
       }
     ]
   },
