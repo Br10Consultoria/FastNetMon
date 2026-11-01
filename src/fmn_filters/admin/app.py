@@ -718,6 +718,13 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
         if request.method == "POST":
             action = f.get("action", "")
             try:
+                if action == "modelo":
+                    preset = f.get("preset", "")
+                    form_source = dict({k: "" for k in cu.RADIUS_KEYS}, RADIUS_TZ=current.get("RADIUS_TZ", ""),
+                                       **cu.apply_preset(preset, f.get("base_url", "")))
+                    flash("Modelo %s aplicado ao formulário (ainda não salvo). %s Cole o token em “Cabeçalhos”, "
+                          "use Testar e depois Salvar." % (cu.PRESETS[preset]["nome"], cu.PRESETS[preset]["ajuda"]))
+                    raise _Rendered()
                 if action in ("radius", "testar_fonte"):
                     values = {k: f.get(k, "").strip() for k in cu.RADIUS_KEYS}
                     values["RADIUS_SQL_B64"] = cu.b64e(f.get("sql_text", "").strip())
@@ -797,6 +804,8 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
                     audit("cliente_salvo", "%s: %s" % (c["name"], " ".join(c["prefixes"])))
                     flash("Cliente salvo.")
                     return redirect(url_for("customers_page"))
+            except _Rendered:
+                pass
             except (cu.CustomerError, ValueError, IndexError) as exc:
                 flash("Não salvo: %s" % exc)
                 if f.get("action") == "salvar":
@@ -807,7 +816,7 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
             if got:
                 edit = dict(got, prefixes="\n".join(got["prefixes"]))
         shown = dict(current, RADIUS_MODE=cu._mode(current)) if form_source is None else form_source
-        if form_source is None and request.method == "POST" and f.get("action") in ("radius", "testar_fonte"):
+        if form_source is None and request.method == "POST" and f.get("action") in ("radius", "testar_fonte", "modelo"):
             shown = {k: f.get(k, "") for k in cu.RADIUS_KEYS}             # erro de validacao: mantem o digitado
             shown.update(RADIUS_SQL_B64=cu.b64e(f.get("sql_text", "")), RADIUS_HTTP_BODY_B64=cu.b64e(f.get("http_body", "")))
         radius_view = {k: shown.get(k, "") for k in cu.RADIUS_KEYS if k not in cu.SECRET_KEYS}
@@ -816,7 +825,7 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
         return render_template("customers.html", items=items or [], installed=items is not None, edit=edit or {},
                                radius=radius_view, has_password=bool(current.get("RADIUS_DB_PASSWORD")),
                                has_headers=bool(cu.b64d(current.get("RADIUS_HTTP_HEADERS_B64", ""))),
-                               modes=cu.MODES, lookup=lookup, tz_choices=TZ_CHOICES)
+                               modes=cu.MODES, presets=cu.PRESETS, lookup=lookup, tz_choices=TZ_CHOICES)
 
     # ---------------------------------------------------------------- ferramentas
     @app.route("/ferramentas", methods=["GET", "POST"])
@@ -958,6 +967,10 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
 
 TZ_CHOICES = ("America/Sao_Paulo", "UTC", "America/Bahia", "America/Manaus", "Europe/Berlin", "Europe/London",
               "Europe/Paris", "America/New_York", "America/Chicago", "America/Los_Angeles", "Asia/Tokyo")
+
+
+class _Rendered(Exception):
+    """Interrompe o tratamento do POST e segue para renderizar a pagina (sem redirecionar)."""
 
 
 def dt_now_utc():

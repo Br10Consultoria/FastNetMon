@@ -57,6 +57,11 @@ ou no RADIUS. Os dados ficam só no servidor e nos chats privados configurados.<
   sempre com usuário somente leitura. O endpoint precisa responder o <b>histórico</b> de conexões do IP (não só quem está
   conectado agora), para servir também às denúncias que chegam dias depois. Segredos (senha e cabeçalhos) nunca voltam
   para a página: campo vazio mantém o atual.</p>
+  <form method="post" class="inline" autocomplete="off">{% include "_csrf.html" %}<input type="hidden" name="action" value="modelo">
+    <label>Modelo pronto <select name="preset">{% for k, p in presets.items() %}<option value="{{ k }}">{{ p.nome }}</option>{% endfor %}</select></label>
+    <label>Endereço do ERP <input name="base_url" placeholder="https://erp.exemplo.com.br" required></label>
+    <button class="secondary">Preencher</button>
+  </form>
   <form method="post" autocomplete="off">{% include "_csrf.html" %}
     <div class="grid">
       <label>Fonte <select name="RADIUS_MODE"><option value="">desativada</option>{% for k, l in modes.items() %}<option value="{{ k }}" {{ 'selected' if radius.RADIUS_MODE==k }}>{{ l }}</option>{% endfor %}</select></label>
@@ -69,7 +74,8 @@ ou no RADIUS. Os dados ficam só no servidor e nos chats privados configurados.<
       <label>Método <select name="RADIUS_HTTP_METHOD">{% for m in ('GET','POST') %}<option {{ 'selected' if (radius.RADIUS_HTTP_METHOD or 'GET')==m }}>{{ m }}</option>{% endfor %}</select></label>
     </div>
     <p class="muted">Marcadores na URL e no corpo: <code>{ip}</code>, <code>{quando}</code> (data e hora local), <code>{data}</code>,
-      <code>{quando_iso}</code> (UTC), <code>{epoch}</code>.</p>
+      <code>{quando_iso}</code> (UTC), <code>{epoch}</code>; início da busca (31 dias antes, para sessões longas):
+      <code>{desde}</code>, <code>{desde_data}</code>, <code>{desde_iso}</code>.</p>
     <label>Corpo JSON (só POST) <textarea name="http_body" rows="3" class="mono" placeholder='{"ip": "{ip}", "data_hora": "{quando}"}'>{{ radius.http_body }}</textarea></label>
     <label>Cabeçalhos de autenticação (um por linha){% if has_headers %} — <small>configurados; vazio = manter</small>{% endif %}
       <textarea name="http_headers" rows="2" class="mono" placeholder="Authorization: Bearer seu-token"></textarea></label>
@@ -79,6 +85,8 @@ ou no RADIUS. Os dados ficam só no servidor e nos chats privados configurados.<
       <label>Campo de início <input name="RADIUS_HTTP_START" value="{{ radius.RADIUS_HTTP_START }}" placeholder="data_inicio"></label>
       <label>Campo de fim <input name="RADIUS_HTTP_STOP" value="{{ radius.RADIUS_HTTP_STOP }}" placeholder="data_fim"></label>
       <label>Campo do MAC <input name="RADIUS_HTTP_MAC" value="{{ radius.RADIUS_HTTP_MAC }}" placeholder="mac (opcional)"></label>
+      <label>Campo do nome do cliente <input name="RADIUS_HTTP_NAME" value="{{ radius.RADIUS_HTTP_NAME }}" placeholder="opcional"></label>
+      <label>Campo do contrato <input name="RADIUS_HTTP_CONTRACT" value="{{ radius.RADIUS_HTTP_CONTRACT }}" placeholder="opcional"></label>
     </div>
     <p class="muted">Campos aninhados com ponto: <code>dados.cliente.login</code>; posição de lista com número: <code>itens.0</code>.</p>
     <label class="check"><input type="checkbox" name="RADIUS_HTTP_INSECURE" value="1" {{ 'checked' if radius.RADIUS_HTTP_INSECURE }}> Aceitar certificado autoassinado do ERP</label>
@@ -105,8 +113,8 @@ ou no RADIUS. Os dados ficam só no servidor e nos chats privados configurados.<
   {% if lookup and lookup.test %}
     <h3>Resultado do teste: {{ lookup.ip }} em {{ lookup.when }}</h3>
     {% if lookup.error %}<p class="warn">{{ lookup.error }}</p>{% endif %}
-    {% if lookup.sessions %}<div class="scroll"><table><tr><th>Login</th><th>Início</th><th>Fim</th><th>MAC</th></tr>
-      {% for s in lookup.sessions %}<tr><td><b>{{ s.login }}</b></td><td>{{ s.inicio }}</td><td>{{ s.fim }}</td><td>{{ s.mac }}</td></tr>{% endfor %}
+    {% if lookup.sessions %}<div class="scroll"><table><tr><th>Login</th><th>Cliente</th><th>Início</th><th>Fim</th><th>MAC</th></tr>
+      {% for s in lookup.sessions %}<tr><td><b>{{ s.login }}</b></td><td>{{ s.cliente }}{% if s.contrato %} <small class="muted">contrato {{ s.contrato }}</small>{% endif %}</td><td>{{ s.inicio }}</td><td>{{ s.fim }}</td><td>{{ s.mac }}</td></tr>{% endfor %}
     </table></div>{% elif not lookup.error %}<p class="muted">Nenhuma sessão no horário (confira os campos e o fuso).</p>{% endif %}
     {% if lookup.raw %}<p class="muted">Resposta crua da API (primeiros 4000 caracteres), para conferir os nomes dos campos:</p><pre class="detail">{{ lookup.raw }}</pre>{% endif %}
   {% endif %}

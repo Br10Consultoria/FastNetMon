@@ -173,6 +173,37 @@ class SourceTests(unittest.TestCase):
         with self.assertRaises(cu.RadiusError):
             bad.sessions("100.64.70.12", datetime(2026, 11, 1, 15))
 
+    def test_orbycore_preset(self):
+        env = dict(cu.apply_preset("orbycore", "https://erp.exemplo.com.br/"), RADIUS_TZ="America/Bahia",
+                   RADIUS_HTTP_HEADERS_B64=cu.b64e("Authorization: ServiceToken orby_teste"))
+        self.assertEqual(cu.validate_radius(env)["RADIUS_MODE"], "http")
+        # formato do RadiusAccountingLogSerializer do OrbyCore (lista na raiz, datas ISO com fuso)
+        payload = [
+            {"source": "hot", "username": "joao123", "assigned_ip": "100.64.70.12", "mac_address": "AA:BB",
+             "started_at": "2026-10-20T08:30:00-03:00", "ended_at": None, "customer_name": "João da Silva",
+             "contract_number": "000123"},
+            {"source": "archive", "username": "antigo", "assigned_ip": "100.64.70.12", "mac_address": "CC:DD",
+             "started_at": "2026-10-01T08:00:00-03:00", "ended_at": "2026-10-19T23:00:00-03:00",
+             "customer_name": "Outro", "contract_number": "9"}]
+        seen = []
+
+        def opener(req, timeout):
+            seen.append(req)
+            return Resp(__import__("json").dumps(payload).encode())
+        r = cu.Radius(env, opener=opener)
+        got = r.sessions("100.64.70.12", datetime(2026, 11, 1, 15))
+        self.assertEqual([(x["login"], x["cliente"], x["contrato"]) for x in got], [("joao123", "João da Silva", "000123")])
+        url = seen[0].full_url
+        self.assertTrue(url.startswith("https://erp.exemplo.com.br/api/v1/network/radius/accounting/?assigned_ip=100.64.70.12"))
+        self.assertIn("from=2026-10-01T15%3A00%3A00%2B00%3A00", url)            # 31 dias antes
+        self.assertIn("to=2026-11-01T15%3A00%3A00%2B00%3A00", url)
+        self.assertEqual(seen[0].get_header("Authorization"), "ServiceToken orby_teste")
+        ident = cu.Identifier(cu.Radius(env, opener=opener), cu.CustomerIndex())
+        self.assertEqual(ident("100.64.70.12", datetime(2026, 11, 1, 15)),
+                         "login joao123 · MAC AA:BB · João da Silva (contrato 000123)")
+        with self.assertRaises(cu.CustomerError):
+            cu.apply_preset("orbycore", "erp sem http")
+
     def test_custom_sql_placeholders(self):
         log = []
         sql = "SELECT c.login, s.inicio, s.fim, s.mac FROM sessoes s JOIN clientes c ON c.id=s.cliente " \

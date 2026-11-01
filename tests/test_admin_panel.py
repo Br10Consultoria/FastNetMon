@@ -888,6 +888,12 @@ class PanelTests(unittest.TestCase):
         self.assertEqual(self.db.audits[-1][1], "identificacao_teste")
         r = self.post("/clientes", **dict(form, RADIUS_HTTP_URL="https://erp.exemplo/sem-ip"))
         self.assertIn(b"https://erp.exemplo/sem-ip", r.data)                # formulario mantido no erro
+        r = self.post("/clientes", action="modelo", preset="orbycore", base_url="https://erp.exemplo.com.br")
+        self.assertIn(b"https://erp.exemplo.com.br/api/v1/network/radius/accounting/?assigned_ip={ip}", r.data)
+        self.assertIn(b'value="customer_name"', r.data)
+        self.assertIn(b"ServiceToken", r.data)
+        env = read_env(Path(self.env["ORBYMON_RADIUS_ENV"]))
+        self.assertEqual(env["RADIUS_HTTP_LIST"], "registros")                 # modelo nao salva sozinho
 
 
 class CliTests(unittest.TestCase):

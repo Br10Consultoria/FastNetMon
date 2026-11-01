@@ -1,7 +1,8 @@
 """Clientes: cadastro com prefixos dedicados e identificacao do assinante (login por IP e horario).
 
 Fonte das sessoes (qualquer ERP), em /etc/orbymon/radius.env (editavel no painel, lido como dados):
-  http          API HTTP/JSON do ERP (recomendado): URL/corpo com {ip}, {quando}, {data}, {quando_iso}, {epoch};
+  http          API HTTP/JSON do ERP (recomendado): URL/corpo com {ip}, {quando}, {data}, {quando_iso}, {epoch},
+                {desde}, {desde_data}, {desde_iso} (= 31 dias antes, para pegar sessoes longas);
                 cabecalho de autenticacao; caminhos dos campos de login, inicio, fim e MAC na resposta
   radacct_mysql radacct do FreeRADIUS em MySQL/MariaDB (username, framedipaddress, acctstarttime, ...)
   radacct_pg    radacct do FreeRADIUS em PostgreSQL
@@ -19,7 +20,7 @@ from zoneinfo import ZoneInfo
 RADIUS_KEYS = ("RADIUS_MODE", "RADIUS_TZ",
                "RADIUS_HTTP_URL", "RADIUS_HTTP_METHOD", "RADIUS_HTTP_BODY_B64", "RADIUS_HTTP_HEADERS_B64",
                "RADIUS_HTTP_LIST", "RADIUS_HTTP_LOGIN", "RADIUS_HTTP_START", "RADIUS_HTTP_STOP", "RADIUS_HTTP_MAC",
-               "RADIUS_HTTP_INSECURE",
+               "RADIUS_HTTP_NAME", "RADIUS_HTTP_CONTRACT", "RADIUS_HTTP_INSECURE",
                "RADIUS_DB_HOST", "RADIUS_DB_PORT", "RADIUS_DB_NAME", "RADIUS_DB_USER", "RADIUS_DB_PASSWORD",
                "RADIUS_TABLE", "RADIUS_SQL_B64")
 NAME_RE = re.compile(r"^[A-Za-z0-9_]{1,64}$")
@@ -118,6 +119,37 @@ MODES = {
     "sql_pg": "consulta SQL própria (PostgreSQL)",
 }
 SECRET_KEYS = ("RADIUS_DB_PASSWORD", "RADIUS_HTTP_HEADERS_B64")
+PLACEHOLDERS = ("ip", "quando_iso", "quando", "data", "epoch", "desde_iso", "desde_data", "desde")
+SESSION_LOOKBACK_DAYS = 31
+
+# Modelos prontos: preenchem o formulario; o operador informa o endereco do ERP e o token.
+#   {base} = endereco do ERP (https://erp.exemplo.com.br), sem barra no fim
+PRESETS = {
+    "orbycore": {
+        "nome": "OrbyCore",
+        "ajuda": "Crie um ServiceToken no OrbyCore com a permissão network.view (e, se quiser, ACL só para o IP do "
+                 "OrbyMon). Cabeçalho: Authorization: ServiceToken orby_...",
+        "header_hint": "Authorization: ServiceToken orby_...",
+        "values": {"RADIUS_MODE": "http", "RADIUS_HTTP_METHOD": "GET",
+                   "RADIUS_HTTP_URL": "{base}/api/v1/network/radius/accounting/?assigned_ip={ip}&from={desde_iso}"
+                                      "&to={quando_iso}&limit=20",
+                   "RADIUS_HTTP_LIST": "", "RADIUS_HTTP_LOGIN": "username", "RADIUS_HTTP_START": "started_at",
+                   "RADIUS_HTTP_STOP": "ended_at", "RADIUS_HTTP_MAC": "mac_address",
+                   "RADIUS_HTTP_NAME": "customer_name", "RADIUS_HTTP_CONTRACT": "contract_number"},
+    },
+}
+
+
+def apply_preset(name, base):
+    p = PRESETS.get(name)
+    if not p:
+        raise CustomerError("modelo desconhecido")
+    base = (base or "").strip().rstrip("/")
+    if not re.match(r"^https?://[A-Za-z0-9.:\[\]_-]+(/[^\s'\\?#]*)?$", base):
+        raise CustomerError("informe o endereço do ERP (ex.: https://erp.exemplo.com.br)")
+    out = dict(p["values"])
+    out["RADIUS_HTTP_URL"] = out["RADIUS_HTTP_URL"].replace("{base}", base)
+    return out
 TABLE_RE = re.compile(r"^[A-Za-z0-9_]{1,64}(\.[A-Za-z0-9_]{1,64})?$")
 FIELD_RE = re.compile(r"^[A-Za-z0-9_.\-]{0,120}$")
 HEADER_RE = re.compile(r"^[A-Za-z0-9-]{1,64}:[^\r\n]{0,2000}$")
@@ -171,7 +203,7 @@ def validate_radius(env):
             raise CustomerError("corpo longo demais")
         out["RADIUS_HTTP_LOGIN"] = out["RADIUS_HTTP_LOGIN"] or "login"
         for key in ("RADIUS_HTTP_LIST", "RADIUS_HTTP_LOGIN", "RADIUS_HTTP_START", "RADIUS_HTTP_STOP",
-                    "RADIUS_HTTP_MAC"):
+                    "RADIUS_HTTP_MAC", "RADIUS_HTTP_NAME", "RADIUS_HTTP_CONTRACT"):
             if not FIELD_RE.match(out[key]):
                 raise CustomerError("caminho de campo inválido: %s" % out[key][:60])
         out["RADIUS_HTTP_INSECURE"] = "1" if out["RADIUS_HTTP_INSECURE"] in ("1", "on", "true") else ""
@@ -202,7 +234,7 @@ def validate_radius(env):
         out["RADIUS_TABLE"] = ""
     for key in ("RADIUS_HTTP_URL", "RADIUS_HTTP_METHOD", "RADIUS_HTTP_BODY_B64", "RADIUS_HTTP_HEADERS_B64",
                 "RADIUS_HTTP_LIST", "RADIUS_HTTP_LOGIN", "RADIUS_HTTP_START", "RADIUS_HTTP_STOP", "RADIUS_HTTP_MAC",
-                "RADIUS_HTTP_INSECURE"):
+                "RADIUS_HTTP_NAME", "RADIUS_HTTP_CONTRACT", "RADIUS_HTTP_INSECURE"):
         out[key] = ""
     return out
 
@@ -331,10 +363,15 @@ class Radius:
         import ssl
         import urllib.parse
         import urllib.request
+        from datetime import timedelta
+        since_utc = when_utc - timedelta(days=SESSION_LOOKBACK_DAYS)          # sessoes longas comecam antes
+        since_local = local - timedelta(days=SESSION_LOOKBACK_DAYS)
         values = {"ip": ip, "quando": local.strftime("%Y-%m-%d %H:%M:%S"), "data": local.strftime("%Y-%m-%d"),
                   "quando_iso": when_utc.replace(tzinfo=timezone.utc).isoformat(),
-                  "epoch": str(int(when_utc.replace(tzinfo=timezone.utc).timestamp()))}
-        fill = lambda text, enc: re.sub(r"\{(ip|quando|data|quando_iso|epoch)\}", lambda m: enc(values[m.group(1)]), text)
+                  "epoch": str(int(when_utc.replace(tzinfo=timezone.utc).timestamp())),
+                  "desde": since_local.strftime("%Y-%m-%d %H:%M:%S"), "desde_data": since_local.strftime("%Y-%m-%d"),
+                  "desde_iso": since_utc.replace(tzinfo=timezone.utc).isoformat()}
+        fill = lambda text, enc: re.sub(r"\{(" + "|".join(PLACEHOLDERS) + r")\}", lambda m: enc(values[m.group(1)]), text)
         url = fill(self.cfg["RADIUS_HTTP_URL"], lambda v: urllib.parse.quote(v, safe=""))
         body = b64d(self.cfg["RADIUS_HTTP_BODY_B64"])
         data = fill(body, lambda v: json.dumps(v)[1:-1]).encode("utf-8") if body else None
@@ -371,9 +408,9 @@ class Radius:
             stop = parse_when(_path(it, self.cfg["RADIUS_HTTP_STOP"]), self.tz) if self.cfg["RADIUS_HTTP_STOP"] else None
             if start and start > when_utc or stop and stop < when_utc:
                 continue                                # sessao fora do horario pedido
-            out.append({"login": str(login), "inicio": start, "fim": stop,
-                        "mac": str(_path(it, self.cfg["RADIUS_HTTP_MAC"]) or "") if self.cfg["RADIUS_HTTP_MAC"] else "",
-                        "nas": ""})
+            opt = lambda key: str(_path(it, self.cfg[key]) or "") if self.cfg[key] else ""
+            out.append({"login": str(login), "inicio": start, "fim": stop, "mac": opt("RADIUS_HTTP_MAC"), "nas": "",
+                        "cliente": opt("RADIUS_HTTP_NAME"), "contrato": opt("RADIUS_HTTP_CONTRACT")})
         out.sort(key=lambda x: x["inicio"] or when_utc.replace(year=1), reverse=True)
         return out[:5]
 
@@ -423,7 +460,10 @@ class Identifier:
             except RadiusError:
                 s = []
             if s:
-                parts.append("login %s%s" % (s[0]["login"], " · MAC %s" % s[0]["mac"] if s[0]["mac"] else ""))
+                x = s[0]
+                parts.append("login %s%s" % (x["login"], " · MAC %s" % x["mac"] if x["mac"] else ""))
+                if x.get("cliente"):
+                    parts.append("%s%s" % (x["cliente"], " (contrato %s)" % x["contrato"] if x.get("contrato") else ""))
         return " · ".join(parts)
 
 

@@ -31,15 +31,26 @@ quem está conectado agora — senão funciona para os avisos em tempo real, mas
 ### API HTTP/JSON
 
 - **URL** e, para POST, **corpo JSON** com marcadores: `{ip}`, `{quando}` (data e hora local no fuso escolhido),
-  `{data}`, `{quando_iso}` (UTC), `{epoch}`. Na URL os valores são codificados; no corpo, escapados para JSON.
+  `{data}`, `{quando_iso}` (UTC), `{epoch}`, e o início da busca 31 dias antes (para sessões longas): `{desde}`,
+  `{desde_data}`, `{desde_iso}`. Na URL os valores são codificados; no corpo, escapados para JSON.
 - **Cabeçalhos de autenticação**, um por linha (`Authorization: Bearer …`, `Authorization: Basic …`, ou o que o ERP
   pedir). Guardados só para escrita: nunca voltam para a página nem para a auditoria.
 - **Mapeamento da resposta**: caminho da lista (ex.: `registros`; vazio = raiz ou objeto único) e dos campos de
-  login, início, fim e MAC (aninhados com ponto: `dados.cliente.login`; índice com número: `itens.0`).
+  login, início, fim, MAC, nome do cliente e contrato (aninhados com ponto: `dados.cliente.login`; índice com número: `itens.0`).
 - Datas aceitas: `2026-11-01 08:30:00`, ISO com ou sem fuso, `01/11/2026 08:30`, epoch em segundos ou milissegundos;
   sem fuso, vale o fuso configurado. Sessões fora do horário pedido são descartadas; a mais recente vence.
 - O teste mostra a **resposta crua** (até 4000 caracteres) para conferir os nomes dos campos.
 - Opção para aceitar certificado autoassinado do ERP (deixe desligada se o certificado for válido).
+
+### Modelos prontos
+
+Na página Clientes, **Modelo pronto** + endereço do ERP preenche URL e mapeamento; falta só colar o token em
+“Cabeçalhos”, **Testar** e **Salvar**.
+
+| ERP | Endpoint | Token |
+|---|---|---|
+| OrbyCore | `GET /api/v1/network/radius/accounting/?assigned_ip={ip}&from={desde_iso}&to={quando_iso}&limit=20` (sessões quentes e arquivadas, com nome do cliente e contrato) | ServiceToken com permissão `network.view` (de preferência com ACL só para o IP do OrbyMon): `Authorization: ServiceToken orby_...` |
+| IXC, SGP | a incluir com os endpoints de histórico de conexões | — |
 
 ### Banco de dados
 
