@@ -26,11 +26,18 @@ class DashboardImprovementsTests(unittest.TestCase):
             found=False
             for p in d["panels"]:
                 for override in p.get("fieldConfig",{}).get("overrides",[]):
-                    if override.get("matcher",{}).get("options")=="MB estimados":
+                    if override.get("matcher",{}).get("options")=="Volume estimado":
                         props=override.get("properties",[])
-                        self.assertIn({"id":"unit","value":"suffix: MB"},props)
+                        self.assertIn({"id":"unit","value":"decbytes"},props)
                         found=True
             self.assertTrue(found,name)
+    def test_units_scale_automatically(self):
+        """Taxas em bits/s e volumes em bytes: o Grafana mostra Gb/s e GB/TB sozinho."""
+        for name in ("orbymon-overview.json","orbymon-ip-analytics.json",
+                     "orbymon-cgnat.json","orbymon-huawei-live.json"):
+            text=json.dumps(dash(name))
+            for fixed in ('"Mbps"','"suffix: MB"',"60000000","300000000","'MB estimados'"):
+                self.assertNotIn(fixed,text,name)
     def test_recency_does_not_depend_on_selected_time_range(self):
         for name in ("orbymon-overview.json","orbymon-ip-analytics.json",
                      "orbymon-cgnat.json"):

@@ -17,7 +17,7 @@
   "panels": [
     {
       "id": 1,
-      "title": "Mbps estimados por protocolo — Huawei",
+      "title": "Taxa estimada por protocolo — Huawei",
       "type": "timeseries",
       "datasource": {
         "type": "mysql",
@@ -36,7 +36,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),protocol AS metric,ROUND(SUM(total_bytes)*8/60000000,3) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) GROUP BY 1,protocol ORDER BY 1",
+          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),protocol AS metric,ROUND(SUM(total_bytes)*8/60,3) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) GROUP BY 1,protocol ORDER BY 1",
           "format": "time_series",
           "editorMode": "code"
         }
@@ -46,8 +46,8 @@
           "color": {
             "mode": "palette-classic"
           },
-          "unit": "Mbps",
-          "decimals": 3
+          "unit": "bps",
+          "decimals": 2
         },
         "overrides": []
       },
@@ -122,7 +122,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT src_asn AS ASN,COALESCE(MAX(NULLIF(src_asn_name,'')),'Não identificado') AS 'Operadora',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND src_asn>0 GROUP BY src_asn ORDER BY SUM(total_bytes) DESC LIMIT 20",
+          "rawSql": "SELECT src_asn AS ASN,COALESCE(MAX(NULLIF(src_asn_name,'')),'Não identificado') AS 'Operadora',ROUND(SUM(total_bytes),0) AS 'Volume estimado' FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND src_asn>0 GROUP BY src_asn ORDER BY SUM(total_bytes) DESC LIMIT 20",
           "format": "table",
           "editorMode": "code"
         }
@@ -133,7 +133,24 @@
             "mode": "palette-classic"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Volume estimado"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "decbytes"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          }
+        ]
       },
       "options": {}
     },
@@ -158,7 +175,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT protocol AS Protocolo,dst_port AS Porta,ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND dst_port>0 AND protocol IN ('tcp','udp') GROUP BY protocol,dst_port ORDER BY SUM(total_bytes) DESC LIMIT 20",
+          "rawSql": "SELECT protocol AS Protocolo,dst_port AS Porta,ROUND(SUM(total_bytes),0) AS 'Volume estimado' FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND dst_port>0 AND protocol IN ('tcp','udp') GROUP BY protocol,dst_port ORDER BY SUM(total_bytes) DESC LIMIT 20",
           "format": "table",
           "editorMode": "code"
         }
@@ -169,7 +186,24 @@
             "mode": "palette-classic"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Volume estimado"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "decbytes"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          }
+        ]
       },
       "options": {}
     },
@@ -194,7 +228,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT ROUND(COALESCE(SUM(total_bytes),0)/1000000,2) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc)",
+          "rawSql": "SELECT ROUND(COALESCE(SUM(total_bytes),0),0) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc)",
           "format": "table",
           "editorMode": "code"
         }
@@ -204,8 +238,8 @@
           "color": {
             "mode": "palette-classic"
           },
-          "unit": "suffix: MB",
-          "decimals": 2
+          "unit": "decbytes",
+          "decimals": 1
         },
         "overrides": []
       },
@@ -221,7 +255,7 @@
     },
     {
       "id": 6,
-      "title": "PPS estimados — média 5 min",
+      "title": "PPS estimados — média dos 5 min mais recentes",
       "type": "stat",
       "datasource": {
         "type": "mysql",
@@ -240,7 +274,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT ROUND(COALESCE(SUM(total_packets),0)/300,1) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND bucket_utc >= UTC_TIMESTAMP() - INTERVAL 5 MINUTE AND bucket_utc <= UTC_TIMESTAMP()",
+          "rawSql": "SELECT ROUND(COALESCE(SUM(total_packets),0)/300,1) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND bucket_utc >= (SELECT MAX(bucket_utc) FROM orby_ip_pairs_minute WHERE source='huawei') - INTERVAL 5 MINUTE AND bucket_utc < (SELECT MAX(bucket_utc) FROM orby_ip_pairs_minute WHERE source='huawei')",
           "format": "table",
           "editorMode": "code"
         }
@@ -267,7 +301,7 @@
     },
     {
       "id": 7,
-      "title": "Mbps estimados — média 5 min",
+      "title": "Taxa estimada — média dos 5 min mais recentes",
       "type": "stat",
       "datasource": {
         "type": "mysql",
@@ -286,7 +320,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT ROUND(COALESCE(SUM(total_bytes),0)*8/300000000,3) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND bucket_utc >= UTC_TIMESTAMP() - INTERVAL 5 MINUTE AND bucket_utc <= UTC_TIMESTAMP()",
+          "rawSql": "SELECT ROUND(COALESCE(SUM(total_bytes),0)*8/300,3) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND bucket_utc >= (SELECT MAX(bucket_utc) FROM orby_ip_pairs_minute WHERE source='huawei') - INTERVAL 5 MINUTE AND bucket_utc < (SELECT MAX(bucket_utc) FROM orby_ip_pairs_minute WHERE source='huawei')",
           "format": "table",
           "editorMode": "code"
         }
@@ -296,8 +330,8 @@
           "color": {
             "mode": "palette-classic"
           },
-          "unit": "Mbps",
-          "decimals": 3
+          "unit": "bps",
+          "decimals": 2
         },
         "overrides": []
       },
@@ -419,7 +453,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT bucket_utc AS 'Minuto UTC',protocol AS Protocolo,ROUND(SUM(total_bytes)*8/60000000,3) AS 'Mbps estimados',ROUND(SUM(total_packets)/60,1) AS 'PPS estimados',SUM(flow_records) AS 'Fluxos' FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) GROUP BY bucket_utc,protocol ORDER BY bucket_utc DESC LIMIT 60",
+          "rawSql": "SELECT bucket_utc AS 'Minuto UTC',protocol AS Protocolo,ROUND(SUM(total_bytes)*8/60,3) AS 'Taxa estimada',ROUND(SUM(total_packets)/60,1) AS 'PPS estimados',SUM(flow_records) AS 'Fluxos' FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) GROUP BY bucket_utc,protocol ORDER BY bucket_utc DESC LIMIT 60",
           "format": "table",
           "editorMode": "code"
         }
@@ -430,7 +464,24 @@
             "mode": "palette-classic"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Taxa estimada"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bps"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          }
+        ]
       },
       "options": {}
     },
@@ -526,7 +577,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT src_country AS País,COUNT(DISTINCT src_ip) AS 'IPs de origem',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND src_country<>'' GROUP BY src_country ORDER BY SUM(total_bytes) DESC LIMIT 20",
+          "rawSql": "SELECT src_country AS País,COUNT(DISTINCT src_ip) AS 'IPs de origem',ROUND(SUM(total_bytes),0) AS 'Volume estimado' FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND src_country<>'' GROUP BY src_country ORDER BY SUM(total_bytes) DESC LIMIT 20",
           "format": "table",
           "editorMode": "code"
         }
@@ -541,16 +592,16 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "MB estimados"
+              "options": "Volume estimado"
             },
             "properties": [
               {
                 "id": "unit",
-                "value": "suffix: MB"
+                "value": "decbytes"
               },
               {
                 "id": "decimals",
-                "value": 2
+                "value": 1
               }
             ]
           }
@@ -560,7 +611,7 @@
     },
     {
       "id": 13,
-      "title": "Mbps estimados por interface Huawei (entrada)",
+      "title": "Taxa estimada por interface Huawei (entrada)",
       "type": "timeseries",
       "datasource": {
         "type": "mysql",
@@ -580,7 +631,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),CASE WHEN input_if=0 THEN 'Não informado' ELSE COALESCE(CONCAT(im.if_name,' (',input_if,')'),CONCAT('ifIndex ',input_if)) END AS metric,ROUND(SUM(total_bytes)*8/60000000,3) AS value FROM orby_ip_pairs_minute AS p LEFT JOIN orby_interface_names AS im ON im.source=p.source AND im.if_index=p.input_if WHERE p.source='huawei' AND $__timeFilter(p.bucket_utc) GROUP BY 1,p.input_if,im.if_name ORDER BY 1",
+          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),CASE WHEN input_if=0 THEN 'Não informado' ELSE COALESCE(CONCAT(im.if_name,' (',input_if,')'),CONCAT('ifIndex ',input_if)) END AS metric,ROUND(SUM(total_bytes)*8/60,3) AS value FROM orby_ip_pairs_minute AS p LEFT JOIN orby_interface_names AS im ON im.source=p.source AND im.if_index=p.input_if WHERE p.source='huawei' AND $__timeFilter(p.bucket_utc) GROUP BY 1,p.input_if,im.if_name ORDER BY 1",
           "format": "time_series",
           "editorMode": "code"
         }
@@ -590,7 +641,7 @@
           "color": {
             "mode": "palette-classic"
           },
-          "unit": "Mbps",
+          "unit": "bps",
           "decimals": 2,
           "custom": {
             "drawStyle": "line",
@@ -692,7 +743,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT UNIX_TIMESTAMP(MAX(bucket_utc)) AS value FROM orby_ip_pairs_minute WHERE source='huawei'",
+          "rawSql": "SELECT UNIX_TIMESTAMP(MAX(bucket_utc))*1000 AS value FROM orby_ip_pairs_minute WHERE source='huawei'",
           "format": "table",
           "editorMode": "code"
         }

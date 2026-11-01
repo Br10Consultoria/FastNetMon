@@ -141,7 +141,7 @@
     },
     {
       "id": 4,
-      "title": "Volume estimado Huawei (MB)",
+      "title": "Volume estimado Huawei",
       "type": "stat",
       "datasource": {
         "type": "mysql",
@@ -160,7 +160,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT ROUND(COALESCE(SUM(total_bytes),0)/1000000,2) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc)",
+          "rawSql": "SELECT ROUND(COALESCE(SUM(total_bytes),0),0) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc)",
           "format": "table",
           "editorMode": "code"
         }
@@ -176,17 +176,18 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "suffix: MB",
+          "unit": "decbytes",
           "color": {
             "mode": "continuous-GrYlRd"
-          }
+          },
+          "decimals": 1
         },
         "overrides": []
       }
     },
     {
       "id": 5,
-      "title": "Mbps estimados por protocolo — Huawei",
+      "title": "Taxa estimada por protocolo — Huawei",
       "type": "timeseries",
       "datasource": {
         "type": "mysql",
@@ -205,7 +206,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),protocol AS metric,ROUND(SUM(total_bytes)*8/60000000,3) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) GROUP BY 1,protocol ORDER BY 1",
+          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),protocol AS metric,ROUND(SUM(total_bytes)*8/60,3) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) GROUP BY 1,protocol ORDER BY 1",
           "format": "time_series",
           "editorMode": "code"
         }
@@ -218,7 +219,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "Mbps",
+          "unit": "bps",
           "color": {
             "mode": "palette-classic"
           },
@@ -226,7 +227,8 @@
             "drawStyle": "line",
             "lineWidth": 2,
             "fillOpacity": 20
-          }
+          },
+          "decimals": 2
         },
         "overrides": []
       }
@@ -363,7 +365,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT src_asn AS 'ASN', COALESCE(MAX(NULLIF(src_asn_name,'')),'Não identificado') AS 'Organização', CASE WHEN COUNT(DISTINCT NULLIF(src_country,''))>1 THEN 'Vários' ELSE COALESCE(MAX(NULLIF(src_country,'')),'Não informado') END AS 'País', ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados', ROUND(SUM(total_packets),0) AS 'Pacotes estimados' FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND src_asn>0 GROUP BY src_asn ORDER BY SUM(total_bytes) DESC LIMIT 25",
+          "rawSql": "SELECT src_asn AS 'ASN', COALESCE(MAX(NULLIF(src_asn_name,'')),'Não identificado') AS 'Organização', CASE WHEN COUNT(DISTINCT NULLIF(src_country,''))>1 THEN 'Vários' ELSE COALESCE(MAX(NULLIF(src_country,'')),'Não informado') END AS 'País', ROUND(SUM(total_bytes),0) AS 'Volume estimado', ROUND(SUM(total_packets),0) AS 'Pacotes estimados' FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND src_asn>0 GROUP BY src_asn ORDER BY SUM(total_bytes) DESC LIMIT 25",
           "format": "table",
           "editorMode": "code"
         }
@@ -379,16 +381,16 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "MB estimados"
+              "options": "Volume estimado"
             },
             "properties": [
               {
                 "id": "unit",
-                "value": "suffix: MB"
+                "value": "decbytes"
               },
               {
                 "id": "decimals",
-                "value": 2
+                "value": 1
               }
             ]
           }
@@ -416,7 +418,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT src_country AS 'País',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND src_country<>'' GROUP BY src_country ORDER BY SUM(total_bytes) DESC LIMIT 15",
+          "rawSql": "SELECT src_country AS 'País',ROUND(SUM(total_bytes),0) AS 'Volume estimado' FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND src_country<>'' GROUP BY src_country ORDER BY SUM(total_bytes) DESC LIMIT 15",
           "format": "table",
           "editorMode": "code"
         }
@@ -439,16 +441,16 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "MB estimados"
+              "options": "Volume estimado"
             },
             "properties": [
               {
                 "id": "unit",
-                "value": "suffix: MB"
+                "value": "decbytes"
               },
               {
                 "id": "decimals",
-                "value": 2
+                "value": 1
               }
             ]
           }
@@ -457,7 +459,7 @@
     },
     {
       "id": 10,
-      "title": "Top portas de destino Huawei (MB estimados)",
+      "title": "Top portas de destino Huawei (volume)",
       "type": "barchart",
       "datasource": {
         "type": "mysql",
@@ -476,7 +478,7 @@
             "type": "mysql",
             "uid": "orbymon-mysql"
           },
-          "rawSql": "SELECT CAST(dst_port AS CHAR) AS 'Porta',ROUND(SUM(total_bytes)/1000000,2) AS 'MB estimados' FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) GROUP BY dst_port ORDER BY SUM(total_bytes) DESC LIMIT 15",
+          "rawSql": "SELECT CAST(dst_port AS CHAR) AS 'Porta',ROUND(SUM(total_bytes),0) AS 'Volume estimado' FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) GROUP BY dst_port ORDER BY SUM(total_bytes) DESC LIMIT 15",
           "format": "table",
           "editorMode": "code"
         }
@@ -496,16 +498,16 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "MB estimados"
+              "options": "Volume estimado"
             },
             "properties": [
               {
                 "id": "unit",
-                "value": "suffix: MB"
+                "value": "decbytes"
               },
               {
                 "id": "decimals",
-                "value": 2
+                "value": 1
               }
             ]
           }

@@ -20,7 +20,16 @@ class LiveDashboardTests(unittest.TestCase):
                 self.assertIn("source='huawei'",s)
         self.assertTrue(any(p["type"]=="geomap" for p in j["panels"]))
         self.assertTrue(any("PPS" in p["title"] and p["type"]=="timeseries" for p in j["panels"]))
-        self.assertTrue(any("Mbps" in p["title"] and p["type"]=="timeseries" for p in j["panels"]))
+        self.assertTrue(any(p["fieldConfig"]["defaults"].get("unit")=="bps" and p["type"]=="timeseries"
+                            for p in j["panels"]))
+    def test_latest_sample_and_recent_average_do_not_depend_on_clock(self):
+        j=dash("orbymon-huawei-live.json")
+        last=[p for p in j["panels"] if "Última amostra" in p["title"]][0]
+        self.assertIn("*1000 AS value",last["targets"][0]["rawSql"])   # Grafana usa milissegundos
+        avg=[p for p in j["panels"] if "média dos 5 min mais recentes" in p["title"]]
+        self.assertEqual(len(avg),2)
+        for p in avg:
+            self.assertIn("SELECT MAX(bucket_utc)",p["targets"][0]["rawSql"])
     def test_overview_keeps_alert_map_separate_from_normal_traffic(self):
         j=dash("orbymon-overview.json")
         alerts=[p for p in j["panels"] if p["id"]==7][0]
