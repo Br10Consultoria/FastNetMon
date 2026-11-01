@@ -56,6 +56,7 @@ mariadb orbymon < "$BASE/sql/interface_names.sql"
 mariadb orbymon < "$BASE/sql/saved_filters.sql"
 mariadb orbymon < "$BASE/sql/net_prefixes.sql"
 mariadb orbymon < "$BASE/sql/filter_rules.sql"
+mariadb orbymon < "$BASE/sql/baseline.sql"
 ADMIN_ENV=/etc/orbymon/admin.env
 DB_PASS=""
 [[ -s "$ADMIN_ENV" ]] && DB_PASS=$(sed -n "s/^ORBYMON_ADMIN_DB_PASSWORD='\(.*\)'$/\1/p" "$ADMIN_ENV")
@@ -71,6 +72,8 @@ GRANT INSERT, UPDATE, DELETE ON orbymon.orby_interface_names TO 'orbymon_admin'@
 GRANT INSERT, UPDATE, DELETE ON orbymon.orby_saved_filters TO 'orbymon_admin'@'127.0.0.1';
 GRANT INSERT, DELETE ON orbymon.orby_net_prefixes TO 'orbymon_admin'@'127.0.0.1';
 GRANT INSERT, UPDATE, DELETE ON orbymon.orby_filter_rules TO 'orbymon_admin'@'127.0.0.1';
+GRANT INSERT, UPDATE, DELETE ON orbymon.orby_exceptions TO 'orbymon_admin'@'127.0.0.1';
+GRANT INSERT, DELETE ON orbymon.orby_exception_prefixes TO 'orbymon_admin'@'127.0.0.1';
 SQL
 install -d -o root -g orbymon-admin -m 0750 /etc/orbymon/admin-tls
 SECRET=/etc/orbymon/admin-secret

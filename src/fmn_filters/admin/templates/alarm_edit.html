@@ -22,15 +22,16 @@
   <h2>Condições</h2>
   <label class="check"><select name="logic" class="auto"><option value="and" {{ 'selected' if d.logic=='and' }}>todas (E)</option><option value="or" {{ 'selected' if d.logic=='or' }}>qualquer uma (OU)</option></select> precisam ser verdadeiras no minuto</label>
   <div class="scroll"><table class="conds">
-    <tr><th>Medida</th><th>Comparação</th><th>Valor</th><th>Janela da média (min)</th></tr>
+    <tr><th>Medida</th><th>Comparação</th><th>Valor</th><th>Janela: min (média) ou dias (habitual)</th></tr>
     {% for i in range(4) %}{% set c = d.conditions[i] if i < d.conditions|length else {} %}
     <tr><td><select name="c{{ i }}_metric">{% for k, v in metrics.items() %}<option value="{{ k }}" {{ 'selected' if c.metric==k }}>{{ v }}</option>{% endfor %}</select></td>
-      <td><select name="c{{ i }}_op">{% for k, v in ops.items() %}<option value="{{ k }}" {{ 'selected' if c.op==k }}>{{ v }}{{ ' (%)' if 'avg' in k }}</option>{% endfor %}</select></td>
+      <td><select name="c{{ i }}_op">{% for k, v in ops.items() %}<option value="{{ k }}" {{ 'selected' if c.op==k }}>{{ v }}{{ ' (%)' if 'avg' in k or 'usual' in k }}</option>{% endfor %}</select></td>
       <td><input name="c{{ i }}_value" value="{{ '' if c.value is not defined else (c.value if c.value is string else '%g'|format(c.value)) }}" inputmode="decimal" placeholder="{{ 'vazio = sem condição' if i else '' }}"></td>
-      <td><input name="c{{ i }}_window" type="number" min="2" max="120" value="{{ c.window or 15 }}"></td></tr>
+      <td><input name="c{{ i }}_window" type="number" min="1" max="120" value="{{ c.window or 15 }}"></td></tr>
     {% endfor %}
   </table></div>
-  <p class="muted">“Acima da média” usa porcentagem: 200 = três vezes a média dos minutos anteriores. Combine com um limite fixo (E) para não disparar em tráfego quase zero.</p>
+  <p class="muted">“Acima da média” usa porcentagem: 200 = três vezes a média dos minutos anteriores. “Acima do habitual” compara com o mesmo horário (±10 min) dos dias anteriores; a janela vira número de dias
+  e precisa de histórico gravado. Combine com um limite fixo (E) para não disparar em tráfego quase zero.</p>
   <div class="grid">
     <label>Minutos seguidos para abrir <input name="consecutive" type="number" min="1" max="30" value="{{ d.consecutive }}"></label>
     <label>Encerrar após (min sem casar) <input name="resolve_after" type="number" min="1" max="240" value="{{ d.resolve_after }}"></label>

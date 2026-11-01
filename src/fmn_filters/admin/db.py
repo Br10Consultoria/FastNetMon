@@ -194,6 +194,64 @@ description=IF(builtin=0,VALUES(description),description)""", (name, expr, descr
         finally:
             db.close()
 
+    # ---------- excecoes e linha de base
+    def exceptions(self):
+        try:
+            rows = self._q("SELECT id,kind,value,side,direction,rule_name,action,factor,note,expires_at,prefixes,"
+                           "synced_at,sync_error,created_by,updated_at FROM orby_exceptions ORDER BY kind,value")
+        except Exception:
+            return []
+        keys = ("id", "kind", "value", "side", "direction", "rule_name", "action", "factor", "note", "expires_at",
+                "prefixes", "synced_at", "sync_error", "created_by", "updated_at")
+        return [dict(zip(keys, r)) for r in rows]
+
+    def save_exception(self, e, user):
+        """Insere (ou renova) uma excecao ja validada. Devolve o id."""
+        db = self.conn_factory()
+        try:
+            with db.cursor() as cur:
+                expires = ("UTC_TIMESTAMP() + INTERVAL %d DAY" % int(e["days"])) if e["days"] else "NULL"
+                cur.execute("INSERT INTO orby_exceptions (kind,value,side,direction,rule_name,action,factor,note,"
+                            "expires_at,created_by) VALUES (%s,%s,%s,%s,%s,%s,%s,%s," + expires + ",%s) "
+                            "ON DUPLICATE KEY UPDATE factor=VALUES(factor),note=VALUES(note),"
+                            "expires_at=VALUES(expires_at),created_by=VALUES(created_by)",
+                            (e["kind"], e["value"], e["side"], e["direction"], e["rule_name"], e["action"],
+                             e["factor"], e["note"], user))
+                cur.execute("SELECT id FROM orby_exceptions WHERE kind=%s AND value=%s AND side=%s AND direction=%s "
+                            "AND rule_name=%s AND action=%s", (e["kind"], e["value"], e["side"], e["direction"],
+                                                               e["rule_name"], e["action"]))
+                eid = cur.fetchone()[0]
+            db.commit()
+            return eid
+        finally:
+            db.close()
+
+    def delete_exception(self, eid):
+        db = self.conn_factory()
+        try:
+            with db.cursor() as cur:
+                cur.execute("DELETE FROM orby_exception_prefixes WHERE exception_id=%s", (eid,))
+                n = cur.execute("DELETE FROM orby_exceptions WHERE id=%s", (eid,))
+            db.commit()
+            return n
+        finally:
+            db.close()
+
+    def sync_exception(self, eid):
+        """Busca os prefixos do ASN agora (RIPEstat). Devolve a mensagem de resultado."""
+        from ..exceptions import sync
+        out = []
+        self.with_connection(lambda db: sync(db, only_id=eid, log=out.append))
+        return "; ".join(out)
+
+    def baseline_table(self):
+        from ..baseline import load
+        return self.with_connection(lambda db: load(db.cursor()))
+
+    def filter_rule_usual(self, rid, minute, days):
+        from ..filter_rules import usual_samples
+        return self.with_connection(lambda db: usual_samples(db.cursor(), rid, minute, days))
+
     # ---------- alarmes por filtro
     def filter_rules(self):
         try:

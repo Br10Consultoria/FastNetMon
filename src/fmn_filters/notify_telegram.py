@@ -202,6 +202,21 @@ class Formatter:
             body.append("Pico: %s · %s · %d IPs %s%s" % (
                 fmt_rate(ev["mbps"] * 1e6), fmt_pps(ev["pps"]), ev["remote_ips"],
                 "de origem" if inbound else "de destino", (" · " + ", ".join(extra)) if extra else ""))
+            try:
+                details = json.loads(ev["details"] or "{}")
+            except (TypeError, ValueError):
+                details = {}
+            lim = details.get("limits") or {}
+            why = []
+            if details.get("dynamic_limit"):
+                why.append("dinâmico da hora")
+            if (details.get("limit_multiplier") or 1) != 1:
+                why.append("limite próprio ×%g" % details["limit_multiplier"])
+            if why and lim:
+                body.append("Limite usado: %s (%s)" % (" · ".join(
+                    x for x in (fmt_pps(lim["min_pps"]) if "min_pps" in lim else "",
+                                fmt_rate(lim["min_mbps"] * 1e6) if "min_mbps" in lim else "") if x),
+                    ", ".join(why)))
             iface = ev["in_name"] if inbound else ev["out_name"]
             if iface:
                 body.append("%s: %s" % ("Entrou por" if inbound else "Saiu por", e(iface)))

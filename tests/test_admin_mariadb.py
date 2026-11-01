@@ -54,6 +54,20 @@ class AdminStoreTests(unittest.TestCase):
             self.s.delete_filter_rule(rid)
         self.assertIsNone(self.s.filter_rule(rid))
 
+    def test_exceptions_crud_and_baseline_read(self):
+        from fmn_filters import exceptions as ex
+        e = ex.validate("cidr", "198.51.100.%d" % (os.urandom(1)[0]), "local", "out", note="teste " + self.name,
+                        days=2)
+        eid = self.s.save_exception(e, self.name)
+        try:
+            self.assertEqual(self.s.save_exception(dict(e, note="renovada"), self.name), eid)
+            item = [x for x in self.s.exceptions() if x["id"] == eid][0]
+            self.assertEqual((item["note"], item["side"]), ("renovada", "local"))
+            self.assertIsNotNone(item["expires_at"])
+            self.assertIsInstance(self.s.baseline_table(), dict)
+        finally:
+            self.assertEqual(self.s.delete_exception(eid), 1)
+
     def test_fails_audit_interfaces_health(self):
         for _ in range(3):
             self.s.fail("192.0.2.77", self.name)

@@ -22,7 +22,8 @@ CONFIG_KEYS = frozenset({
     "nat_socket", "observation_ifindexes", "keep_ports", "counter_multiplier",
     "settle_minutes", "cooldown_minutes", "max_query_rows", "retention_days",
     "rules", "nat_rules"})
-OPTIONAL_CONFIG_KEYS = frozenset({"ipv6_protected_cidrs", "provider_name", "asns", "a10_sources"})
+OPTIONAL_CONFIG_KEYS = frozenset({"ipv6_protected_cidrs", "provider_name", "asns", "a10_sources",
+                                  "dynamic_thresholds"})
 RULE_KEYS = frozenset({"name", "enabled", "severity", "direction", "protocols",
                        "local_ports", "remote_ports", "split_by",
                        "consecutive_minutes", "limits"})
@@ -123,6 +124,9 @@ def validate_config(obj):
         raise ValueError("a10_sources: lista de IPs de origem do log do A10")
     for ip in obj["a10_sources"]:
         ip_address(ip)
+    if "dynamic_thresholds" in obj:
+        from .baseline import validate_settings
+        obj["dynamic_thresholds"] = validate_settings(obj["dynamic_thresholds"])
     obj.setdefault("ipv6_protected_cidrs", [])
     v6 = obj["ipv6_protected_cidrs"]
     if not isinstance(v6, list):

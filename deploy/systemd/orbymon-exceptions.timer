@@ -1,0 +1,12 @@
+[Unit]
+Description=OrbyMon - atualizacao diaria dos prefixos dos ASNs de excecao
+
+[Timer]
+OnBootSec=5min
+OnCalendar=*-*-* 04:41:00
+RandomizedDelaySec=10min
+Persistent=true
+Unit=orbymon-exceptions.service
+
+[Install]
+WantedBy=timers.target

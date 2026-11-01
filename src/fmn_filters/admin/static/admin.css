@@ -75,3 +75,10 @@ select.auto,input.auto{display:inline-block;width:auto;margin:0 6px}
 table.conds td{min-width:140px}
 svg.chart .hit{fill:var(--bad);opacity:.18}
 tr.hitrow td{background:color-mix(in srgb,var(--bad) 12%,transparent)}
+svg.hours .static{fill:none;stroke:var(--muted);stroke-dasharray:3 2}
+svg.hours .fix{fill:var(--muted);opacity:.35}
+svg.hours .dyn{fill:var(--accent);opacity:.75}
+svg.hours .base{stroke:var(--bad);stroke-width:2}
+.legend .sw{display:inline-block;width:12px;height:10px;margin:0 4px 0 12px;vertical-align:-1px}
+.legend .sw.static{border:1px dashed var(--muted)}.legend .sw.dyn{background:var(--accent)}.legend .sw.base{border-top:2px solid var(--bad);height:0}
+svg.hours .lbl{font-size:10px}

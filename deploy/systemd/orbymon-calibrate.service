@@ -9,7 +9,7 @@ Group=orbymon
 WorkingDirectory=/opt/orbymon
 EnvironmentFile=/etc/orbymon/pipeline.env
 Environment=PYTHONPATH=/opt/orbymon/src
-ExecStart=/opt/orbymon/.venv/bin/python -m fmn_filters.calibrate --config /etc/orbymon/bidir.json --hours 24 --write /var/lib/orbymon/calibration/bidir.proposed.json --json /var/lib/orbymon/calibration/relatorio-diario.json
+ExecStart=/opt/orbymon/.venv/bin/python -m fmn_filters.calibrate --config /etc/orbymon/bidir.json --hours 24 --write /var/lib/orbymon/calibration/bidir.proposed.json --json /var/lib/orbymon/calibration/relatorio-diario.json --baseline
 Nice=10
 TimeoutStartSec=900
 NoNewPrivileges=true

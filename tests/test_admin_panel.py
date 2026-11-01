@@ -126,6 +126,40 @@ class FakeStore:
         self.saved = [x for x in self.saved if not (x["id"] == fid and not x["builtin"])]
         return before - len(self.saved)
 
+    excs = None
+    synced_ids = ()
+
+    def exceptions(self):
+        if self.excs is None:
+            self.excs = []
+        return [dict(e) for e in self.excs]
+
+    def save_exception(self, e, user):
+        self.exceptions()
+        eid = len(self.excs) + 1
+        self.excs.append(dict(e, id=eid, created_by=user, expires_at=None, prefixes=0, synced_at=None, sync_error=""))
+        return eid
+
+    def delete_exception(self, eid):
+        before = len(self.exceptions())
+        self.excs = [e for e in self.excs if e["id"] != eid]
+        return before - len(self.excs)
+
+    def sync_exception(self, eid):
+        self.synced_ids = tuple(self.synced_ids) + (eid,)
+        return "AS%s: 3 prefixos" % next(e["value"] for e in self.excs if e["id"] == eid)
+
+    def baseline_table(self):
+        out = {}
+        for h in range(24):
+            for dt in ("wkd", "wke"):
+                out[("IN UDP volumetrico", "dedicated", dt, h, "min_pps")] = (2000.0 if h < 7 else 40000.0, 5)
+                out[("IN UDP volumetrico", "dedicated", dt, h, "min_mbps")] = (20.0 if h < 7 else 300.0, 5)
+        return out
+
+    def filter_rule_usual(self, rid, minute, days):
+        return []
+
     alarm_rules = None
 
     def filter_rules(self):
@@ -675,6 +709,49 @@ class PanelTests(unittest.TestCase):
         self.assertEqual(self.db.audits[-1][1], "alarme_excluido")
         r = self.post("/alarmes/nova", action="salvar", **dict(form, expr="any; reboot"))
         self.assertNotIn(3, self.db.alarm_rules)
+
+
+    def test_exceptions_page(self):
+        self.login()
+        self.assertEqual(self.c.get("/excecoes").status_code, 200)
+        r = self.post("/excecoes", kind="cidr", value="187.87.201.53", side="local", direction="out",
+                      rule_name="", action="ignore", factor="1", note="DNS recursivo", days="")
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(self.db.excs[0]["value"], "187.87.201.53/32")
+        self.assertEqual(self.db.audits[-1][1], "excecao_salva")
+        r = self.post("/excecoes", action="preset", asn="15169", direction="in", rule_name="")
+        self.assertEqual(self.db.excs[1]["kind"], "asn")
+        self.assertEqual(self.db.synced_ids, (2,))                      # prefixos buscados na hora
+        r = self.post("/excecoes", kind="cidr", value="0.0.0.0/0", side="remote", direction="any", rule_name="",
+                      action="ignore", factor="1", note="", days="")
+        self.assertEqual(len(self.db.excs), 2)
+        r = self.post("/excecoes", kind="cidr", value="45.238.170.70", side="remote", direction="any",
+                      rule_name="", action="multiply", factor="3", note="", days="")
+        self.assertEqual(len(self.db.excs), 2)                          # multiplicador so do lado local
+        r = self.post("/excecoes", kind="cidr", value="45.238.170.70", side="local", direction="in",
+                      rule_name="Regra que nao existe", action="ignore", factor="1", note="", days="")
+        self.assertEqual(len(self.db.excs), 2)
+        page = self.c.get("/excecoes")
+        self.assertIn(b"187.87.201.53/32", page.data)
+        self.assertIn(b"AS15169", page.data)
+        page = self.c.get("/excecoes?kind=cidr&value=45.238.170.70&side=local&action=multiply")
+        self.assertIn(b'value="45.238.170.70"', page.data)
+        self.post("/excecoes", action="excluir", id="1")
+        self.assertEqual([e["id"] for e in self.db.excs], [2])
+        self.assertEqual(self.db.audits[-1][1], "excecao_excluida")
+
+    def test_baseline_page(self):
+        self.login()
+        page = self.c.get("/base")
+        self.assertEqual(page.status_code, 200, page.data[:300])
+        self.assertIn(b"Linha de base", page.data)
+        r = self.post("/base", enabled="1", factor="2,5", floor_pct="20", min_days="3", timezone="America/Bahia")
+        self.assertEqual(r.status_code, 302)
+        page = self.c.get("/base")
+        self.assertIn(b'value="2.5"', page.data)
+        self.assertIn(b"America/Bahia", page.data)
+        r = self.post("/base", enabled="1", factor="50", floor_pct="20", min_days="3", timezone="America/Bahia")
+        self.assertIn("Não salvo".encode(), self.c.get("/base").data)
 
 
 class CliTests(unittest.TestCase):

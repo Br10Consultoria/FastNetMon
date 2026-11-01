@@ -28,7 +28,8 @@ METRICS = (("min_pps", "Pacotes/s", float), ("min_mbps", "Mbps", float), ("min_r
            ("min_syn_ratio", "Fração SYN", float), ("min_zero_port_ratio", "Fração porta 0", float))
 SERVICES = ("orbymon-nfcapd@huawei.service", "orbymon-a10-nat.service", "orbymon-flow-rollup-huawei.timer",
             "orbymon-bidir-huawei.timer", "orbymon-ip-huawei.timer", "orbymon-telegram.timer",
-            "orbymon-retention.timer", "orbymon-calibrate.timer", "grafana-server.service", "mariadb.service")
+            "orbymon-retention.timer", "orbymon-calibrate.timer", "orbymon-filter-rules.timer",
+            "orbymon-exceptions.timer", "grafana-server.service", "mariadb.service")
 
 
 def _secret_key(env):
@@ -664,8 +665,9 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
                     if action == "testar":
                         now = dt.now(dt_timezone.utc).replace(tzinfo=None, microsecond=0)
                         minutes = min(120, max(5, int(f.get("test_minutes") or 30)))
+                        usual_fn = (lambda m, days: store.filter_rule_usual(rid, m, days)) if rid else None
                         simulation = fr.simulate(config.p.flow_root / cfg["source"], expr, definition, table, now,
-                                                 minutes)
+                                                 minutes, usual_fn=usual_fn)
                         key = {"mbps": "bps"}.get(definition["conditions"][0]["metric"],
                                                   definition["conditions"][0]["metric"])
                         chart = fq.svg_series(simulation, key, marks=[p["matched"] for p in simulation])
@@ -692,11 +694,127 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
                                metrics=fr.METRICS, ops=fr.OPS, aggs=fr.AGGS, human=fq.human,
                                describe=fr.describe)
 
+    # ---------------------------------------------------------------- etapa 2: excecoes e linha de base
+    @app.route("/excecoes", methods=["GET", "POST"])
+    def exceptions_page():
+        from .. import exceptions as ex
+        cfg = config.bidir()
+        rule_names = [r["name"] for r in cfg["rules"]]
+        f = request.form
+        form = {"kind": request.args.get("kind", "cidr"), "value": request.args.get("value", ""),
+                "side": request.args.get("side", "remote"), "direction": request.args.get("direction", "any"),
+                "rule_name": request.args.get("rule", ""), "action": request.args.get("action", "ignore"),
+                "factor": request.args.get("factor", "3"), "note": "", "days": ""}
+        if request.method == "POST":
+            action = f.get("action")
+            try:
+                if action == "excluir":
+                    eid = int(f.get("id", 0))
+                    item = next((x for x in store.exceptions() if x["id"] == eid), None)
+                    if item and store.delete_exception(eid):
+                        audit("excecao_excluida", ex.describe(item))
+                        flash("Exceção removida. O detector deixa de usá-la no próximo minuto.")
+                    return redirect(url_for("exceptions_page"))
+                if action == "sincronizar":
+                    flash("Prefixos: %s" % (store.sync_exception(int(f.get("id", 0))) or "nada a atualizar"))
+                    return redirect(url_for("exceptions_page"))
+                if action == "preset":
+                    asn = int(f.get("asn", 0))
+                    if asn not in dict((a, n) for n, a in ex.PRESETS):
+                        raise ex.ExceptionError("grupo desconhecido")
+                    name = dict((a, n) for n, a in ex.PRESETS)[asn]
+                    e = ex.validate("asn", str(asn), "remote", f.get("direction", "in"), f.get("rule_name", ""),
+                                    "ignore", 1, name)
+                else:
+                    form = {k: f.get(k, "") for k in form}
+                    e = ex.validate(form["kind"], form["value"], form["side"], form["direction"], form["rule_name"],
+                                    form["action"], form["factor"], form["note"], form["days"] or None)
+                if e["rule_name"] and e["rule_name"] not in rule_names:
+                    raise ex.ExceptionError("regra desconhecida")
+                eid = store.save_exception(e, g.user["username"])
+                audit("excecao_salva", ex.describe(e) + (" — " + e["note"] if e["note"] else ""))
+                msg = "Exceção salva: %s." % ex.describe(e)
+                if e["kind"] == "asn":
+                    msg += " Prefixos: %s" % (store.sync_exception(eid) or "consulta pendente (atualização diária)")
+                flash(msg)
+                return redirect(url_for("exceptions_page"))
+            except (ex.ExceptionError, ValueError) as exc:
+                flash("Não salvo: %s" % exc)
+        return render_template("exceptions.html", items=store.exceptions(), form=form, rule_names=rule_names,
+                               presets=ex.PRESETS, describe=ex.describe)
+
+    @app.route("/base", methods=["GET", "POST"])
+    def baseline_page():
+        from .. import baseline as bl
+        cfg = config.bidir()
+        if request.method == "POST":
+            f = request.form
+
+            def apply():
+                new = copy.deepcopy(cfg)
+                new["dynamic_thresholds"] = {
+                    "enabled": f.get("enabled") == "1", "factor": float(f.get("factor", "2").replace(",", ".")),
+                    "min_days": int(f.get("min_days", 3)),
+                    "floor_ratio": float(f.get("floor_pct", "25").replace(",", ".")) / 100,
+                    "timezone": f.get("timezone", "America/Sao_Paulo")}
+                config.save_bidir(new)
+                return new["dynamic_thresholds"]
+            safe("limite_dinamico", apply, "Configuração salva. O detector usa no próximo minuto.")
+            return redirect(url_for("baseline_page", r=request.args.get("r", 0), s=request.args.get("s", "")))
+        st = bl.settings(cfg)
+        table = store.baseline_table()
+        rules = [r for r in cfg["rules"]]
+        try:
+            ri = min(max(int(request.args.get("r", 0)), 0), len(rules) - 1)
+        except ValueError:
+            ri = 0
+        rule = rules[ri]
+        scope = request.args.get("s") if request.args.get("s") in rule["limits"] else next(iter(rule["limits"]))
+        prof = bl.profile(table, cfg, rule, scope)
+        charts = {(dt, m): _svg_hours(prof[dt], m) for dt in bl.DAYTYPES for m in bl.METRICS
+                  if m in rule["limits"][scope]}
+        coverage = {}
+        for (rn, sc, _dt, _h, _m), (_v, days) in table.items():
+            k = (rn, sc)
+            coverage[k] = max(coverage.get(k, 0), days)
+        _, report = config.calibration_proposal()
+        offenders = []
+        for e in (report or {}).get("regras", []):
+            for o in e.get("reincidentes", []):
+                offenders.append(dict(o, regra=e["regra"]))
+        offenders.sort(key=lambda o: -o["alarmes"])
+        direction = {r["name"]: r["direction"] for r in rules}
+        return render_template("baseline.html", st=st, rules=rules, ri=ri, rule=rule, scope=scope, prof=prof,
+                               charts=charts, coverage=coverage, offenders=offenders[:20], direction=direction,
+                               daytypes=bl.DAYTYPES, tz_choices=TZ_CHOICES, report=report)
+
+
     return app
 
 
 TZ_CHOICES = ("America/Sao_Paulo", "UTC", "America/Bahia", "America/Manaus", "Europe/Berlin", "Europe/London",
               "Europe/Paris", "America/New_York", "America/Chicago", "America/Los_Angeles", "Asia/Tokyo")
+
+
+def _svg_hours(hours, metric, width=720, height=150):
+    """Barras por hora: limite efetivo (cheio) sobre o limite fixo (contorno) e o p99,9 medido (traço)."""
+    top = max([h[metric]["static"] for h in hours] + [h[metric]["base"] or 0 for h in hours]) or 1.0
+    bw = width / 24.0
+    y = lambda v: height - 18 - (v / top) * (height - 30)
+    parts = ['<svg class="chart hours" viewBox="0 0 %d %d" role="img" aria-label="Limite por hora">' % (width, height)]
+    for h in hours:
+        m, x = h[metric], h["hour"] * bw
+        parts.append('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" class="static"/>'
+                     % (x + 2, y(m["static"]), bw - 4, height - 18 - y(m["static"])))
+        parts.append('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" class="%s"/>'
+                     % (x + 2, y(m["limit"]), bw - 4, height - 18 - y(m["limit"]), "dyn" if h["dynamic"] else "fix"))
+        if m["base"] is not None:
+            parts.append('<line x1="%.1f" x2="%.1f" y1="%.1f" y2="%.1f" class="base"/>'
+                         % (x + 2, x + bw - 2, y(m["base"]), y(m["base"])))
+        if h["hour"] % 3 == 0:
+            parts.append('<text x="%.1f" y="%d" class="lbl">%02dh</text>' % (x + 2, height - 4, h["hour"]))
+    parts.append('<text x="4" y="12" class="lbl">máx. %s</text></svg>' % ("%g" % round(top, 1)))
+    return "".join(parts)
 
 
 def _group_listings(rows):

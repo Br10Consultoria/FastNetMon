@@ -17,6 +17,8 @@
     <a href="{{ url_for('borders') }}" class="{{ 'on' if here=='borders' }}">Bordas</a>
     <a href="{{ url_for('rules') }}" class="{{ 'on' if here=='rules' }}">Regras</a>
     <a href="{{ url_for('alarms') }}" class="{{ 'on' if here in ('alarms','alarm_edit') }}">Alarmes</a>
+    <a href="{{ url_for('exceptions_page') }}" class="{{ 'on' if here == 'exceptions_page' }}">Exceções</a>
+    <a href="{{ url_for('baseline_page') }}" class="{{ 'on' if here == 'baseline_page' }}">Base</a>
     <a href="{{ url_for('analysis') }}" class="{{ 'on' if here=='analysis' }}">Análise</a>
     <a href="{{ url_for('investigate') }}" class="{{ 'on' if here=='investigate' }}">Investigar</a>
     <a href="{{ url_for('reputation') }}" class="{{ 'on' if here=='reputation' }}">Reputação</a>

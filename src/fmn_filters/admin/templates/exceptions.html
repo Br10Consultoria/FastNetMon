@@ -1,0 +1,53 @@
+{% extends "base.html" %}{% block title %}Exceções{% endblock %}
+{% block body %}
+<h1>Exceções da detecção</h1>
+<p class="muted">Tráfego que não deve contar para as regras do detector (e para a calibração), ou IPs da rede com limite próprio.
+Cada exceção pode valer para um sentido e para uma regra só: prefira o mais específico. Ignorar um ASN inteiro do lado
+remoto também esconde ataques com origem forjada naquelas faixas.</p>
+
+<section class="card">
+  <h2>Nova exceção</h2>
+  <form method="post" autocomplete="off">{% include "_csrf.html" %}
+    <div class="grid">
+      <label>Tipo <select name="kind">{% for k, l in (('cidr','IP ou rede'),('asn','ASN (prefixos anunciados)')) %}<option value="{{ k }}" {{ 'selected' if form.kind==k }}>{{ l }}</option>{% endfor %}</select></label>
+      <label>Valor <input name="value" value="{{ form.value }}" placeholder="8.8.8.8, 2001:db8::/48 ou AS15169" required maxlength="64"></label>
+      <label>Lado <select name="side">{% for k, l in (('remote','remoto (internet)'),('local','local (nossa rede)')) %}<option value="{{ k }}" {{ 'selected' if form.side==k }}>{{ l }}</option>{% endfor %}</select></label>
+      <label>Sentido <select name="direction">{% for k, l in (('any','ambos'),('in','recebido'),('out','originado')) %}<option value="{{ k }}" {{ 'selected' if form.direction==k }}>{{ l }}</option>{% endfor %}</select></label>
+      <label>Regra <select name="rule_name"><option value="">todas</option>{% for n in rule_names %}<option {{ 'selected' if form.rule_name==n }}>{{ n }}</option>{% endfor %}</select></label>
+      <label>Ação <select name="action">{% for k, l in (('ignore','ignorar o tráfego'),('multiply','multiplicar o limite (só local)')) %}<option value="{{ k }}" {{ 'selected' if form.action==k }}>{{ l }}</option>{% endfor %}</select></label>
+      <label>Multiplicador <input name="factor" value="{{ form.factor }}" inputmode="decimal"><small>Usado só em “multiplicar”: 3 = limite 3× maior para este IP.</small></label>
+      <label>Validade (dias) <input name="days" type="number" min="1" max="365" value="{{ form.days }}" placeholder="sem prazo"></label>
+    </div>
+    <label>Observação <input name="note" value="{{ form.note }}" maxlength="200" placeholder="ex.: DNS recursivo do provedor; servidor de jogos do cliente X"></label>
+    <button name="action_btn" value="1">Salvar exceção</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Grupos prontos (lado remoto, ignorar)</h2>
+  <p class="muted">Prefixos anunciados pelo ASN, consultados no RIPEstat e atualizados todo dia. Uso típico: QUIC/UDP 443 de
+  CDNs chegando aos clientes e disparando “UDP recebido”. Escolha o sentido e, de preferência, a regra.</p>
+  <form method="post" class="inline">{% include "_csrf.html" %}<input type="hidden" name="action" value="preset">
+    <label>Grupo <select name="asn">{% for name, asn in presets %}<option value="{{ asn }}">{{ name }} (AS{{ asn }})</option>{% endfor %}</select></label>
+    <label>Sentido <select name="direction"><option value="in">recebido</option><option value="out">originado</option><option value="any">ambos</option></select></label>
+    <label>Regra <select name="rule_name"><option value="">todas</option>{% for n in rule_names %}<option>{{ n }}</option>{% endfor %}</select></label>
+    <button>Adicionar</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Exceções cadastradas</h2>
+  {% if items %}<div class="scroll"><table>
+    <tr><th>Exceção</th><th>Observação</th><th>Validade</th><th>Prefixos</th><th></th></tr>
+    {% for e in items %}<tr>
+      <td><code>{{ 'AS' ~ e.value if e.kind=='asn' else e.value }}</code><br><small class="muted">{{ describe(e) }}</small></td>
+      <td><small>{{ e.note }}</small><br><small class="muted">{{ e.created_by }}</small></td>
+      <td class="nowrap">{{ e.expires_at or 'sem prazo' }}</td>
+      <td>{% if e.kind=='asn' %}{{ e.prefixes }}{% if e.synced_at %}<br><small class="muted">{{ e.synced_at }} UTC</small>{% endif %}{% if e.sync_error %}<br><small class="warn">{{ e.sync_error }}</small>{% endif %}{% else %}—{% endif %}</td>
+      <td class="nowrap"><form method="post" class="inlineform">{% include "_csrf.html" %}<input type="hidden" name="id" value="{{ e.id }}">
+        {% if e.kind=='asn' %}<button name="action" value="sincronizar" class="secondary small">Atualizar</button>{% endif %}
+        <button name="action" value="excluir" class="secondary small">Remover</button></form></td>
+    </tr>{% endfor %}
+  </table></div>{% else %}<p class="muted">Nenhuma exceção.</p>{% endif %}
+</section>
+{% endblock %}

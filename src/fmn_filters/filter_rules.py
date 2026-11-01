@@ -5,6 +5,8 @@ Regra (orby_filter_rules.definition, JSON):
      gt/ge/lt/le       -> limite fixo (Mbps, pacotes/s, fluxos/min ou bytes/pacote)
      above_avg (value%) -> atual > media dos `window` minutos anteriores x (1 + value/100)
      below_avg (value%) -> atual < media x (1 - value/100)   (queda de trafego)
+     above_usual / below_usual (value%, window = dias) -> compara com o MESMO horario (+-10 min) dos
+                          `window` dias anteriores (linha de base do proprio filtro; precisa de historico)
   logic: and|or         consecutive: minutos seguidos para abrir   resolve_after: minutos sem casar para encerrar
   report: {agg: dstip|srcip|dstport|srcport|proto|record, top}   notify: Telegram   retention_days: serie
 
@@ -28,7 +30,11 @@ import time
 from . import flow_query as fq
 
 METRICS = {"mbps": "Mbps", "pps": "pacotes/s", "flows": "fluxos/min", "bpp": "bytes/pacote"}
-OPS = {"gt": ">", "ge": "≥", "lt": "<", "le": "≤", "above_avg": "acima da média", "below_avg": "abaixo da média"}
+OPS = {"gt": ">", "ge": "≥", "lt": "<", "le": "≤", "above_avg": "acima da média", "below_avg": "abaixo da média",
+       "above_usual": "acima do habitual", "below_usual": "abaixo do habitual"}
+AVG_OPS = ("above_avg", "below_avg")
+USUAL_OPS = ("above_usual", "below_usual")
+USUAL_SPAN = timedelta(minutes=10)      # "mesmo horario" = +-10 min nos dias anteriores
 AGGS = {"dstip": "destinos", "srcip": "origens", "dstport": "portas de destino", "srcport": "portas de origem",
         "proto": "protocolos", "record": "conversas"}
 SEVERITIES = ("warning", "high", "critical")
@@ -75,6 +81,15 @@ def validate(name, expr, definition, severity="high", direction="in", table=None
             if op == "below_avg" and not 1 <= value <= 99:
                 raise RuleError("queda entre 1% e 99%")
             item["window"] = window
+        elif op in USUAL_OPS:
+            days = int(c.get("window") or 7)
+            if not 1 <= days <= 28:
+                raise RuleError("comparação com o habitual: de 1 a 28 dias")
+            if op == "above_usual" and not 1 <= value <= 10000:
+                raise RuleError("aumento entre 1% e 10000%")
+            if op == "below_usual" and not 1 <= value <= 99:
+                raise RuleError("queda entre 1% e 99%")
+            item["window"] = days
         elif value < 0:
             raise RuleError("valor negativo")
         clean.append(item)
@@ -92,6 +107,8 @@ def validate(name, expr, definition, severity="high", direction="in", table=None
         raise RuleError("top entre 1 e 20")
     if not 1 <= out["retention_days"] <= 90:
         raise RuleError("histórico entre 1 e 90 dias")
+    usual_days = max([c["window"] for c in clean if c["op"] in USUAL_OPS] or [0])
+    out["retention_days"] = max(out["retention_days"], usual_days + 1)     # o habitual precisa do historico
     return name, expr.strip(), out
 
 
@@ -99,8 +116,10 @@ def describe(definition):
     parts = []
     for c in definition["conditions"]:
         unit = METRICS[c["metric"]]
-        if c["op"] in ("above_avg", "below_avg"):
+        if c["op"] in AVG_OPS:
             parts.append("%s %d%% %s de %d min" % (unit, c["value"], OPS[c["op"]], c["window"]))
+        elif c["op"] in USUAL_OPS:
+            parts.append("%s %d%% %s (mesmo horário, %d dia(s))" % (unit, c["value"], OPS[c["op"]], c["window"]))
         else:
             parts.append("%s %s %s" % (unit, OPS[c["op"]], ("%g" % c["value"])))
     joiner = " E " if definition["logic"] == "and" else " OU "
@@ -136,12 +155,25 @@ def metric_value(sample, metric):
     return sample["bps"] / 1e6 if metric == "mbps" else sample[metric]
 
 
-def check(definition, sample, history):
-    """history: amostras anteriores (lista de dict) mais recentes por ultimo."""
+def check(definition, sample, history, usual=None, minute=None):
+    """history: amostras anteriores (lista de dict) mais recentes por ultimo.
+    usual: amostras do mesmo horario em dias anteriores (dict com 't'), para above_usual/below_usual."""
     results = []
     for c in definition["conditions"]:
         cur = metric_value(sample, c["metric"])
-        if c["op"] in ("above_avg", "below_avg"):
+        if c["op"] in USUAL_OPS:
+            since = (minute - timedelta(days=c["window"]) - USUAL_SPAN) if minute else None
+            past = [metric_value(h, c["metric"]) for h in (usual or []) if since is None or h["t"] >= since]
+            if len(past) < 10 * max(1, (c["window"] + 1) // 2):      # ao menos metade dos dias com dados
+                results.append(False)
+                continue
+            avg = sum(past) / len(past)
+            if c["op"] == "above_usual":
+                results.append(avg > 0 and cur > avg * (1 + c["value"] / 100))
+            else:
+                results.append(cur < avg * (1 - c["value"] / 100))
+            continue
+        if c["op"] in AVG_OPS:
             past = [metric_value(h, c["metric"]) for h in history[-c["window"]:]]
             if len(past) < max(2, c["window"] // 2):
                 results.append(False)                  # sem historico suficiente: nao dispara
@@ -196,8 +228,14 @@ def subscribers(db, source, ip, when, limit=3):
         return []
 
 
-def simulate(flow_dir, expr, definition, table, now, minutes=30, budget=40.0):
-    """Mede o filtro nos ultimos `minutes` e mostra em quais minutos a regra dispararia (sem gravar nada)."""
+def usual_days(definition):
+    return max([c["window"] for c in definition["conditions"] if c["op"] in USUAL_OPS] or [0])
+
+
+def simulate(flow_dir, expr, definition, table, now, minutes=30, budget=40.0, usual_fn=None):
+    """Mede o filtro nos ultimos `minutes` e mostra em quais minutos a regra dispararia (sem gravar nada).
+    usual_fn(minuto, dias): amostras gravadas do mesmo horario (sem ela, o 'habitual' nao dispara)."""
+    days = usual_days(definition)
     expanded = fq.expand(expr, table)
     t0 = time.monotonic()
     points, hist, streak = [], [], 0
@@ -205,7 +243,8 @@ def simulate(flow_dir, expr, definition, table, now, minutes=30, budget=40.0):
         if time.monotonic() - t0 > budget:
             break
         sample = measure(flow_dir, files, expanded)
-        matched = check(definition, sample, hist)
+        usual = usual_fn(minute, days) if (days and usual_fn) else None
+        matched = check(definition, sample, hist, usual, minute)
         streak = streak + 1 if matched else 0
         points.append(dict(sample, t=minute, matched=matched, opens=streak == definition["consecutive"]))
         hist.append(sample)
@@ -239,6 +278,18 @@ def history(cur, rule_id, before, minutes):
     cur.execute("SELECT bps,pps,flows,bpp FROM orby_filter_rule_samples WHERE rule_id=%s AND bucket_utc<%s "
                 "AND bucket_utc>=%s ORDER BY bucket_utc", (rule_id, before, before - timedelta(minutes=minutes)))
     return [{"bps": r[0], "pps": r[1], "flows": r[2], "bpp": r[3]} for r in cur.fetchall()]
+
+
+def usual_samples(cur, rule_id, minute, days):
+    """Amostras do mesmo horario (+-10 min) nos `days` dias anteriores."""
+    if not days:
+        return []
+    ranges = [(minute - timedelta(days=k) - USUAL_SPAN, minute - timedelta(days=k) + USUAL_SPAN)
+              for k in range(1, days + 1)]
+    cur.execute("SELECT bucket_utc,bps,pps,flows,bpp FROM orby_filter_rule_samples WHERE rule_id=%s AND (" +
+                " OR ".join(["bucket_utc BETWEEN %s AND %s"] * len(ranges)) + ")",
+                (rule_id,) + tuple(x for r in ranges for x in r))
+    return [{"t": r[0], "bps": r[1], "pps": r[2], "flows": r[3], "bpp": r[4]} for r in cur.fetchall()]
 
 
 def open_incident(cur, rule_id):
@@ -276,12 +327,13 @@ def evaluate_rule(db, rule, flow_dir, table, now, scopes=None, source="huawei", 
     since = max(since, now - CATCH_UP)
     expanded = fq.expand(rule["expr"], table)
     minutes = minute_files(flow_dir, since, now)
-    windows = [c.get("window", 0) for c in d["conditions"]] + [0]
+    windows = [c["window"] for c in d["conditions"] if c["op"] in AVG_OPS] + [0]
+    days = usual_days(d)
     actions = []
     for minute, files in minutes.items():
         sample = measure(flow_dir, files, expanded)
         hist = history(cur, rule["id"], minute, max(windows) + 1) if max(windows) else []
-        matched = check(d, sample, hist)
+        matched = check(d, sample, hist, usual_samples(cur, rule["id"], minute, days), minute)
         cur.execute("""INSERT INTO orby_filter_rule_samples (rule_id,bucket_utc,bps,pps,flows,bpp,matched)
  VALUES (%s,%s,%s,%s,%s,%s,%s) ON DUPLICATE KEY UPDATE bps=VALUES(bps),pps=VALUES(pps),flows=VALUES(flows),
  bpp=VALUES(bpp),matched=VALUES(matched)""", (rule["id"], minute, sample["bps"], sample["pps"], sample["flows"],

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import argparse
 from array import array
-from collections import defaultdict
+from collections import Counter, defaultdict
 import copy
 from datetime import datetime, timedelta, timezone
 import json
@@ -65,11 +65,14 @@ class _Track:
 
     Regras com proporcao (SYN, porta 0) medem o proprio sinal: pacotes SYN/s ou de porta 0/s.
     """
-    __slots__ = ("sig", "tot", "mbps", "ratio", "streak", "last", "alarms_now", "limits", "n", "ratio_key")
+    __slots__ = ("sig", "tot", "mbps", "ratio", "slot", "streak", "last", "alarms_now", "limits", "n", "ratio_key",
+                 "offenders")
 
     def __init__(self, limits, n):
         self.sig, self.tot, self.mbps, self.ratio = array("f"), array("f"), array("f"), array("f")
+        self.slot = array("B")                  # tipo de dia x 24 + hora local
         self.streak, self.last = {}, {}
+        self.offenders = Counter()
         self.alarms_now = 0
         self.limits, self.n = limits, n
         self.ratio_key = next((k for k in RATIO_KEYS if k in limits), None)
@@ -80,8 +83,9 @@ class _Track:
                 (("min_mbps" not in limits) or mbps >= limits["min_mbps"]) and
                 (ratio_key is None or ratio >= limits[ratio_key]))
 
-    def add(self, key, minute, packets, nbytes, syn, zero):
+    def add(self, key, minute, packets, nbytes, syn, zero, slot=0):
         tot, mbps = packets / 60.0, nbytes * 8 / 60e6
+        self.slot.append(slot)
         part = {"min_syn_ratio": syn, "min_zero_port_ratio": zero}.get(self.ratio_key, packets)
         ratio = part / packets if packets else 0.0
         self.sig.append(part / 60.0)
@@ -95,12 +99,18 @@ class _Track:
         self.streak[key], self.last[key] = run, minute
         if run == self.n:                       # alarme dispara ao completar a sequencia
             self.alarms_now += 1
+            self.offenders[key] += 1
 
 
 class Calibrator:
-    def __init__(self, cfg, attacks=frozenset()):
+    def __init__(self, cfg, attacks=frozenset(), exc=None):
+        from zoneinfo import ZoneInfo
+        from .baseline import settings
         self.cfg = cfg
         self.attacks = attacks                  # {(entidade, minuto)} a ignorar
+        self.exc = exc                          # excecoes (exceptions.Matcher): lado local
+        self.tz = ZoneInfo(settings(cfg)["timezone"])
+        self.slots = {}
         self.rules = [r for r in cfg["rules"] if r["enabled"]]
         self.tracks = {(r["name"], s): _Track(r["limits"][s], r["consecutive_minutes"])
                        for r in self.rules for s in r["limits"]}
@@ -113,12 +123,17 @@ class Calibrator:
         if self.current is None:
             return
         minute = self.current
+        slot = self.slots.get(minute // 60)
+        if slot is None:
+            from .baseline import slot as local_slot
+            daytype, hour = local_slot(datetime.fromtimestamp(minute * 60, timezone.utc).replace(tzinfo=None), self.tz)
+            slot = self.slots[minute // 60] = (24 if daytype == "wke" else 0) + hour
         for (rule_name, vscope, entity, proto, lport, rport), (packets, nbytes, syn, zero) in self.acc.items():
             if (entity, minute) in self.attacks:
                 self.ignored.add((entity, minute))
                 continue
             self.tracks[(rule_name, vscope)].add((vscope, entity, proto, lport, rport), minute,
-                                                 packets, nbytes, syn, zero)
+                                                 packets, nbytes, syn, zero, slot)
         self.acc.clear()
 
     def add(self, row):
@@ -137,9 +152,14 @@ class Calibrator:
             if rule.get("remote_ports") and row["remote_port"] not in rule["remote_ports"]:
                 continue
             split = rule["split_by"]
+            if self.exc and self.exc.ignore_row(rule["name"], rule["direction"],
+                                                (row["local_ip"], row["subscriber_ip"]), row.get("remote_ip", "")):
+                continue
             for vscope, entity in _entities(row):
                 if vscope not in rule["limits"]:
                     continue
+                if self.exc and self.exc.multiplier(rule["name"], rule["direction"], entity) != 1:
+                    continue                    # perfil proprio: fora da distribuicao geral
                 item = self.acc[(rule["name"], vscope, entity, row["protocol"],
                                  row["local_port"] if "local_port" in split else 0,
                                  row["remote_port"] if "remote_port" in split else 0)]
@@ -175,10 +195,33 @@ class Calibrator:
                 entry[metric]["proposto"] = new[metric]
             entry["minutos_acima_do_proposto"] = sum(
                 1 for t, m, r in zip(tr.tot, tr.mbps, tr.ratio) if _Track.fires(new, tr.ratio_key, t, m, r))
+            entry["reincidentes"] = [{"escopo": k[0], "entidade": k[1], "protocolo": k[2], "porta_local": k[3],
+                                      "porta_remota": k[4], "alarmes": c} for k, c in tr.offenders.most_common(5)]
             by_name[rule_name]["limits"][vscope].update(new)
             report.append(entry)
         return {"minutos_com_dados": len(self.minutes), "dias": round(days, 2),
-                "entidade_minutos_ignorados_por_ataque": len(self.ignored), "regras": report}, proposal
+                "entidade_minutos_ignorados_por_ataque": len(self.ignored), "regras": report,
+                "linha_de_base": self.baseline_rows()}, proposal
+
+    def baseline_rows(self, min_samples=None):
+        """[(regra, escopo, tipo de dia, hora, metrica, p99_9, p50, amostras)] por hora local com dados."""
+        from .baseline import MIN_SAMPLES
+        min_samples = min_samples or MIN_SAMPLES
+        out = []
+        for (rule_name, vscope), tr in sorted(self.tracks.items()):
+            by_slot = defaultdict(list)
+            for i, sl in enumerate(tr.slot):
+                by_slot[sl].append(i)
+            for sl, idx in sorted(by_slot.items()):
+                if len(idx) < min_samples:
+                    continue
+                daytype, hour = ("wke" if sl >= 24 else "wkd"), sl % 24
+                for metric, values in (("min_pps", tr.sig), ("min_mbps", tr.mbps)):
+                    if metric in tr.limits:
+                        vals = [values[i] for i in idx]
+                        out.append((rule_name, vscope, daytype, hour, metric, round(percentile(vals, .999), 4),
+                                    round(percentile(vals, .5), 4), len(vals)))
+        return out
 
 
 def calibrate_nat(cfg, rows, proposal, factor=2.0):
@@ -210,7 +253,7 @@ def attack_minutes(events, margin=5):
     return frozenset(out)
 
 
-def run(cfg, hours=24, factor=2.0, now=None, max_down=0.5, max_up=4.0):
+def run(cfg, hours=24, factor=2.0, now=None, max_down=0.5, max_up=4.0, save_baseline=False):
     from .mysql_sink import connection_from_env
     import pymysql.cursors
     end = (now or datetime.now(timezone.utc)).astimezone(timezone.utc).replace(
@@ -223,7 +266,9 @@ def run(cfg, hours=24, factor=2.0, now=None, max_down=0.5, max_up=4.0):
             attacks = attack_minutes(cur.fetchall())
             cur.execute(NAT_SQL, (start, end))
             nat_rows = [dict(zip(("bucket_utc", "inside_ip", "allocs", "active_ports"), r)) for r in cur.fetchall()]
-        cal = Calibrator(cfg, attacks)
+            from .exceptions import load as load_exceptions
+            exc = load_exceptions(cur, end)
+        cal = Calibrator(cfg, attacks, exc)
         names = ("bucket_utc", "direction", "scope", "local_ip", "subscriber_ip", "protocol",
                  "local_port", "remote_port", "packets", "bytes", "syn_packets", "zero_port_packets")
         hour = start
@@ -238,6 +283,20 @@ def run(cfg, hours=24, factor=2.0, now=None, max_down=0.5, max_up=4.0):
         db.close()
     summary, proposal = cal.finish(factor, max_down=max_down, max_up=max_up)
     summary["nat"] = calibrate_nat(cfg, nat_rows, proposal, factor)
+    if save_baseline:
+        if hours < 23:
+            raise ValueError("--baseline precisa de --hours 23 ou mais (um dia inteiro)")
+        from .baseline import merge
+        day = (end.replace(tzinfo=timezone.utc).astimezone(cal.tz)).date()
+        db = connection_from_env()
+        try:
+            with db.cursor() as cur:
+                summary["linha_de_base_gravada"] = merge(cur, summary["linha_de_base"], day)
+            db.commit()
+        except Exception as exc:        # tabela ausente/sem permissao: a proposta de limites sai mesmo assim
+            summary["linha_de_base_erro"] = str(exc)[:200]
+        finally:
+            db.close()
     summary["periodo_utc"] = [start.isoformat(), end.isoformat()]
     summary["fator"] = factor
     return summary, validate_config(proposal)
@@ -280,6 +339,8 @@ def main(argv=None):
     ap.add_argument("--write", help="grava a configuracao proposta neste arquivo")
     ap.add_argument("--json", help="grava o relatorio completo em JSON neste arquivo")
     ap.add_argument("--apply", action="store_true", help="faz backup e aplica a proposta na configuracao")
+    ap.add_argument("--baseline", action="store_true",
+                    help="grava a linha de base por hora (orby_baseline); uma vez por dia, com --hours 24")
     args = ap.parse_args(argv)
     try:
         if not 1 <= args.hours <= 47 or not 1.2 <= args.factor <= 10:
@@ -287,8 +348,15 @@ def main(argv=None):
         cfg = read_config(args.config)
         if not (0.1 <= args.max_down <= 1 and 1 <= args.max_up <= 20):
             raise ValueError("--max-down 0.1..1 e --max-up 1..20")
-        summary, proposal = run(cfg, args.hours, args.factor, max_down=args.max_down, max_up=args.max_up)
+        summary, proposal = run(cfg, args.hours, args.factor, max_down=args.max_down, max_up=args.max_up,
+                                save_baseline=args.baseline)
         print(render(summary))
+        if args.baseline:
+            if summary.get("linha_de_base_erro"):
+                print("AVISO linha de base nao gravada (rode scripts/setup-baseline.sh): %s"
+                      % summary["linha_de_base_erro"], file=sys.stderr)
+            else:
+                print("linha de base: %d hora(s) atualizadas" % summary.get("linha_de_base_gravada", 0))
         text = json.dumps(proposal, ensure_ascii=False, indent=2) + "\n"
         if args.json:
             Path(args.json).write_text(json.dumps(summary, ensure_ascii=False, indent=2, default=str) + "\n")

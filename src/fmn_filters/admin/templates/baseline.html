@@ -1,0 +1,52 @@
+{% extends "base.html" %}{% block title %}Linha de base{% endblock %}
+{% block body %}
+<h1>Linha de base e limite dinâmico</h1>
+<p class="muted">A calibração diária mede cada regra por hora do dia, separando dias úteis e fim de semana. Com o limite dinâmico
+ligado, o detector usa em cada hora <b>o menor</b> entre o limite fixo da regra e <i>p99,9 da hora × fator</i>, nunca abaixo do piso.
+Resultado: de madrugada um ataque menor já alarma; no horário de pico vale o limite fixo calibrado.</p>
+
+<form method="post" class="card">{% include "_csrf.html" %}
+  <h2>Configuração</h2>
+  <div class="grid">
+    <label>Fator sobre o p99,9 da hora <input name="factor" value="{{ st.factor }}" inputmode="decimal"></label>
+    <label>Piso (% do limite fixo) <input name="floor_pct" value="{{ '%g'|format(st.floor_ratio * 100) }}" inputmode="decimal"></label>
+    <label>Dias de histórico na hora para valer <input name="min_days" type="number" min="1" max="28" value="{{ st.min_days }}"></label>
+    <label>Fuso das horas <select name="timezone">{% for z in tz_choices %}<option {{ 'selected' if st.timezone==z }}>{{ z }}</option>{% endfor %}</select></label>
+  </div>
+  <label class="check"><input type="checkbox" name="enabled" value="1" {{ 'checked' if st.enabled }}> Limite dinâmico ligado</label>
+  <button>Salvar</button>
+</form>
+
+<section class="card">
+  <h2>Por regra</h2>
+  <form method="get" class="inline">
+    <label>Regra <select name="r">{% for r in rules %}<option value="{{ loop.index0 }}" {{ 'selected' if loop.index0==ri }}>{{ r.name }}{{ '' if r.enabled else ' (desligada)' }}</option>{% endfor %}</select></label>
+    <label>Tipo de IP <select name="s">{% for sc in rule.limits %}<option value="{{ sc }}" {{ 'selected' if sc==scope }}>{{ SCOPE_PT.get(sc, sc) }}</option>{% endfor %}</select></label>
+    <button class="secondary">Ver</button>
+  </form>
+  {% set days = coverage.get((rule.name, scope), 0) %}
+  <p>{% if days %}Histórico: até <b>{{ days }}</b> dia(s) por hora{% if days < st.min_days %} — o dinâmico começa a valer com {{ st.min_days }}{% endif %}.{% else %}<span class="warn">Sem linha de base ainda.</span> Ela é gravada pela calibração diária (05:17).{% endif %}
+    {% if not st.enabled %}<span class="muted">Limite dinâmico desligado: o gráfico mostra como ficaria.</span>{% endif %}</p>
+  {% for dt, label in daytypes.items() %}
+    <h3>{{ label|capitalize }}</h3>
+    {% for m in ('min_pps', 'min_mbps') %}{% if charts.get((dt, m)) %}
+      <p class="muted">{{ 'pacotes/s' if m=='min_pps' else 'Mbps' }} por entidade/minuto · fixo {{ rule.limits[scope][m] }}</p>
+      <div class="chartbox">{{ charts[(dt, m)]|safe }}</div>
+    {% endif %}{% endfor %}
+  {% endfor %}
+  <p class="muted legend"><span class="sw static"></span> limite fixo <span class="sw dyn"></span> limite dinâmico da hora <span class="sw base"></span> p99,9 medido</p>
+</section>
+
+<section class="card">
+  <h2>Quem mais dispararia</h2>
+  <p class="muted">Entidades que mais completariam alarme com os limites atuais no último dia calibrado
+  {% if report %}({{ report.periodo_utc[0] }} a {{ report.periodo_utc[1] }} UTC){% endif %}. Se o tráfego é legítimo,
+  dê um limite próprio (multiplicador) em vez de subir o limite de todos.</p>
+  {% if offenders %}<div class="scroll"><table>
+    <tr><th>Regra</th><th>Entidade</th><th>Tipo</th><th class="num">Alarmes/dia</th><th></th></tr>
+    {% for o in offenders %}<tr><td>{{ o.regra }}</td><td><code>{{ o.entidade }}</code>{% if o.porta_local or o.porta_remota %} <small class="muted">porta {{ o.porta_local or o.porta_remota }}</small>{% endif %}</td>
+      <td>{{ SCOPE_PT.get(o.escopo, o.escopo) }}</td><td class="num">{{ o.alarmes }}</td>
+      <td><a href="{{ url_for('exceptions_page', kind='cidr', value=o.entidade, side='local', action='multiply', rule=o.regra, direction=direction.get(o.regra, 'any')) }}">limite próprio</a></td></tr>{% endfor %}
+  </table></div>{% else %}<p class="muted">Nada a mostrar (sem relatório de calibração ou ninguém estourou os limites).</p>{% endif %}
+</section>
+{% endblock %}

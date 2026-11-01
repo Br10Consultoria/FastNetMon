@@ -71,8 +71,15 @@ def _minute_ok(acc, limits):
     return ok, pps, mbps, remote_ips, ratio, zero
 
 
-def evaluate(rows, rule, start):
-    """Eventos de fluxo para uma regra, na janela [start, start+consecutive_minutes)."""
+def scaled(limits, factor):
+    if factor == 1:
+        return limits
+    return {k: (v * factor if k in ("min_pps", "min_mbps") else v) for k, v in limits.items()}
+
+
+def evaluate(rows, rule, start, exc=None, dyn=None):
+    """Eventos de fluxo para uma regra, na janela [start, start+consecutive_minutes).
+    exc: excecoes (exceptions.Matcher); dyn: limites por hora (baseline.Limits)."""
     n = rule["consecutive_minutes"]
     end = start + timedelta(minutes=n)
     limits = rule["limits"]
@@ -85,6 +92,9 @@ def evaluate(rows, rule, start):
                 or not start <= row["bucket_utc"] < end):
             continue
         if (lports and row["local_port"] not in lports) or (rports and row["remote_port"] not in rports):
+            continue
+        if exc and exc.ignore_row(rule["name"], rule["direction"], (row["local_ip"], row["subscriber_ip"]),
+                                  row["remote_ip"]):
             continue
         for vscope, entity in _entities(row):
             if vscope not in limits:
@@ -109,7 +119,14 @@ def evaluate(rows, rule, start):
         accs = [series.get(start + timedelta(minutes=i)) for i in range(n)]
         if any(a is None for a in accs):
             continue
-        checks = [_minute_ok(a, limits[vscope]) for a in accs]
+        mult = exc.multiplier(rule["name"], rule["direction"], entity) if exc else 1.0
+        used, dynamic = [], False
+        for i in range(n):
+            lim, d = dyn.get(rule["name"], vscope, limits[vscope], start + timedelta(minutes=i)) if dyn \
+                else (limits[vscope], False)
+            used.append(scaled(lim, mult))
+            dynamic = dynamic or d
+        checks = [_minute_ok(a, lim) for a, lim in zip(accs, used)]
         if not all(c[0] for c in checks):
             continue
         last = accs[-1]
@@ -137,7 +154,9 @@ def evaluate(rows, rule, start):
                 "public_ips": [ip for ip, _ in last.pubs.most_common(3)],
                 "interfaces": [{"in": i, "out": o} for (i, o), _ in last.ifaces.most_common(3)],
                 "zero_port_ratio": round(max(c[5] for c in checks), 4),
-                "minutes": n},
+                "minutes": n,
+                "limits": {k: used[-1][k] for k in ("min_pps", "min_mbps") if k in used[-1]},
+                "dynamic_limit": dynamic, "limit_multiplier": mult},
         })
     return events
 
@@ -247,10 +266,13 @@ def run(config, now=None, dry_run=False):
             nat_rows = _fetch(cur, SQL_NAT, (begin, end),
                               ("bucket_utc", "inside_ip", "allocs", "frees", "active_ports"),
                               config["max_query_rows"])
+            from . import baseline, exceptions
+            exc = exceptions.load(cur, utc)
+            dyn = baseline.Limits(config, baseline.load(cur) if baseline.settings(config)["enabled"] else {})
             found = []
             for rule in config["rules"]:
                 if rule["enabled"]:
-                    evs = evaluate(rows, rule, end - timedelta(minutes=rule["consecutive_minutes"]))
+                    evs = evaluate(rows, rule, end - timedelta(minutes=rule["consecutive_minutes"]), exc, dyn)
                     found.extend((rule, ev) for ev in dedupe(evs))
             for rule in config["nat_rules"]:
                 if rule["enabled"]:
