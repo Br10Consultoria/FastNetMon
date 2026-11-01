@@ -810,7 +810,7 @@
         "spec": {
           "id": 7,
           "title": "Top Mais originou ataques ",
-          "description": "IP privado 100.64.x = assinante CGNAT (identificado pelo log NAT do A10). Os eventos ficam guardados.",
+          "description": "Quem mais originou ataques no período. Eventos de regras de fluxo trazem pico de pps/taxa (amostrado); eventos das regras NAT (excesso de portas/alocações no A10, sem amostragem) não medem tráfego: para eles valem as colunas de portas e alocações NAT — sinal típico de varredura, flood ou malware no equipamento do assinante.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -829,7 +829,7 @@
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
-                        "rawSql": "SELECT IF(subscriber_ip='',local_ip,subscriber_ip) AS 'Assinante / IP',MAX(local_ip) AS 'IP público',MAX(pool) AS 'Pool',COUNT(*) AS 'Eventos',GROUP_CONCAT(DISTINCT rule_name ORDER BY rule_name SEPARATOR ', ') AS 'Tipos',MAX(pps) AS 'Pico pps',MAX(mbps)*1000000 AS 'Pico taxa',MIN(event_time) AS 'Primeiro (UTC)',MAX(event_time) AS 'Último (UTC)' FROM orby_attack_events WHERE $__timeFilter(event_time) AND direction='out' AND (${ip:sqlstring}='' OR local_ip=${ip:sqlstring} OR subscriber_ip=${ip:sqlstring}) GROUP BY IF(subscriber_ip='',local_ip,subscriber_ip) ORDER BY COUNT(*) DESC LIMIT 100"
+                        "rawSql": "SELECT IF(subscriber_ip='',local_ip,subscriber_ip) AS 'Assinante / IP',MAX(local_ip) AS 'IP público',MAX(pool) AS 'Pool',COUNT(*) AS 'Eventos',GROUP_CONCAT(DISTINCT rule_name ORDER BY rule_name SEPARATOR ', ') AS 'Tipos',MAX(IF(detection='nat',NULL,pps)) AS 'Pico pps',MAX(IF(detection='nat',NULL,mbps))*1000000 AS 'Pico taxa',MAX(CAST(JSON_VALUE(details,'$.active_ports') AS UNSIGNED)) AS 'Portas NAT ativas (máx)',MAX(CAST(JSON_VALUE(details,'$.allocs_per_min') AS UNSIGNED)) AS 'Alocações NAT/min (máx)',MIN(event_time) AS 'Primeiro (UTC)',MAX(event_time) AS 'Último (UTC)' FROM orby_attack_events WHERE $__timeFilter(event_time) AND direction='out' AND (${ip:sqlstring}='' OR local_ip=${ip:sqlstring} OR subscriber_ip=${ip:sqlstring}) GROUP BY IF(subscriber_ip='',local_ip,subscriber_ip) ORDER BY COUNT(*) DESC LIMIT 100"
                       }
                     },
                     "refId": "A",
