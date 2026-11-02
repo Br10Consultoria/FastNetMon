@@ -1,6 +1,6 @@
 {
   "id": null,
-  "uid": "orbyflow-cgnat-portas",
+  "uid": "orbymon-cgnat-portas",
   "title": "CGNAT - Portas por IP público",
   "description": "Uso de portas NAT por IP público do pool (log do A10, sem amostragem). Um IP público com portas esgotadas faz as novas conexões dos assinantes que o compartilham falharem.",
   "tags": [

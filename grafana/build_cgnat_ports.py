@@ -106,7 +106,7 @@ def build():
                "SELECT $__timeGroupAlias(bucket_utc,'1m'),pool AS metric,SUM(allocs) AS value FROM orby_nat_public_minute "
                "WHERE $__timeFilter(bucket_utc) GROUP BY 1,pool ORDER BY 1", 61),
     ]
-    return {"id": None, "uid": "orbyflow-cgnat-portas", "title": "CGNAT - Portas por IP público",
+    return {"id": None, "uid": "orbymon-cgnat-portas", "title": "CGNAT - Portas por IP público",
             "description": "Uso de portas NAT por IP público do pool (log do A10, sem amostragem). Um IP público com "
                            "portas esgotadas faz as novas conexões dos assinantes que o compartilham falharem.",
             "tags": ["orbymon", "cgnat", "a10", "portas"], "editable": True, "schemaVersion": 41, "version": 1,

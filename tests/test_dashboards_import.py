@@ -17,7 +17,8 @@ class DashboardImportTests(unittest.TestCase):
         after = {p.name: p.read_text() for p in DASH.glob("*.json")}
         self.assertEqual(before, after, "rode python3 grafana/import_v2.py e faça commit do resultado")
         self.assertEqual(set(after), {"orbymon-f4-ataques.json", "orbymon-cgnat.json", "orbymon-ip-analytics.json",
-                                      "orbymon-huawei-live.json", "orbymon-reputacao.json", "orbymon-overview.json"})
+                                      "orbymon-huawei-live.json", "orbymon-reputacao.json", "orbymon-overview.json",
+                                      "orbymon-cgnat-portas.json"})      # gerado por grafana/build_cgnat_ports.py
 
     def test_no_provider_specific_blocks(self):
         for path in DASH.glob("*.json"):
@@ -37,7 +38,13 @@ class DashboardImportTests(unittest.TestCase):
             for p in d["panels"]:
                 for t in p.get("targets", []):
                     self.assertEqual(t["datasource"], {"type": "mysql", "uid": "orbymon-mysql"})
-        self.assertEqual(len(uids), 6)
+        self.assertEqual(len(uids), 7)
+
+    def test_cgnat_ports_dashboard_is_generated(self):
+        sys.path.insert(0, str(ROOT / "grafana"))
+        import build_cgnat_ports as b
+        self.assertEqual(json.loads((DASH / "orbymon-cgnat-portas.json").read_text()), b.build(),
+                         "rode python3 grafana/build_cgnat_ports.py")
 
     def test_protocol_filter_has_all_protocols(self):
         d = json.loads((DASH / "orbymon-f4-ataques.json").read_text())
