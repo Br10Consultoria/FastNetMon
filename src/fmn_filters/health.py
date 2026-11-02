@@ -349,6 +349,24 @@ def message(alerts, recovered, reminders, site=""):
     return "\n".join(lines)
 
 
+CH_SPOOL = "/var/lib/orbymon/clickhouse-spool"
+
+
+def check_clickhouse(spool=CH_SPOOL, now_ts=None):
+    """Lotes que o rollup nao conseguiu gravar no ClickHouse ficam no spool; acumulando = ClickHouse fora."""
+    d = Path(spool)
+    if not d.is_dir():
+        return []                                   # ClickHouse nao instalado
+    files = list(d.glob("*.tsv.gz"))
+    if not files:
+        return [item("clickhouse", "ClickHouse (fluxos)", OK, "gravando em dia")]
+    now_ts = time.time() if now_ts is None else now_ts
+    age = now_ts - min(f.stat().st_mtime for f in files)
+    st = CRIT if age > 3600 else WARN if age > 180 else OK
+    return [item("clickhouse", "ClickHouse (fluxos)", st, "%d lote(s) aguardando há %s" % (len(files), fmt_age(age)),
+                 "veja journalctl -u clickhouse-server -n 30 e sudo bash scripts/setup-clickhouse.sh --status")]
+
+
 def _guard(key, label, fn):
     """Uma verificacao com defeito vira 'sem dados' em vez de derrubar todas as outras."""
     try:
@@ -370,6 +388,7 @@ def collect(db, cfg, flow_root, now, telegram_on=False, run=_systemctl, now_ts=N
     items += _guard("backup", "Backup diário", lambda: check_backup(backup_dir))
     items += _guard("services", "Serviços", lambda: check_failed_units(run))
     items += _guard("runtime", "Tempo de execução", lambda: check_runtimes(run=run))
+    items += _guard("clickhouse", "ClickHouse (fluxos)", lambda: check_clickhouse(now_ts=now_ts))
     return items
 
 

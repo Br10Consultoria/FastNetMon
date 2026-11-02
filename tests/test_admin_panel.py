@@ -1,6 +1,7 @@
 """Painel web: login com senha + 2FA, CSRF, bloqueio, gravacao validada das configuracoes."""
 from datetime import datetime, timedelta, timezone
 import json
+import re
 import os
 from pathlib import Path
 import shutil
@@ -995,6 +996,50 @@ class PanelTests(unittest.TestCase):
         self.assertEqual(self.db.audits[-1][1], "relatorio")
         r = self.c.get("/relatorio?alvo=10.0.0.0/8")
         self.assertIn("amplo demais".encode(), r.data)
+
+    def test_attacks_page_and_detail(self):
+        from fmn_filters import attacks as at
+        self.login()
+        r = self.c.get("/ataques")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("Nenhum ataque".encode(), r.data)
+        t0 = datetime(2026, 11, 1, 10, 0)
+        events = [{"event_time": t0, "rule_name": "OUT varredura", "severity": "critical", "detection": "flow",
+                   "direction": "out", "scope": "cgnat_private", "pool": "NAT-POOL-08", "local_ip": "45.238.170.10",
+                   "subscriber_ip": "100.64.65.10", "protocol": "tcp", "local_port": 0, "remote_port": 23,
+                   "pps": 900.0, "mbps": 1.2, "remote_ips": 180, "syn_ratio": 0.9,
+                   "details": {"minutes": 2, "top_remote_ips": ["198.51.100.9"]}}]
+        with mock.patch.object(at, "fetch_events", return_value=events) as fe:
+            r = self.c.get("/ataques?sentido=out&porta=23&tz=UTC")
+        self.assertEqual(fe.call_args[0][1]["porta_n"], 23)
+        self.assertIn(b"100.64.65.10 (p\xc3\xbablico 45.238.170.10)", r.data)
+        self.assertIn(b"Telnet", r.data)
+        link = re.search(rb'href="(/ataques/detalhe\?[^"]+)"', r.data).group(1).decode().replace("&amp;", "&")
+        attack = at.group_events(events)[0][0]
+        detail = {"key": None, "attack": attack, "events": events, "backend": "MariaDB", "since": t0, "partial": False,
+                  "error": None, "flows": {
+                      "totais": {"pacotes": 4096.0, "bytes": 1e6, "fluxos": 2, "remotos": 1, "de": t0, "ate": t0},
+                      "conversas": [{"remote_ip": "198.51.100.9", "protocol": "tcp", "local_port": 40001,
+                                     "remote_port": 23, "pacotes": 4096.0, "bytes": 1e6, "fluxos": 2,
+                                     "local_ip": "45.238.170.10", "subscriber_ip": "100.64.65.10", "asn": 64500,
+                                     "asn_name": "Exemplo", "pais": "BR", "servico": "Telnet"}],
+                      "portas": [{"protocol": "tcp", "local_port": 0, "remote_port": 23, "pacotes": 4096.0,
+                                  "bytes": 1e6, "remotos": 1, "servico": "Telnet"}],
+                      "minutos": [{"bucket": t0, "pacotes": 4096.0, "bytes": 1e6, "remotos": 1}],
+                      "outros": [{"ip": "45.238.170.10", "pacotes": 4096.0}], "asns": []}}
+
+        def fake_build(cur, k, maria, click, geo, remote):
+            detail["key"] = k
+            return detail
+        with mock.patch.object(at, "build_detail", side_effect=fake_build):
+            r = self.c.get(link)
+        self.assertEqual(r.status_code, 200, r.data[:300])
+        self.assertIn(b"198.51.100.9", r.data)
+        self.assertIn(b"AS64500", r.data)
+        self.assertIn("varredura Telnet".encode(), r.data)
+        self.assertIn(b"<svg", r.data)
+        self.assertEqual(self.db.audits[-1][1], "ataque")
+        self.assertEqual(self.c.get("/ataques/detalhe?alvo=x").status_code, 400)
 
 
     def test_mitigation_page(self):

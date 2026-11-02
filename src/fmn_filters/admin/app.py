@@ -30,7 +30,7 @@ SERVICES = ("orbymon-nfcapd@huawei.service", "orbymon-a10-nat.service", "orbymon
             "orbymon-bidir-huawei.timer", "orbymon-ip-huawei.timer", "orbymon-telegram.timer",
             "orbymon-retention.timer", "orbymon-calibrate.timer", "orbymon-filter-rules.timer",
             "orbymon-exceptions.timer", "orbymon-health.timer", "orbymon-backup.timer", "orbymon-mitigation.timer",
-            "orbymon-gobgpd.service", "grafana-server.service", "mariadb.service")
+            "orbymon-gobgpd.service", "grafana-server.service", "mariadb.service", "clickhouse-server.service")
 
 
 def _secret_key(env):
@@ -1007,6 +1007,141 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
                 error = str(exc)
         return render_template("report.html", form=form, customers=customers, report=report, text=text, error=error,
                                title=title, tz=tz, tz_choices=TZ_CHOICES, ts=fmt_ts, human_bytes=cr.human_bytes)
+
+    # ---------------------------------------------------------------- ataques (tela unica)
+    geo_cache = {}
+
+    def geo():
+        """GeoLite2 (ASN/pais) dos IPs remotos, se o painel tiver leitura das bases; senao None."""
+        if "g" not in geo_cache:
+            geo_cache["g"] = None
+            try:
+                from ..enrichment import Enricher
+                asn = env.get("ORBYMON_ASN_MMDB") or "/var/lib/orbymon/geoip/GeoLite2-ASN.mmdb"
+                city = env.get("ORBYMON_CITY_MMDB") or "/var/lib/orbymon/geoip/GeoLite2-City.mmdb"
+                paths = [p if os.access(p, os.R_OK) else None for p in (asn, city)]
+                if any(paths):
+                    geo_cache["g"] = Enricher(*paths)
+            except Exception:
+                geo_cache["g"] = None
+        return geo_cache["g"]
+
+    def click_flows(source):
+        from ..attacks import ClickFlows
+        from ..clickhouse import Client, ClickHouseError
+        try:
+            client = Client.from_env(env, timeout=30)
+        except ClickHouseError:
+            return None
+        return ClickFlows(client, source) if client else None
+
+    @app.route("/ataques")
+    def attacks_page():
+        from datetime import timezone as dt_timezone
+        from zoneinfo import ZoneInfo
+        from .. import attacks as at
+        from ..abuse_lookup import fmt_ts, parse_time
+        a = request.args
+        tzname = a.get("tz") if a.get("tz") in TZ_CHOICES else "America/Sao_Paulo"
+        tz = dt_timezone.utc if tzname == "UTC" else ZoneInfo(tzname)
+        customers = store.customers() or []
+        cfg = config.bidir()
+        rules = sorted({r["name"] for r in cfg.get("rules", [])} | {r["name"] for r in cfg.get("nat_rules", [])})
+        form = {k: a.get(k, "") for k in ("inicio", "fim", "sentido", "ip", "cliente", "remoto", "porta", "proto",
+                                           "regra", "sev", "tipo")}
+        form["tz"] = tzname
+        attacks, total, error, note, backend = [], 0, None, "", ""
+        try:
+            f = at.parse_filters(a, dt_now_utc(), parse_time, tz, customers)
+            click = click_flows(cfg["source"])
+
+            def run(db):
+                cur = db.cursor()
+                try:
+                    cur.execute("SET SESSION max_statement_time=30")
+                except Exception:
+                    pass
+                remote_locals = None
+                if f["remoto"] and click is not None:
+                    try:
+                        remote_locals = click.locals_for_remote(f["remoto"], f["start"] - timedelta(hours=1), f["end"])
+                    except Exception:
+                        remote_locals = None
+                return at.fetch_events(cur, f, remote_locals), remote_locals
+            events, remote_locals = store.with_connection(run)
+            attacks, total = at.group_events(events)
+            if f["remoto"] and remote_locals is None:
+                note = ("IP remoto procurado entre os principais IPs de cada ataque. Com o ClickHouse ligado, "
+                        "a busca considera todos os fluxos.")
+            if len(events) >= at.MAX_EVENTS:
+                note = (note + " " if note else "") + "Muitos eventos: mostrando os %d mais antigos; reduza o período." \
+                    % at.MAX_EVENTS
+            backend = "ClickHouse" if click is not None else "MariaDB"
+        except at.AttackError as exc:
+            error = str(exc)
+        for x in attacks:
+            x["link"] = url_for("attack_detail", tz=tzname, **at.key_params(x))
+        return render_template("attacks.html", form=form, attacks=attacks, total=total, error=error, note=note,
+                               customers=customers, rules=rules, tz=tz, tz_choices=TZ_CHOICES, ts=fmt_ts,
+                               human=at.human, mbps=at.mbps, scope_pt=at.SCOPE_PT, backend=backend)
+
+    @app.route("/ataques/detalhe")
+    def attack_detail():
+        from datetime import timezone as dt_timezone
+        from zoneinfo import ZoneInfo
+        from .. import attacks as at
+        from ..abuse_lookup import fmt_ts
+        from ..customer_report import human_bytes
+        from ..customers import build_identifier
+        a = request.args
+        tzname = a.get("tz") if a.get("tz") in TZ_CHOICES else "America/Sao_Paulo"
+        tz = dt_timezone.utc if tzname == "UTC" else ZoneInfo(tzname)
+        try:
+            k = at.parse_key(a)
+        except at.AttackError as exc:
+            return render_template("message.html", title="Ataque", text=str(exc)), 400
+        remote = None
+        if a.get("remoto"):
+            try:
+                from ipaddress import ip_address
+                remote = str(ip_address(a["remoto"].strip()))
+            except ValueError:
+                remote = None
+        cfg = config.bidir()
+        click = click_flows(cfg["source"])
+        radius_path = config.p.radius if config.p.radius.exists() else None
+
+        def run(db):
+            cur = db.cursor()
+            try:
+                cur.execute("SET SESSION max_statement_time=40")
+            except Exception:
+                pass
+            d = at.build_detail(cur, k, at.MariaFlows(cur, cfg["source"]), click, geo(), remote)
+            who = ""
+            try:
+                ident = build_identifier(db, radius_path)
+                if ident is not None:
+                    who = ident(k["entity"], k["end"]) or ""
+                    if ident.radius is not None:
+                        ident.radius.close()
+            except Exception:
+                who = ""
+            return d, who
+        d, who = store.with_connection(run)
+        text = at.summary_text(d, lambda t: fmt_ts(t, tz) + (" (%s)" % tzname), who)
+        audit("ataque", "%s %s %s a %s" % (k["direction"], k["entity"], k["start"], k["end"]))
+        chart = at.svg_series(d["flows"]["minutos"], tz=tz) if d["flows"] else ""
+        chart_mbps = at.svg_series(d["flows"]["minutos"], "bytes", divisor=60 / 8 * 1e6, label="Mbps", tz=tz) \
+            if d["flows"] else ""
+        report_link = url_for("report_page", alvo=k["entity"], inicio=(k["start"] - timedelta(hours=1))
+                              .strftime("%Y-%m-%d %H:%M"), fim=(k["end"] + timedelta(hours=1)).strftime("%Y-%m-%d %H:%M"),
+                              tz="UTC")
+        return render_template("attack_detail.html", d=d, k=k, who=who, text=text, chart=chart, chart_mbps=chart_mbps,
+                               tz=tz, tzname=tzname, ts=fmt_ts, human=at.human, mbps=at.mbps, human_bytes=human_bytes,
+                               scope_pt=at.SCOPE_PT, remote=remote, report_link=report_link,
+                               back=url_for("attacks_page", ip=k["entity"], tz=tzname),
+                               base_args={x: v for x, v in a.items() if x != "remoto"})
 
     # ---------------------------------------------------------------- e-mail e webhook
     @app.route("/avisos", methods=["GET", "POST"])

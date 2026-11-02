@@ -1,0 +1,64 @@
+{% extends "base.html" %}{% block title %}Ataques{% endblock %}
+{% block body %}
+<h1>Ataques</h1>
+<p class="muted">Todos os ataques detectados, <b>recebidos</b> (contra a rede) e <b>originados</b> (saindo de clientes), num só lugar.
+Eventos repetidos do mesmo alvo viram um ataque com início, fim e pico. Combine os filtros e clique num ataque para ver
+origem, destino, portas, IP privado do assinante e os IPs remotos.</p>
+<form method="get" class="card" autocomplete="off">
+  <div class="grid">
+    <label>Início <input name="inicio" value="{{ form.inicio }}" placeholder="padrão: 24 h antes do fim"></label>
+    <label>Fim <input name="fim" value="{{ form.fim }}" placeholder="padrão: agora"></label>
+    <label>Sentido <select name="sentido">
+      <option value="">os dois</option>
+      <option value="in" {{ 'selected' if form.sentido=='in' }}>recebido (contra a rede)</option>
+      <option value="out" {{ 'selected' if form.sentido=='out' }}>originado (saindo de cliente)</option></select></label>
+    <label>IP da rede (público ou privado) <input name="ip" value="{{ form.ip }}" placeholder="187.87.201.40, 100.64.70.12, 45.238.170.0/24"></label>
+    <label>ou cliente <select name="cliente"><option value="">—</option>{% for c in customers %}<option value="{{ c.id }}" {{ 'selected' if form.cliente==c.id|string }}>{{ c.name }}</option>{% endfor %}</select></label>
+    <label>IP remoto <input name="remoto" value="{{ form.remoto }}" placeholder="atacante ou alvo externo"></label>
+    <label>Porta <input name="porta" value="{{ form.porta }}" placeholder="53, 123, 23…" inputmode="numeric"></label>
+    <label>Protocolo <select name="proto">{% for p in ('', 'tcp', 'udp', 'icmp', 'gre', 'esp') %}<option value="{{ p }}" {{ 'selected' if form.proto==p }}>{{ p or 'todos' }}</option>{% endfor %}</select></label>
+    <label>Regra <select name="regra"><option value="">todas</option>{% for r in rules %}<option {{ 'selected' if form.regra==r }}>{{ r }}</option>{% endfor %}</select></label>
+    <label>Severidade mínima <select name="sev"><option value="">todas</option>{% for s, n in (('warning','aviso'),('high','alta'),('critical','crítica')) %}<option value="{{ s }}" {{ 'selected' if form.sev==s }}>{{ n }}</option>{% endfor %}</select></label>
+    <label>Tipo de detecção <select name="tipo"><option value="">todos</option>
+      <option value="flow" {{ 'selected' if form.tipo=='flow' }}>tráfego (NetStream)</option>
+      <option value="nat" {{ 'selected' if form.tipo=='nat' }}>portas NAT (log do A10)</option></select></label>
+    <label>Fuso <select name="tz">{% for z in tz_choices %}<option {{ 'selected' if form.tz==z }}>{{ z }}</option>{% endfor %}</select></label>
+  </div>
+  <button>Filtrar</button> <a href="{{ url_for('attacks_page') }}">limpar</a>
+</form>
+{% if error %}<p class="flash">{{ error }}</p>{% endif %}
+{% if note %}<p class="muted">{{ note }}</p>{% endif %}
+{% if not error %}
+<section class="card">
+  <h2>{{ total }} ataque(s){% if total > attacks|length %} — mostrando os {{ attacks|length }} mais recentes{% endif %}</h2>
+  {% if attacks %}
+  <div class="scroll"><table>
+    <tr><th>Quando</th><th>Sentido</th><th>Origem</th><th>Destino</th><th>Proto · portas</th><th>Tipo de IP</th><th class="num">Pico</th><th>Regra</th><th></th></tr>
+    {% for x in attacks %}
+    <tr>
+      <td>{{ ts(x.start, tz) }}<br><small class="muted">{{ x.minutes }} min{% if x.events > 1 %} · {{ x.events }} eventos{% endif %}</small></td>
+      <td>{{ 'recebido' if x.direction=='in' else 'originado' }}</td>
+      <td><code>{{ x.origem }}</code></td>
+      <td><code>{{ x.destino }}</code></td>
+      <td>{% if x.detection == 'nat' and not x.protocol %}
+            {% if x.ports_top %}{% for p in x.ports_top[:3] %}{{ p.protocolo }}/{{ p.porta }} ({{ p.destinos }} destinos){{ ', ' if not loop.last }}{% endfor %}{% else %}<span class="muted">portas NAT</span>{% endif %}
+          {% else %}
+            {{ x.protocol or 'todos' }}{% if x.porta_origem %} · origem {{ x.porta_origem }}{% endif %}{% if x.porta_destino %} · destino {{ x.porta_destino }}{% endif %}
+            {% if x.ports_top %}<br><small>{% for p in x.ports_top[:3] %}{{ p.protocolo }}/{{ p.porta }} ({{ p.destinos }}){{ ', ' if not loop.last }}{% endfor %}</small>{% endif %}
+          {% endif %}
+          {% if x.service %}<br><small class="muted">{{ x.service }}</small>{% endif %}</td>
+      <td>{{ scope_pt.get(x.scope, x.scope) }}{% if x.pool %}<br><small class="muted">{{ x.pool }}</small>{% endif %}
+          {% if x.entity_col=='local_ip' and x.subs_top %}<br><small>assinante: {% for s in x.subs_top[:2] %}<code>{{ s }}</code> {% endfor %}</small>{% endif %}</td>
+      <td class="num">{% if x.detection == 'nat' %}{{ x.allocs }} aloc./min<br><small>{{ x.active_ports }} portas</small>
+          {% else %}{{ human(x.pps) }} pps<br><small>{{ mbps(x.mbps) }} Mbps · {{ x.remote_ips }} IPs</small>{% endif %}</td>
+      <td><span class="pill sev-{{ x.severity }}">{{ x.severity }}</span><br><small>{{ x.rule }}</small></td>
+      <td><a href="{{ x.link }}">detalhe</a></td>
+    </tr>
+    {% endfor %}
+  </table></div>
+  {% else %}<p class="muted">Nenhum ataque com esses filtros no período.</p>{% endif %}
+</section>
+<p class="muted">Detalhe dos fluxos: {{ backend or 'MariaDB' }}. Pico estimado a partir do NetStream amostrado (1:2048); detecção por portas NAT usa
+o log do A10 (não amostrado).</p>
+{% endif %}
+{% endblock %}

@@ -25,7 +25,7 @@
 </section>
 </div>
 <section class="card">
-  <h2>Eventos recentes</h2>
+  <h2>Eventos recentes <small><a href="{{ url_for('attacks_page') }}">ver todos os ataques →</a></small></h2>
   {% if events %}
   <div class="scroll"><table>
     <tr><th>Hora (UTC)</th><th>Regra</th><th>Severidade</th><th>Sentido</th><th>IP</th><th>Assinante</th><th>pps</th><th>Mbps</th></tr>

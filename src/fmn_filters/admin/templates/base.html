@@ -13,6 +13,7 @@
   <nav>
     {% set here = request.endpoint %}
     <a href="{{ url_for('index') }}" class="{{ 'on' if here=='index' }}">Status</a>
+    <a href="{{ url_for('attacks_page') }}" class="{{ 'on' if here in ('attacks_page','attack_detail') }}">Ataques</a>
     <a href="{{ url_for('network') }}" class="{{ 'on' if here=='network' }}">Rede</a>
     <a href="{{ url_for('borders') }}" class="{{ 'on' if here=='borders' }}">Bordas</a>
     <a href="{{ url_for('rules') }}" class="{{ 'on' if here=='rules' }}">Regras</a>

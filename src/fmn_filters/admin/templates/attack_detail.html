@@ -1,0 +1,95 @@
+{% extends "base.html" %}{% block title %}Ataque {{ k.entity }}{% endblock %}
+{% block body %}
+{% set a = d.attack %}{% set fl = d.flows %}{% set inbound = k.direction == 'in' %}
+<p><a href="{{ back }}">← ataques deste IP</a></p>
+<h1>Ataque {{ 'recebido' if inbound else 'originado' }} · <code>{{ k.entity }}</code></h1>
+<section class="card">
+  <div class="grid">
+    <div><b>IP da rede</b><br><code>{{ k.entity }}</code> — {{ scope_pt.get(k.scope, k.scope) }}{% if a and a.pool %} ({{ a.pool }}){% endif %}
+      {% if who %}<br><b>{{ who }}</b>{% endif %}
+      {% if a and k.entity_col=='subscriber_ip' and a.publics_top %}<br>IP público (CGNAT): {% for p in a.publics_top[:3] %}<code>{{ p }}</code> {% endfor %}{% endif %}
+      {% if fl and fl.outros %}<br>{{ 'IPs públicos usados' if k.entity_col=='subscriber_ip' else 'Assinantes (IP privado) por trás deste IP' }}:
+        {% for o in fl.outros[:6] %}<a href="{{ url_for('attacks_page', ip=o.ip, tz=tzname) }}"><code>{{ o.ip }}</code></a> {% endfor %}{% endif %}</div>
+    <div><b>Período</b><br>{{ ts(k.start, tz) }}<br>até {{ ts(k.end, tz) }}{% if a %}<br><small class="muted">{{ a.minutes }} min · {{ a.events }} evento(s)</small>{% endif %}</div>
+    <div><b>Regra</b><br>{{ k.rule }}{% if a %} <span class="pill sev-{{ a.severity }}">{{ a.severity }}</span>{% endif %}
+      <br>{{ k.protocol or 'todos os protocolos' }}{% if k.local_port %} · porta nossa {{ k.local_port }}{% endif %}{% if k.remote_port %} · porta remota {{ k.remote_port }}{% endif %}</div>
+    <div><b>Pico</b><br>{% if a and a.detection=='nat' %}{{ a.allocs }} alocações NAT/min · {{ a.active_ports }} portas ativas
+      {% elif a %}{{ human(a.pps) }} pacotes/s · {{ mbps(a.mbps) }} Mbps<br>{{ a.remote_ips }} IPs remotos{% else %}—{% endif %}</div>
+  </div>
+</section>
+
+{% if d.error %}<p class="flash">{{ d.error }}</p>{% endif %}
+{% if fl %}
+<section class="card">
+  <h2>Minuto a minuto</h2>
+  <p class="muted">Fonte: {{ d.backend }}{% if d.partial %} — dados só a partir de {{ ts(d.since, tz) }}{% endif %}.
+    Total amostrado: {{ human(fl.totais.pacotes) }} pacotes · {{ human_bytes(fl.totais.bytes or 0) }} · {{ fl.totais.remotos or 0 }} IPs remotos.</p>
+  {% if remote %}<p>Filtrado pelo IP remoto <code>{{ remote }}</code> · <a href="{{ url_for('attack_detail', **base_args) }}">tirar filtro</a></p>{% endif %}
+  {% if fl.minutos %}
+  <div class="chartbox">{{ chart|safe }}</div>
+  <div class="chartbox">{{ chart_mbps|safe }}</div>
+  {% else %}<p class="muted">Nenhum fluxo amostrado desse alvo no período (ataque curto ou amostragem 1:2048 não pegou pacotes).</p>{% endif %}
+</section>
+
+<section class="card">
+  <h2>Origem → destino</h2>
+  <p class="muted">Conversas com mais pacotes no período. {% if inbound %}Origem = IP remoto (quem envia), destino = nossa rede.{% else %}Origem = nossa rede (cliente), destino = IP remoto.{% endif %}
+    Clique no IP remoto para filtrar.</p>
+  <div class="scroll"><table>
+    <tr><th>Origem</th><th class="num">Porta origem</th><th>Destino</th><th class="num">Porta destino</th><th>Proto</th><th>IP privado</th><th>ASN / país (remoto)</th><th class="num">Pacotes</th><th class="num">Volume</th></tr>
+    {% for c in fl.conversas %}
+    {% set rlink = url_for('attack_detail', remoto=c.remote_ip, **base_args) %}
+    <tr>
+      {% if inbound %}
+      <td><a href="{{ rlink }}"><code>{{ c.remote_ip }}</code></a></td><td class="num">{{ c.remote_port or '—' }}</td>
+      <td><code>{{ c.local_ip }}</code></td><td class="num">{{ c.local_port or '—' }}</td>
+      {% else %}
+      <td><code>{{ c.local_ip }}</code></td><td class="num">{{ c.local_port or '—' }}</td>
+      <td><a href="{{ rlink }}"><code>{{ c.remote_ip }}</code></a></td><td class="num">{{ c.remote_port or '—' }}</td>
+      {% endif %}
+      <td>{{ c.protocol }}{% if c.servico %} <small class="muted">{{ c.servico }}</small>{% endif %}</td>
+      <td>{% if c.subscriber_ip and c.subscriber_ip != c.local_ip %}<code>{{ c.subscriber_ip }}</code>{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td>{% if c.asn %}AS{{ c.asn }} <small>{{ c.asn_name[:40] }}</small>{% endif %} {{ c.pais }}
+        <small><a href="{{ url_for('tools_page', tool='rdap', q=c.remote_ip) }}">RDAP</a></small></td>
+      <td class="num">{{ human(c.pacotes) }}</td><td class="num">{{ human_bytes(c.bytes or 0) }}</td>
+    </tr>
+    {% else %}<tr><td colspan="9" class="muted">Sem fluxos nesse período.</td></tr>{% endfor %}
+  </table></div>
+  <p class="muted">Porta 0 em origem/destino = portas efêmeras agrupadas (não guardadas uma a uma) ou fragmentos.</p>
+</section>
+
+<div class="grid">
+<section class="card">
+  <h2>Portas e protocolos</h2>
+  <table><tr><th>Proto</th><th class="num">Porta nossa</th><th class="num">Porta remota</th><th class="num">IPs remotos</th><th class="num">Pacotes</th></tr>
+    {% for p in fl.portas %}<tr><td>{{ p.protocol }}{% if p.servico %} <small class="muted">{{ p.servico }}</small>{% endif %}</td><td class="num">{{ p.local_port or '—' }}</td><td class="num">{{ p.remote_port or '—' }}</td><td class="num">{{ p.remotos }}</td><td class="num">{{ human(p.pacotes) }}</td></tr>{% endfor %}
+  </table>
+</section>
+<section class="card">
+  <h2>Redes remotas (ASN)</h2>
+  {% if fl.asns %}<table><tr><th>ASN</th><th>Nome</th><th class="num">IPs</th><th>País</th><th class="num">Pacotes</th></tr>
+    {% for x in fl.asns %}<tr><td><a href="{{ url_for('tools_page', tool='asn', q=x.asn) }}">AS{{ x.asn }}</a></td><td><small>{{ x.nome[:40] }}</small></td><td class="num">{{ x.ips }}</td><td>{{ x.paises }}</td><td class="num">{{ human(x.pacotes) }}</td></tr>{% endfor %}
+  </table>{% else %}<p class="muted">Sem ASN (base GeoLite2 indisponível para o painel ou IPs sem registro).</p>{% endif %}
+</section>
+</div>
+{% endif %}
+
+{% if a and a.detection == 'nat' and a.ports_top %}
+<section class="card"><h2>Saída do assinante (portas NAT)</h2>
+  <p>{% for p in a.ports_top %}{{ p.protocolo }}/{{ p.porta }}: <b>{{ p.destinos }}</b> destinos{{ ', ' if not loop.last }}{% endfor %}</p></section>
+{% endif %}
+
+<section class="card">
+  <h2>Resumo para explicar</h2>
+  <pre class="detail">{{ text }}</pre>
+  <p><a href="{{ report_link }}">Relatório completo deste IP</a> · <a href="{{ url_for('mitigation_page') }}">Mitigação</a></p>
+</section>
+
+{% if d.events %}
+<section class="card"><h2>Eventos ({{ d.events|length }})</h2>
+  <div class="scroll"><table><tr><th>Hora</th><th class="num">pps</th><th class="num">Mbps</th><th class="num">IPs remotos</th><th>Principais remotos</th></tr>
+  {% for e in d.events %}<tr><td>{{ ts(e.event_time, tz) }}</td><td class="num">{{ human(e.pps) }}</td><td class="num">{{ mbps(e.mbps) }}</td><td class="num">{{ e.remote_ips }}</td>
+    <td><small>{% for ip in e.details.top_remote_ips or [] %}<code>{{ ip }}</code> {% endfor %}</small></td></tr>{% endfor %}
+  </table></div></section>
+{% endif %}
+{% endblock %}

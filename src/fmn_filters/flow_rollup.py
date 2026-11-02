@@ -234,6 +234,12 @@ VALUES (%s,%s,%s,%s,%s,%s,%s)""", (source, path.name, st.st_size, st.st_mtime_ns
 
 AGGREGATES = {"enabled": True}
 
+
+def clickhouse_sink():
+    """Gravacao opcional no ClickHouse (ORBYMON_CH_URL no ambiente); None quando desligado."""
+    from .clickhouse import Sink
+    return Sink.from_env()
+
 B5 = "bucket_utc - INTERVAL MINUTE(bucket_utc) %% 5 MINUTE"
 BACKFILL_SQL = (
     """INSERT INTO orby_flow_agg_minute (source,bucket_utc,direction,scope,protocol,edge_if,packets,bytes,syn_packets,
@@ -334,6 +340,11 @@ def run(cfg, *, max_files=40, max_age_hours=2, min_age=45, dry_run=False, folder
     eligible = candidates(directory, time.time(), min_age, max_age_hours * 3600)
     db = None if dry_run or not eligible else connection_from_env()
     imported = failed = 0
+    sink = None if db is None else clickhouse_sink()
+    if sink is not None:
+        sent = sink.flush_spool()
+        if sent:
+            print("ClickHouse: %d lote(s) do spool reenviado(s)" % sent, flush=True)
     try:
         pending = eligible if db is None else pending_files(db, source, eligible)
         paths = pending[:max_files]
@@ -348,6 +359,8 @@ def run(cfg, *, max_files=40, max_age_hours=2, min_age=45, dry_run=False, folder
                 else:
                     ok = save_file(db, source, path, st, rows, stats)
                     imported += int(ok)
+                    if ok and sink is not None:      # depois do commit no MariaDB; falha vai para o spool
+                        sink.write(sink.token(source, path.name, st.st_size, st.st_mtime_ns), rows)
                     print("%s %s %s" % ("IMPORTADO" if ok else "JA_IMPORTADO", path.name, stats),
                           flush=True)
             except Exception as exc:
