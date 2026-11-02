@@ -305,6 +305,7 @@ class NatService:
         self.table = NatTable(retention_seconds, slack_seconds)
         self.log = EventLog(log_dir)
         self.minutes: dict[tuple, list] = {}
+        self.pub_allocs: Counter = Counter()        # (minuto, IP publico) -> alocacoes
         self.stats = defaultdict(int)
         self.diag = None          # Counter de diagnostico (somente no replay)
         self.span = None          # [primeiro, ultimo] horario do A10 (somente no replay)
@@ -325,6 +326,8 @@ class NatService:
                 self.log.write(ev)
                 slot = self.minutes.setdefault((int(ev.ts // 60), ev.inside_ip), [0, 0])
                 slot[0 if ev.kind == "allocated" else 1] += 1
+                if ev.kind == "allocated":
+                    self.pub_allocs[(int(ev.ts // 60), ev.public_ip)] += 1
                 if self.span is not None:
                     self.span[0] = min(self.span[0], ev.a10_ts)
                     self.span[1] = max(self.span[1], ev.a10_ts)
@@ -338,6 +341,31 @@ class NatService:
             allocs, frees = self.minutes.pop(key)
             bucket = datetime.fromtimestamp(key[0] * 60, timezone.utc).replace(tzinfo=None)
             rows.append((bucket, key[1], allocs, frees, int(self.table.users.get(key[1], 0))))
+        return rows
+
+    def public_rows(self, now: float, capacity: int = None):
+        """Uso de portas por IP publico do pool agora (foto da tabela NAT) + alocacoes do ultimo minuto completo.
+        Linhas para orby_nat_public_minute: (minuto, ip, pool, tcp, udp, outras, assinantes, alocacoes, capacidade)."""
+        capacity = capacity or PORTS_PER_IP
+        minute = int(now // 60) - 1
+        ports = defaultdict(lambda: [0, 0, 0])
+        subs = defaultdict(set)
+        for (pub, _port, proto), cur in self.table.active.items():
+            ports[pub][0 if proto == "tcp" else 1 if proto == "udp" else 2] += 1
+            subs[pub].add(cur[0])
+        for key in [k for k in self.pub_allocs if k[0] < minute]:
+            if key[0] < minute - 1:
+                self.pub_allocs.pop(key, None)
+        bucket = datetime.fromtimestamp(minute * 60, timezone.utc).replace(tzinfo=None)
+        rows = []
+        for pub in set(ports) | {k[1] for k in self.pub_allocs if k[0] == minute}:
+            try:
+                pool = self.scopes.classify(pub)[1] or ""
+            except Exception:
+                pool = ""
+            t, u, o = ports.get(pub, (0, 0, 0))
+            rows.append((bucket, pub, pool[:64], t, u, o, len(subs.get(pub, ())),
+                         self.pub_allocs.get((minute, pub), 0), capacity))
         return rows
 
     def lookup_many(self, keys):
@@ -356,6 +384,42 @@ NAT_MINUTE_SQL = """INSERT INTO orby_nat_user_minute
 (bucket_utc,inside_ip,allocs,frees,active_ports) VALUES (%s,%s,%s,%s,%s)
 ON DUPLICATE KEY UPDATE allocs=allocs+VALUES(allocs),frees=frees+VALUES(frees),
 active_ports=GREATEST(active_ports,VALUES(active_ports))"""
+
+
+PORTS_PER_IP = int(os.environ.get("ORBYMON_NAT_PORTS_PER_IP", "64512"))   # 1024-65535 por protocolo (padrao A10)
+NAT_PUBLIC_SQL = """INSERT INTO orby_nat_public_minute
+(bucket_utc,public_ip,pool,tcp_ports,udp_ports,other_ports,subscribers,allocs,capacity) VALUES
+(%s,%s,%s,%s,%s,%s,%s,%s,%s) ON DUPLICATE KEY UPDATE tcp_ports=GREATEST(tcp_ports,VALUES(tcp_ports)),
+udp_ports=GREATEST(udp_ports,VALUES(udp_ports)),other_ports=GREATEST(other_ports,VALUES(other_ports)),
+subscribers=GREATEST(subscribers,VALUES(subscribers)),allocs=GREATEST(allocs,VALUES(allocs))"""
+PUBLIC_RETENTION_DAYS = 7
+PUBLIC_STATE = {"disabled": False, "pruned": 0.0}
+
+
+def save_public(rows, now=None):
+    """Uso de portas por IP publico (tabela opcional: sem ela, desliga em silencio e o resto segue)."""
+    if PUBLIC_STATE["disabled"] or not rows:
+        return
+    from .mysql_sink import connection_from_env
+    db = connection_from_env()
+    try:
+        with db.cursor() as cur:
+            for n in range(0, len(rows), 500):
+                cur.executemany(NAT_PUBLIC_SQL, rows[n:n + 500])
+            now = time.time() if now is None else now
+            if now - PUBLIC_STATE["pruned"] > 3600:
+                cur.execute("DELETE FROM orby_nat_public_minute WHERE bucket_utc < UTC_TIMESTAMP() - INTERVAL %s DAY "
+                            "LIMIT 100000", (PUBLIC_RETENTION_DAYS,))
+                PUBLIC_STATE["pruned"] = now
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        if "orby_nat_public_minute" in str(exc) and ("doesn't exist" in str(exc) or "denied" in str(exc)):
+            PUBLIC_STATE["disabled"] = True          # rode scripts/setup-cgnat-ports.sh para ligar
+            return
+        raise
+    finally:
+        db.close()
 
 
 def save_minutes(rows):
@@ -493,6 +557,12 @@ async def serve(service: NatService, host, port, socket_path, *, use_db=True, wa
                     except Exception as exc:
                         service.stats["falhas_mariadb"] += 1
                         print("ERRO gravando agregados NAT: %s" % exc, file=sys.stderr, flush=True)
+                if use_db and not PUBLIC_STATE["disabled"]:
+                    try:                          # uso de portas por IP publico (independente do acima)
+                        await loop.run_in_executor(None, save_public, service.public_rows(now))
+                    except Exception as exc:
+                        service.stats["falhas_portas_publicas"] += 1
+                        print("ERRO gravando portas por IP publico: %s" % exc, file=sys.stderr, flush=True)
                 print("NAT estado=%s contadores=%s" % (service.table.sizes(), dict(service.stats)), flush=True)
     finally:
         tcp.close()

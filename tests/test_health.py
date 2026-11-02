@@ -167,5 +167,31 @@ class SaveTests(unittest.TestCase):
             self.assertIn(k, keys)
 
 
+class NatPortsTests(unittest.TestCase):
+    def cur(self, rows, fail=False):
+        class Cur:
+            def execute(self, sql, params=None):
+                if fail:
+                    raise RuntimeError("Table doesn't exist")
+
+            def fetchall(self):
+                return rows
+        return Cur()
+
+    def test_levels(self):
+        from datetime import datetime
+        from fmn_filters import health
+        now = datetime(2026, 11, 2, 12, 0)
+        self.assertEqual(health.check_nat_ports(self.cur([], fail=True), now), [])
+        ok = health.check_nat_ports(self.cur([("45.238.170.70", "NAT-POOL-08", 1000, 50, 12, 64512, now)]), now)
+        self.assertEqual(ok[0]["status"], health.OK)
+        warn = health.check_nat_ports(self.cur([("45.238.170.70", "NAT-POOL-08", 53000, 50, 30, 64512, now)]), now)
+        self.assertEqual(warn[0]["status"], health.WARN)
+        self.assertIn("45.238.170.70", warn[0]["detail"])
+        crit = health.check_nat_ports(self.cur([("45.238.170.70", "NAT-POOL-08", 10, 63000, 30, 64512, now)]), now)
+        self.assertEqual(crit[0]["status"], health.CRIT)
+        self.assertIn("UDP", crit[0]["value"])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -304,3 +304,53 @@ class WatcherTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PublicPortsTests(unittest.TestCase):
+    def test_ports_per_public_ip_with_pool_and_subscribers(self):
+        svc = NatService(SCOPES, allowed_sources=["127.0.0.1"])
+        sp = StreamSplitter()
+        text = (msg(pub_port=1) + msg(pub_port=2, inside="100.64.64.9") + msg(proto="UDP", pub_port=3) +
+                msg(public="45.238.171.80", pub_port=5) + msg(kind="Freed", pub_port=1))
+        svc.ingest_text(text, sp, now=600.0)
+        rows = {r[1]: r for r in svc.public_rows(now=670.0, capacity=100)}
+        r = rows["45.238.170.70"]
+        self.assertEqual(r[2], "NAT-POOL-08")
+        self.assertEqual((r[3], r[4], r[5]), (1, 1, 0))          # tcp 2 (1 liberada), udp 1
+        self.assertEqual(r[6], 2)                                # dois assinantes
+        self.assertEqual(r[7], 3)                                # 3 alocacoes no minuto
+        self.assertEqual(r[8], 100)
+        self.assertEqual(rows["45.238.171.80"][2], "NAT-POOL-09")
+        svc.public_rows(now=900.0)                              # minutos velhos saem da memoria
+        self.assertFalse([k for k in svc.pub_allocs if k[0] < 13])
+
+    def test_missing_table_disables_quietly(self):
+        from unittest import mock
+        from fmn_filters import a10_nat
+
+        class Cur:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+            def executemany(self, *a):
+                raise RuntimeError("Table 'orbymon.orby_nat_public_minute' doesn't exist")
+
+        class Db:
+            def cursor(self):
+                return Cur()
+
+            def rollback(self):
+                pass
+
+            def close(self):
+                pass
+        state = dict(a10_nat.PUBLIC_STATE)
+        try:
+            with mock.patch("fmn_filters.mysql_sink.connection_from_env", return_value=Db()):
+                a10_nat.save_public([("x",)])
+            self.assertTrue(a10_nat.PUBLIC_STATE["disabled"])
+        finally:
+            a10_nat.PUBLIC_STATE.update(state)

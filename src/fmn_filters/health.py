@@ -198,6 +198,39 @@ def _age(now, when):
     return None if when is None else max(0.0, (now - when).total_seconds())
 
 
+NAT_PORTS_WARN = float(os.environ.get("ORBYMON_NAT_PORTS_WARN", "80"))
+NAT_PORTS_CRIT = float(os.environ.get("ORBYMON_NAT_PORTS_CRIT", "95"))
+
+
+def check_nat_ports(cur, now):
+    """Esgotamento de portas por IP publico do pool CGNAT (ultimo minuto gravado pelo receptor A10)."""
+    try:
+        cur.execute("SELECT public_ip,pool,tcp_ports,udp_ports,subscribers,capacity,bucket_utc FROM "
+                    "orby_nat_public_minute WHERE bucket_utc=(SELECT MAX(bucket_utc) FROM orby_nat_public_minute "
+                    "WHERE bucket_utc>=%s - INTERVAL 15 MINUTE) ORDER BY GREATEST(tcp_ports,udp_ports) DESC LIMIT 5",
+                    (now,))
+        rows = cur.fetchall()
+    except Exception:
+        return []                                 # tabela ainda nao instalada (setup-cgnat-ports.sh)
+    if not rows:
+        return []
+    def pct(r):
+        return 100.0 * max(int(r[2]), int(r[3])) / max(1, int(r[5]))
+    worst = rows[0]
+    p = pct(worst)
+    hot = [r for r in rows if pct(r) >= NAT_PORTS_WARN]
+    st = CRIT if p >= NAT_PORTS_CRIT else WARN if p >= NAT_PORTS_WARN else OK
+    proto = "TCP" if int(worst[2]) >= int(worst[3]) else "UDP"
+    detail = ""
+    if st != OK:
+        detail = ("IPs públicos perto do limite: " + ", ".join("%s (%s) %.0f%%, %d assinantes" % (r[0], r[1] or "?", pct(r), int(r[4]))
+                                                                for r in hot) +
+                  ". Novas conexões desses assinantes podem falhar: veja o dashboard CGNAT - Portas.")
+    return [item("cgnat_ports", "CGNAT: portas por IP público", st,
+                 "maior uso %.0f%% (%s %s, %s, %d assinantes)" % (p, worst[0], proto, worst[1] or "?", int(worst[4])),
+                 detail)]
+
+
 def check_db(cur, cfg, now, telegram_on=False, a10_on=True):
     src = cfg["source"]
     out = []
@@ -231,6 +264,8 @@ def check_db(cur, cfg, now, telegram_on=False, a10_on=True):
             st = WARN if pct < 50 else OK
             out.append(item("nat_resolve", "Fluxos de pool com assinante identificado (1 h)", st, "%.0f%%" % pct,
                             "" if st == OK else "o log NAT está incompleto ou atrasado em relação aos fluxos"))
+    if a10_on:
+        out += check_nat_ports(cur, now)
     try:
         cur.execute("SELECT r.name,s.last_bucket,s.last_error FROM orby_filter_rules r LEFT JOIN "
                     "orby_filter_rule_state s ON s.rule_id=r.id WHERE r.enabled=1")
