@@ -77,5 +77,64 @@ class DbTests(unittest.TestCase):
             db.close()
 
 
+
+
+class FakeCur:
+    def __init__(self, db):
+        self.db = db
+    def __enter__(self):
+        return self
+    def __exit__(self, *a):
+        return False
+    def execute(self, sql, params=None):
+        if sql.startswith("SELECT MIN"):
+            return
+        self.db.calls.append(params[1])
+        if params[1] in self.db.fail_at:
+            self.db.fail_at[params[1]] -= 1
+            if self.db.fail_at[params[1]] >= 0:
+                raise RuntimeError("timeout")
+    def fetchone(self):
+        return (datetime(2026, 11, 1, 0, 3),)
+
+
+class FakeDb:
+    def __init__(self, fail_at=None):
+        self.calls, self.fail_at, self.closed = [], dict(fail_at or {}), 0
+    def cursor(self):
+        return FakeCur(self)
+    def commit(self):
+        pass
+    def rollback(self):
+        pass
+    def close(self):
+        self.closed += 1
+
+
+class BackfillTests(unittest.TestCase):
+    def test_blocks_of_15_min_aligned_to_5(self):
+        db = FakeDb()
+        done, skipped = fr.backfill(db, "huawei", datetime(2026, 11, 1, 1, 2), log=lambda m: None)
+        # 00:00 .. 01:00 em blocos de 15 min
+        self.assertEqual((done, skipped), (4, 0))
+        self.assertEqual(sorted(set(db.calls)), [datetime(2026, 11, 1, 0, m) for m in (0, 15, 30, 45)])
+
+    def test_retries_then_skips_and_continues(self):
+        bad = datetime(2026, 11, 1, 0, 15)
+        db = FakeDb({bad: 5})                               # falha sempre nesse bloco
+        logs = []
+        done, skipped = fr.backfill(db, "huawei", datetime(2026, 11, 1, 1, 0), log=logs.append,
+                                    reconnect=lambda: db)
+        self.assertEqual((done, skipped), (3, 1))
+        self.assertTrue(any(m.startswith("PULADO") for m in logs))
+
+    def test_retry_succeeds(self):
+        bad = datetime(2026, 11, 1, 0, 30)
+        db = FakeDb({bad: 1})                               # falha so na primeira tentativa
+        done, skipped = fr.backfill(db, "huawei", datetime(2026, 11, 1, 1, 0), log=lambda m: None,
+                                    reconnect=lambda: db)
+        self.assertEqual((done, skipped), (4, 0))
+
+
 if __name__ == "__main__":
     unittest.main()

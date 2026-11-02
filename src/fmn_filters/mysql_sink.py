@@ -14,7 +14,7 @@ import sys
 from .parsers import parse_record, stream_records
 
 
-def connection_from_env():
+def connection_from_env(read_timeout=30):
     try:
         import pymysql
     except ImportError as exc:
@@ -28,7 +28,7 @@ def connection_from_env():
                            password=os.environ['ORBYMON_DB_PASSWORD'],
                            database=os.environ['ORBYMON_DB_NAME'],
                            charset='utf8mb4', autocommit=False,
-                           connect_timeout=5, read_timeout=30, write_timeout=30,
+                           connect_timeout=5, read_timeout=read_timeout, write_timeout=30,
                            init_command="SET time_zone = '+00:00'")
 
 

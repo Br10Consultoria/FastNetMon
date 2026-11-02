@@ -12,7 +12,7 @@ class LiveDashboardTests(unittest.TestCase):
     def test_huawei_live_sources_new_enriched_rollup_only(self):
         j=dash("orbymon-huawei-live.json")
         self.assertEqual(j["uid"],"orbymon-huawei-live")
-        self.assertEqual(j["refresh"],"30s")
+        self.assertEqual(j["refresh"],"1m")
         for p in j["panels"]:
             s=p["targets"][0]["rawSql"]
             self.assertNotIn("orby_traffic_minute",s)

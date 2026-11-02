@@ -20,9 +20,13 @@ systemctl restart orbymon-flow-rollup-huawei.service 2>/dev/null || true
 
 echo "=== Preenchendo com o historico do detalhado (uma hora por vez; pode levar alguns minutos) ==="
 # mesmo usuario e ambiente dos servicos (o EnvironmentFile e lido pelo systemd, nunca executado)
-systemd-run --quiet --wait --pipe --collect -p User=orbymon -p EnvironmentFile=/etc/orbymon/pipeline.env \
+# baixa prioridade de disco/CPU; uma falha aqui nao impede o resto (os agregados se completam com o tempo)
+if ! systemd-run --quiet --wait --pipe --collect -p User=orbymon -p EnvironmentFile=/etc/orbymon/pipeline.env \
+  -p Nice=10 -p IOSchedulingClass=idle \
   --setenv=PYTHONPATH="$BASE/src" "$BASE/.venv/bin/python" -m fmn_filters.flow_rollup \
-  --config /etc/orbymon/bidir.json --backfill-aggregates | tail -n 3
+  --config /etc/orbymon/bidir.json --backfill-aggregates 2>&1 | { grep -v "^agregados ate" || true; } | tail -n 5; then
+  echo "AVISO: preenchimento do historico incompleto; os dashboards ja usam os dados novos (pode rodar de novo depois)"
+fi
 
 echo "=== Dashboards ==="
 bash "$BASE/scripts/deploy-live-dashboards.sh" >/dev/null && echo "dashboards atualizados"

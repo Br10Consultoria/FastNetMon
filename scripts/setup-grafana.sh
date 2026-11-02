@@ -64,6 +64,8 @@ mariadb <<SQL
 CREATE USER IF NOT EXISTS 'orbymon_grafana'@'127.0.0.1' IDENTIFIED BY '$DB_PASS';
 ALTER USER 'orbymon_grafana'@'127.0.0.1' IDENTIFIED BY '$DB_PASS';
 GRANT SELECT ON orbymon.* TO 'orbymon_grafana'@'127.0.0.1';
+-- consulta de painel abandonado (periodo grande, aba fechada) e encerrada em 60 s
+ALTER USER 'orbymon_grafana'@'127.0.0.1' WITH MAX_STATEMENT_TIME 60;
 SQL
 KEY=/etc/orbymon/grafana-tls/grafana.key
 CERT=/etc/orbymon/grafana-tls/grafana.crt

@@ -259,27 +259,51 @@ protocol,remote_ip ON DUPLICATE KEY UPDATE packets=VALUES(packets),bytes=VALUES(
 locals=VALUES(locals)""")
 
 
-def backfill(db, source, until, log=print):
-    """Preenche os agregados a partir do detalhado ja gravado (antes de `until`), uma hora por vez.
-    Recalcula (nao soma): pode rodar de novo sem duplicar. Horas multiplas de 5 min para nao cortar os 5m."""
+def backfill(db, source, until, log=print, step_minutes=15, reconnect=None):
+    """Preenche os agregados a partir do detalhado ja gravado (antes de `until`), em blocos de 15 min.
+    Recalcula (nao soma): pode rodar de novo sem duplicar. Blocos multiplos de 5 min para nao cortar os 5m.
+    Um bloco que falha (servidor ocupado) e tentado de novo uma vez e depois pulado; o resto continua."""
     with db.cursor() as cur:
         cur.execute("SELECT MIN(bucket_utc) FROM orby_flow_minute WHERE source=%s", (source,))
         first = cur.fetchone()[0]
     if first is None:
-        return 0
-    hour = first.replace(minute=0, second=0, microsecond=0)
+        return 0, 0
+    t = first.replace(minute=first.minute - first.minute % 5, second=0, microsecond=0)
     until = until.replace(minute=until.minute - until.minute % 5, second=0, microsecond=0)
-    hours = 0
-    while hour < until:
-        nxt = min(hour + timedelta(hours=1), until)
-        with db.cursor() as cur:
-            for sql in BACKFILL_SQL:
-                cur.execute(sql, (source, hour, nxt))
-        db.commit()
-        hours += 1
-        log("agregados: %s ate %s" % (hour, nxt))
-        hour = nxt
-    return hours
+    done = skipped = 0
+    while t < until:
+        nxt = min(t + timedelta(minutes=step_minutes), until)
+        for attempt in (1, 2):
+            try:
+                with db.cursor() as cur:
+                    for sql in BACKFILL_SQL:
+                        cur.execute(sql, (source, t, nxt))
+                db.commit()
+                done += 1
+                break
+            except Exception as exc:
+                try:
+                    db.rollback()
+                except Exception:
+                    pass
+                if reconnect:
+                    try:
+                        db.close()
+                    except Exception:
+                        pass
+                    db = reconnect()
+                if attempt == 2:
+                    skipped += 1
+                    log("PULADO %s ate %s: %s" % (t, nxt, exc))
+        if t.minute == 0 or nxt == until:
+            log("agregados ate %s" % nxt)
+        t = nxt
+    if reconnect:                               # a conexao pode ter sido trocada: quem reconecta tambem fecha
+        try:
+            db.close()
+        except Exception:
+            pass
+    return done, skipped
 
 
 def prune(db, days):
@@ -354,12 +378,11 @@ def main(argv=None):
     if args.backfill_aggregates:
         try:
             cfg = read_config(args.config)
-            db = connection_from_env()
-            try:
-                n = backfill(db, cfg["source"], datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=10))
-            finally:
-                db.close()
-            print("agregados preenchidos: %d hora(s)" % n)
+            connect = lambda: connection_from_env(read_timeout=900)
+            done, skipped = backfill(connect(), cfg["source"],
+                                     datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=10),
+                                     reconnect=connect)
+            print("agregados preenchidos: %d bloco(s) de 15 min, %d pulado(s)" % (done, skipped))
             return 0
         except Exception as exc:
             print("FALHA backfill: %s" % exc, file=sys.stderr)

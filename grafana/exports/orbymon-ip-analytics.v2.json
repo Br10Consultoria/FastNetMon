@@ -1950,7 +1950,7 @@
       "timezone": "browser",
       "from": "now-30m",
       "to": "now",
-      "autoRefresh": "30s",
+      "autoRefresh": "1m",
       "autoRefreshIntervals": [
         "5s",
         "10s",
