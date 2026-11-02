@@ -35,6 +35,15 @@ ch_status() {   # le a senha do arquivo como dado (nunca executa o arquivo)
 }
 if (( STATUS )); then ch_status; exit; fi
 
+echo "=== CPU ==="
+# o ClickHouse exige SSE4.2 e POPCNT (x86-64-v2). Em VM Proxmox com CPU "kvm64" esses recursos ficam escondidos e o
+# binario morre com "Illegal instruction": mude o tipo de CPU da VM para "host" (ou x86-64-v2-AES) e desligue/ligue.
+for flag in sse4_2 popcnt; do
+  grep -qw "$flag" /proc/cpuinfo || { echo "CPU da VM sem $flag: no Proxmox, Hardware > Processadores > Tipo = host" \
+    "(ou x86-64-v2-AES), desligue e ligue a VM e rode de novo." >&2; exit 1; }
+done
+echo "ok (sse4_2, popcnt)"
+
 echo "=== Pacotes ==="
 if ! command -v clickhouse-server >/dev/null; then
   DEBIAN_FRONTEND=noninteractive apt-get install -y -q apt-transport-https ca-certificates curl gnupg >/dev/null
@@ -46,7 +55,14 @@ if ! command -v clickhouse-server >/dev/null; then
   # senha do "default" vazia na instalacao; logo abaixo ele e bloqueado
   DEBIAN_FRONTEND=noninteractive apt-get install -y -q clickhouse-server clickhouse-client >/dev/null
 fi
-clickhouse-server --version 2>/dev/null | head -n 1 || true
+# instalacao anterior interrompida (ex.: CPU sem SSE4.2): termina a configuracao do pacote
+if ! dpkg-query -W -f='${Status}' clickhouse-server 2>/dev/null | grep -q "install ok installed" || ! id clickhouse >/dev/null 2>&1; then
+  DEBIAN_FRONTEND=noninteractive dpkg --configure -a
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -q --reinstall clickhouse-common-static clickhouse-server >/dev/null
+fi
+clickhouse-server --version >/dev/null 2>&1 || { echo "clickhouse-server nao executa nesta CPU" >&2; exit 1; }
+id clickhouse >/dev/null 2>&1 || { echo "usuario clickhouse nao foi criado pelo pacote" >&2; exit 1; }
+clickhouse-server --version 2>/dev/null | head -n 1
 
 echo "=== Configuracao do servidor ==="
 install -d -m 0755 /etc/clickhouse-server/config.d /etc/clickhouse-server/users.d
