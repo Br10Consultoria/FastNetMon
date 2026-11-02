@@ -206,5 +206,48 @@ class LifecycleTests(unittest.TestCase):
         self.assertIn("incomplete IP", cur.fetchone()[0])
 
 
+@unittest.skipUnless(os.path.exists(fq.NFDUMP), "nfdump nao instalado")
+class TestAllTests(unittest.TestCase):
+    def test_simulates_every_rule_including_disabled_and_reports_errors(self):
+        import io, contextlib
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            d_ = tmp / "huawei"
+            d_.mkdir()
+            now = datetime.now(timezone.utc).replace(tzinfo=None, second=0, microsecond=0)
+            for i in range(3, 0, -1):
+                m = now - timedelta(minutes=i)
+                for half in (0, 30):
+                    t = m.replace(tzinfo=timezone.utc).timestamp() + half + 30
+                    f = d_ / ("nfcapd.%s" % datetime.fromtimestamp(t - 30, timezone.utc).strftime("%Y%m%d%H%M%S"))
+                    shutil.copy(FIXTURE, f)
+                    os.utime(f, (t, t))
+            rows = [(1, "Tudo", 0, "high", "in", "@dst_rede", json.dumps(d())),
+                    (2, "Quebrado", 1, "high", "in", "@inexistente", json.dumps(d()))]
+
+            class Cur:
+                def execute(self, sql, params=None):
+                    pass
+
+                def fetchall(self):
+                    return rows
+
+            class Db:
+                def cursor(self):
+                    return Cur()
+            out = fr.test_all(Db(), CFG, PROFILE, tmp, minutes=5, now=now)
+            self.assertGreaterEqual(out[0]["minutos"], 2)          # o minuto mais recente espera fechar
+            self.assertFalse(out[0]["ligado"])
+            self.assertGreater(out[0]["condicoes"][0]["max"], 0)
+            self.assertIn("inexistente", out[1]["erro"])
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                fr.print_test(out, 5)
+            self.assertIn("Tudo", buf.getvalue())
+            self.assertIn("ERRO", buf.getvalue())
+        finally:
+            shutil.rmtree(tmp)
+
+
 if __name__ == "__main__":
     unittest.main()

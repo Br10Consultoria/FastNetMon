@@ -510,6 +510,46 @@ def run(db, cfg, profile, flow_root, now=None, telegram=None, formatter=None, re
     return actions, sent
 
 
+def test_all(db, cfg, profile, flow_root, minutes=60, now=None, budget=40.0, log=print):
+    """Simula TODOS os alarmes (ligados ou nao) nos ultimos `minutes` sem gravar nada: quantas vezes abririam e o
+    maior valor medido de cada condicao, para escolher o limite antes de ligar."""
+    now = now or datetime.now(timezone.utc).replace(tzinfo=None, microsecond=0)
+    table = fq.macros(cfg, profile)
+    flow_dir = Path(flow_root) / cfg["source"]
+    out = []
+    for rule in load_rules(db.cursor(), only_enabled=False):
+        d = rule["definition"]
+        try:
+            pts = simulate(flow_dir, rule["expr"], d, table, now, minutes, budget)
+        except (fq.QueryError, ValueError) as exc:
+            out.append({"nome": rule["name"], "ligado": bool(rule["enabled"]), "erro": str(exc)[:160]})
+            continue
+        conds = []
+        for c in d["conditions"]:
+            vals = sorted(metric_value(p, c["metric"]) for p in pts) or [0.0]
+            conds.append({"medida": c["metric"], "op": c["op"], "valor": c["value"], "max": vals[-1],
+                          "p95": vals[int(0.95 * (len(vals) - 1))]})
+        out.append({"nome": rule["name"], "ligado": bool(rule["enabled"]), "minutos": len(pts),
+                    "casaram": sum(1 for p in pts if p["matched"]), "abririam": sum(1 for p in pts if p["opens"]),
+                    "condicoes": conds})
+    return out
+
+
+def print_test(rows, minutes):
+    fmt = lambda v: ("%.0f" % v) if v >= 100 else ("%.1f" % v)
+    print("Simulacao dos ultimos %d min (nada gravado, nenhum aviso enviado)" % minutes)
+    print("%-48s %-6s %8s %8s  %s" % ("alarme", "ligado", "casaram", "abririam", "condicao: limite | max medido | p95"))
+    for r in rows:
+        if "erro" in r:
+            print("%-48s %-6s ERRO: %s" % (r["nome"][:48], "sim" if r["ligado"] else "nao", r["erro"]))
+            continue
+        cond = "; ".join("%s %s %s | max %s | p95 %s" % (c["medida"], c["op"], fmt(float(c["valor"])), fmt(c["max"]),
+                                                         fmt(c["p95"])) for c in r["condicoes"])
+        print("%-48s %-6s %8s %8s  %s" % (r["nome"][:48], "sim" if r["ligado"] else "nao",
+                                          "%d/%d" % (r["casaram"], r["minutos"]), r["abririam"], cond))
+    print("abririam = quantos alarmes teriam aberto; 'acima do habitual' so funciona com historico do alarme ligado.")
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="OrbyFlow: alarmes por filtro (nfdump)")
     ap.add_argument("--config", default="/etc/orbymon/bidir.json")
@@ -517,6 +557,8 @@ def main(argv=None):
     ap.add_argument("--telegram-env", help="telegram.env para avisar (lido como dados)")
     ap.add_argument("--radius-env", default="/etc/orbymon/radius.env",
                     help="RADIUS para mostrar o login PPPoE (lido como dados; ignorado se nao existir)")
+    ap.add_argument("--testar-todos", type=int, metavar="MIN",
+                    help="simula todos os alarmes (inclusive desligados) nos ultimos MIN minutos e sai (5-120)")
     args = ap.parse_args(argv)
     try:
         from .admin.config_store import read_env
@@ -524,6 +566,15 @@ def main(argv=None):
         from .mysql_sink import connection_from_env
         cfg = read_config(args.config)
         profile = load_profile(cfg)
+        if args.testar_todos is not None:
+            if not 5 <= args.testar_todos <= 120:
+                raise ValueError("--testar-todos entre 5 e 120 minutos")
+            db = connection_from_env()
+            try:
+                print_test(test_all(db, cfg, profile, args.flow_root, args.testar_todos), args.testar_todos)
+            finally:
+                db.close()
+            return 0
         telegram = formatter = None
         reminder = 30
         if args.telegram_env:
