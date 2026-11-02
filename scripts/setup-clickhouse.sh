@@ -36,29 +36,52 @@ ch_status() {   # le a senha do arquivo como dado (nunca executa o arquivo)
 if (( STATUS )); then ch_status; exit; fi
 
 echo "=== CPU ==="
-# o ClickHouse exige SSE4.2 e POPCNT (x86-64-v2). Em VM Proxmox com CPU "kvm64" esses recursos ficam escondidos e o
-# binario morre com "Illegal instruction": mude o tipo de CPU da VM para "host" (ou x86-64-v2-AES) e desligue/ligue.
-for flag in sse4_2 popcnt; do
-  grep -qw "$flag" /proc/cpuinfo || { echo "CPU da VM sem $flag: no Proxmox, Hardware > Processadores > Tipo = host" \
-    "(ou x86-64-v2-AES), desligue e ligue a VM e rode de novo." >&2; exit 1; }
+# x86-64-v2 (SSE4.2, POPCNT): minimo. Em VM Proxmox com CPU "kvm64" esses recursos ficam escondidos e o binario morre
+# com "Illegal instruction": mude o tipo de CPU da VM para "host" e desligue/ligue.
+for flag in sse4_2 popcnt ssse3 sse4_1; do
+  grep -qw "$flag" /proc/cpuinfo || { echo "CPU da VM sem $flag: no Proxmox, Hardware > Processadores > Tipo = host," \
+    "desligue e ligue a VM e rode de novo." >&2; exit 1; }
 done
-echo "ok (sse4_2, popcnt)"
+# ClickHouse 26.6+ exige x86-64-v3 (AVX2). Sem AVX2 (ex.: Xeon E56xx/Westmere) fixa a serie LTS 26.3, a ultima
+# compilada para x86-64-v2 (correcoes ate ~marco/2027). Com AVX2 usa o LTS atual.
+SERIES=""
+if ! grep -qw avx2 /proc/cpuinfo; then
+  SERIES="${ORBYFLOW_CH_SERIES:-26.3}"
+  echo "CPU sem AVX2: ClickHouse fixado na serie LTS $SERIES (x86-64-v2)"
+else
+  echo "ok (x86-64-v3)"
+fi
 
 echo "=== Pacotes ==="
-if ! command -v clickhouse-server >/dev/null; then
+if [[ ! -f /etc/apt/sources.list.d/clickhouse.list ]]; then
   DEBIAN_FRONTEND=noninteractive apt-get install -y -q apt-transport-https ca-certificates curl gnupg >/dev/null
   curl -fsSL 'https://packages.clickhouse.com/rpm/lts/repodata/repomd.xml.key' \
     | gpg --dearmor --yes -o /usr/share/keyrings/clickhouse-keyring.gpg
   echo "deb [signed-by=/usr/share/keyrings/clickhouse-keyring.gpg arch=$(dpkg --print-architecture)] https://packages.clickhouse.com/deb lts main" \
     > /etc/apt/sources.list.d/clickhouse.list
-  apt-get update -q >/dev/null
-  # senha do "default" vazia na instalacao; logo abaixo ele e bloqueado
-  DEBIAN_FRONTEND=noninteractive apt-get install -y -q clickhouse-server clickhouse-client >/dev/null
 fi
-# instalacao anterior interrompida (ex.: CPU sem SSE4.2): termina a configuracao do pacote
-if ! dpkg-query -W -f='${Status}' clickhouse-server 2>/dev/null | grep -q "install ok installed" || ! id clickhouse >/dev/null 2>&1; then
-  DEBIAN_FRONTEND=noninteractive dpkg --configure -a
-  DEBIAN_FRONTEND=noninteractive apt-get install -y -q --reinstall clickhouse-common-static clickhouse-server >/dev/null
+PIN=/etc/apt/preferences.d/clickhouse-orbyflow
+if [[ -n "$SERIES" ]]; then
+  [[ "$SERIES" =~ ^[0-9]+\.[0-9]+$ ]] || { echo "ORBYFLOW_CH_SERIES invalido" >&2; exit 1; }
+  printf 'Package: clickhouse-*\nPin: version %s.*\nPin-Priority: 1001\n' "$SERIES" > "$PIN"
+else
+  rm -f "$PIN"
+fi
+apt-get update -q >/dev/null
+# instalacao anterior que nao roda nesta CPU (ex.: 26.8 sem AVX2): remove antes de instalar a serie certa
+if dpkg-query -W -f='${Status}' clickhouse-server 2>/dev/null | grep -q "install" && \
+   { ! dpkg-query -W -f='${Status}' clickhouse-server | grep -q "install ok installed" || \
+     ! clickhouse-server --version >/dev/null 2>&1; }; then
+  echo "removendo instalacao que nao executa nesta CPU"
+  DEBIAN_FRONTEND=noninteractive dpkg --purge --force-remove-reinstreq clickhouse-server clickhouse-client \
+    clickhouse-common-static >/dev/null 2>&1 || true
+fi
+if ! command -v clickhouse-server >/dev/null; then
+  if [[ -n "$SERIES" ]] && ! apt-cache madison clickhouse-server | awk '{print $3}' | grep -q "^${SERIES}\."; then
+    echo "serie $SERIES nao encontrada no repositorio do ClickHouse" >&2; exit 1
+  fi
+  # senha do "default" vazia na instalacao; logo abaixo ele e bloqueado
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -q --allow-downgrades clickhouse-server clickhouse-client >/dev/null
 fi
 clickhouse-server --version >/dev/null 2>&1 || { echo "clickhouse-server nao executa nesta CPU" >&2; exit 1; }
 id clickhouse >/dev/null 2>&1 || { echo "usuario clickhouse nao foi criado pelo pacote" >&2; exit 1; }

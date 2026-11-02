@@ -27,7 +27,9 @@ sudo bash scripts/setup-clickhouse.sh --status        # linhas, período, tamanh
 
 O script:
 
-1. instala o `clickhouse-server` do repositório oficial (canal LTS), se faltar;
+1. instala o `clickhouse-server` do repositório oficial (canal LTS), se faltar. O ClickHouse 26.6+ exige CPU com
+   AVX2 (x86-64-v3); em CPUs sem AVX2 (ex.: Xeon E56xx) o script fixa a série LTS **26.3**, a última para
+   x86-64-v2 (com correções até ~março/2027). Em VM Proxmox, use o tipo de CPU **host**;
 2. escuta **só em 127.0.0.1**, limita a memória (`--memory-ratio`, padrão 0.25) e desliga logs internos que só
    gastam disco;
 3. cria três usuários locais — `orbyflow_admin` (só o script), `orbyflow_writer` (rollup, gravação) e
