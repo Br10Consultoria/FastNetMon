@@ -197,6 +197,16 @@ class Formatter:
                     "Alocações de porta: %s/min · portas ativas: %s" % (details.get("allocs_per_min", "?"),
                                                                        details.get("active_ports", "?")),
                     "Sinal de varredura, flood ou malware no equipamento do cliente."]
+            if details.get("top_portas"):
+                body.insert(-1, "Saída do assinante (amostrada): " + ", ".join(
+                    "%s/%s %d destinos" % (e(str(t["protocolo"])), e(str(t["porta"])), t["destinos"])
+                    for t in details["top_portas"][:3]))
+            if details.get("public_ips"):
+                body.insert(-1, "IP público: <code>%s</code>%s" % (e(details["public_ips"][0]),
+                                                                  " (%s)" % e(ev["pool"]) if ev.get("pool") else ""))
+            who = self.ident(ev["subscriber_ip"] or ev["local_ip"], ev.get("event_time"))
+            if who:
+                body.insert(-1, "Identificação: %s" % e(who))
         else:
             inbound = ev["direction"] == "in"
             body = [self.header("🚨" if inbound else "📤", "Ataque recebido" if inbound else "Ataque originado")

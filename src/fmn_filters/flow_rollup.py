@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import argparse
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from ipaddress import ip_address
 import sys
 import time
@@ -30,6 +30,53 @@ packets,bytes,syn_packets,zero_port_packets,flows) VALUES (""" + ",".join(["%s"]
 ON DUPLICATE KEY UPDATE packets=packets+VALUES(packets),bytes=bytes+VALUES(bytes),
 syn_packets=syn_packets+VALUES(syn_packets),zero_port_packets=zero_port_packets+VALUES(zero_port_packets),
 flows=flows+VALUES(flows),pool=VALUES(pool)"""
+
+
+AGG_SQL = {
+    "agg": """INSERT INTO orby_flow_agg_minute (source,bucket_utc,direction,scope,protocol,edge_if,packets,bytes,
+syn_packets,zero_port_packets,flows) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) ON DUPLICATE KEY UPDATE
+packets=packets+VALUES(packets),bytes=bytes+VALUES(bytes),syn_packets=syn_packets+VALUES(syn_packets),
+zero_port_packets=zero_port_packets+VALUES(zero_port_packets),flows=flows+VALUES(flows)""",
+    "ip": """INSERT INTO orby_flow_ip_minute (source,bucket_utc,direction,scope,local_ip,subscriber_ip,pool,packets,bytes,
+flows,remotes) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) ON DUPLICATE KEY UPDATE packets=packets+VALUES(packets),
+bytes=bytes+VALUES(bytes),flows=flows+VALUES(flows),remotes=GREATEST(remotes,VALUES(remotes)),pool=VALUES(pool)""",
+    "port": """INSERT INTO orby_flow_port_5m (source,bucket_utc,direction,protocol,local_port,remote_port,packets,bytes,
+zero_port_packets,flows) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) ON DUPLICATE KEY UPDATE packets=packets+VALUES(packets),
+bytes=bytes+VALUES(bytes),zero_port_packets=zero_port_packets+VALUES(zero_port_packets),flows=flows+VALUES(flows)""",
+    "remote": """INSERT INTO orby_flow_remote_5m (source,bucket_utc,direction,protocol,remote_ip,packets,bytes,flows,locals)
+VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) ON DUPLICATE KEY UPDATE packets=packets+VALUES(packets),bytes=bytes+VALUES(bytes),
+flows=flows+VALUES(flows),locals=GREATEST(locals,VALUES(locals))""",
+}
+AGG_RETENTION_DAYS = {"orby_flow_agg_minute": 90, "orby_flow_ip_minute": 4, "orby_flow_port_5m": 30,
+                      "orby_flow_remote_5m": 4}
+
+
+def aggregates(rows):
+    """Agregados para os dashboards a partir das linhas de um arquivo (mesma ordem de colunas do INSERT_SQL)."""
+    agg, ip, port, rem = {}, {}, {}, {}
+    ip_remotes, rem_locals = {}, {}
+    for (src, bucket, direction, scope, pool, local_ip, sub, remote_ip, proto, lport, rport, in_if, out_if,
+         packets, nbytes, syn, zero, flows) in rows:
+        b5 = bucket.replace(minute=bucket.minute - bucket.minute % 5)
+        edge = in_if if direction == "in" else out_if
+        a = agg.setdefault((src, bucket, direction, scope, proto, edge), [0.0, 0.0, 0.0, 0.0, 0])
+        a[0] += packets; a[1] += nbytes; a[2] += syn; a[3] += zero; a[4] += flows
+        k = (src, bucket, direction, scope, local_ip, sub)
+        i = ip.setdefault(k, [pool, 0.0, 0.0, 0])
+        i[0] = pool or i[0]; i[1] += packets; i[2] += nbytes; i[3] += flows
+        ip_remotes.setdefault(k, set()).add(remote_ip)
+        p = port.setdefault((src, b5, direction, proto, lport, rport), [0.0, 0.0, 0.0, 0])
+        p[0] += packets; p[1] += nbytes; p[2] += zero; p[3] += flows
+        rk = (src, b5, direction, proto, remote_ip)
+        r = rem.setdefault(rk, [0.0, 0.0, 0])
+        r[0] += packets; r[1] += nbytes; r[2] += flows
+        rem_locals.setdefault(rk, set()).add(local_ip)
+    return {
+        "agg": [k + tuple(v) for k, v in agg.items()],
+        "ip": [k + tuple(v) + (len(ip_remotes[k]),) for k, v in ip.items()],
+        "port": [k + tuple(v) for k, v in port.items()],
+        "remote": [k + tuple(v) + (len(rem_locals[k]),) for k, v in rem.items()],
+    }
 
 
 def _public(ip):
@@ -170,13 +217,81 @@ VALUES (%s,%s,%s,%s,%s,%s,%s)""", (source, path.name, st.st_size, st.st_mtime_ns
             return False
         for n in range(0, len(rows), 500):
             cur.executemany(INSERT_SQL, rows[n:n + 500])
+        if AGGREGATES["enabled"]:
+            try:
+                for name, items in aggregates(rows).items():
+                    for n in range(0, len(items), 500):
+                        cur.executemany(AGG_SQL[name], items[n:n + 500])
+            except Exception as exc:              # tabelas ainda nao criadas: segue so com o detalhado
+                if "orby_flow_" not in str(exc) or "doesn't exist" not in str(exc):
+                    raise
+                AGGREGATES["enabled"] = False
+                print("AVISO: agregados dos dashboards desligados (rode scripts/setup-performance.sh)",
+                      file=sys.stderr, flush=True)
     db.commit()
     return True
+
+
+AGGREGATES = {"enabled": True}
+
+B5 = "bucket_utc - INTERVAL MINUTE(bucket_utc) %% 5 MINUTE"
+BACKFILL_SQL = (
+    """INSERT INTO orby_flow_agg_minute (source,bucket_utc,direction,scope,protocol,edge_if,packets,bytes,syn_packets,
+zero_port_packets,flows) SELECT source,bucket_utc,direction,scope,protocol,IF(direction='in',input_if,output_if),
+SUM(packets),SUM(bytes),SUM(syn_packets),SUM(zero_port_packets),SUM(flows) FROM orby_flow_minute WHERE source=%s AND
+bucket_utc>=%s AND bucket_utc<%s GROUP BY source,bucket_utc,direction,scope,protocol,IF(direction='in',input_if,output_if)
+ON DUPLICATE KEY UPDATE packets=VALUES(packets),bytes=VALUES(bytes),syn_packets=VALUES(syn_packets),
+zero_port_packets=VALUES(zero_port_packets),flows=VALUES(flows)""",
+    """INSERT INTO orby_flow_ip_minute (source,bucket_utc,direction,scope,local_ip,subscriber_ip,pool,packets,bytes,flows,
+remotes) SELECT source,bucket_utc,direction,scope,local_ip,subscriber_ip,MAX(pool),SUM(packets),SUM(bytes),SUM(flows),
+COUNT(DISTINCT remote_ip) FROM orby_flow_minute WHERE source=%s AND bucket_utc>=%s AND bucket_utc<%s
+GROUP BY source,bucket_utc,direction,scope,local_ip,subscriber_ip ON DUPLICATE KEY UPDATE pool=VALUES(pool),
+packets=VALUES(packets),bytes=VALUES(bytes),flows=VALUES(flows),remotes=VALUES(remotes)""",
+    """INSERT INTO orby_flow_port_5m (source,bucket_utc,direction,protocol,local_port,remote_port,packets,bytes,
+zero_port_packets,flows) SELECT source,""" + B5 + """,direction,protocol,local_port,remote_port,SUM(packets),SUM(bytes),
+SUM(zero_port_packets),SUM(flows) FROM orby_flow_minute WHERE source=%s AND bucket_utc>=%s AND bucket_utc<%s
+GROUP BY source,""" + B5 + """,direction,protocol,local_port,remote_port ON DUPLICATE KEY UPDATE
+packets=VALUES(packets),bytes=VALUES(bytes),zero_port_packets=VALUES(zero_port_packets),flows=VALUES(flows)""",
+    """INSERT INTO orby_flow_remote_5m (source,bucket_utc,direction,protocol,remote_ip,packets,bytes,flows,locals)
+SELECT source,""" + B5 + """,direction,protocol,remote_ip,SUM(packets),SUM(bytes),SUM(flows),COUNT(DISTINCT local_ip)
+FROM orby_flow_minute WHERE source=%s AND bucket_utc>=%s AND bucket_utc<%s GROUP BY source,""" + B5 + """,direction,
+protocol,remote_ip ON DUPLICATE KEY UPDATE packets=VALUES(packets),bytes=VALUES(bytes),flows=VALUES(flows),
+locals=VALUES(locals)""")
+
+
+def backfill(db, source, until, log=print):
+    """Preenche os agregados a partir do detalhado ja gravado (antes de `until`), uma hora por vez.
+    Recalcula (nao soma): pode rodar de novo sem duplicar. Horas multiplas de 5 min para nao cortar os 5m."""
+    with db.cursor() as cur:
+        cur.execute("SELECT MIN(bucket_utc) FROM orby_flow_minute WHERE source=%s", (source,))
+        first = cur.fetchone()[0]
+    if first is None:
+        return 0
+    hour = first.replace(minute=0, second=0, microsecond=0)
+    until = until.replace(minute=until.minute - until.minute % 5, second=0, microsecond=0)
+    hours = 0
+    while hour < until:
+        nxt = min(hour + timedelta(hours=1), until)
+        with db.cursor() as cur:
+            for sql in BACKFILL_SQL:
+                cur.execute(sql, (source, hour, nxt))
+        db.commit()
+        hours += 1
+        log("agregados: %s ate %s" % (hour, nxt))
+        hour = nxt
+    return hours
 
 
 def prune(db, days):
     """Retencao do rollup e dos agregados NAT (eventos de ataque sao mantidos)."""
     with db.cursor() as cur:
+        if AGGREGATES["enabled"]:
+            for table, keep in AGG_RETENTION_DAYS.items():
+                try:
+                    cur.execute("DELETE FROM " + table + " WHERE bucket_utc < UTC_TIMESTAMP() - INTERVAL %s DAY "
+                                "LIMIT 50000", (keep,))
+                except Exception:
+                    pass
         cur.execute("DELETE FROM orby_flow_minute WHERE bucket_utc < "
                     "UTC_TIMESTAMP() - INTERVAL %s DAY LIMIT 50000", (days,))
         cur.execute("DELETE FROM orby_nat_user_minute WHERE bucket_utc < "
@@ -233,7 +348,22 @@ def main(argv=None):
     ap.add_argument("--max-age-hours", type=int, default=2)
     ap.add_argument("--min-age", type=int, default=45)
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--backfill-aggregates", action="store_true",
+                    help="preenche as tabelas agregadas dos dashboards com o detalhado ja gravado e sai")
     args = ap.parse_args(argv)
+    if args.backfill_aggregates:
+        try:
+            cfg = read_config(args.config)
+            db = connection_from_env()
+            try:
+                n = backfill(db, cfg["source"], datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=10))
+            finally:
+                db.close()
+            print("agregados preenchidos: %d hora(s)" % n)
+            return 0
+        except Exception as exc:
+            print("FALHA backfill: %s" % exc, file=sys.stderr)
+            return 1
     if min(args.max_files, args.max_age_hours, args.min_age) < 1:
         ap.error("limites precisam ser positivos")
     try:

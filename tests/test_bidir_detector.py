@@ -213,3 +213,27 @@ class ConfigTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NatEnrichTests(unittest.TestCase):
+    def test_nat_event_gets_ports_and_public_ip(self):
+        from fmn_filters.bidir_detector import enrich_nat
+        rule = NAT_RULES[next(iter(NAT_RULES))]
+        nat = [dict(bucket_utc=START + timedelta(minutes=m), inside_ip="100.64.70.39", allocs=9000, frees=0,
+                    active_ports=30000) for m in range(rule["consecutive_minutes"])]
+        evs = evaluate_nat(nat, rule, START)
+        self.assertEqual(len(evs), 1)
+        flows = rows(direction="out", scope="cgnat_pool", local="45.238.170.70", sub="100.64.70.39", proto="tcp",
+                     pps=500, mbps=1, sources=40, rport=23, pool="NAT-POOL-08", minutes=2)
+        flows += rows(direction="out", scope="cgnat_pool", local="45.238.170.70", sub="100.64.70.39", proto="tcp",
+                      pps=100, mbps=1, sources=3, rport=443, pool="NAT-POOL-08", minutes=2)
+        ev = enrich_nat(evs[0], flows, START, START + timedelta(minutes=rule["consecutive_minutes"]))
+        self.assertEqual((ev["protocol"], ev["remote_port"], ev["pool"]), ("tcp", 23, "NAT-POOL-08"))
+        self.assertEqual(ev["details"]["top_portas"][0], {"protocolo": "tcp", "porta": 23, "destinos": 40})
+        self.assertEqual(ev["details"]["public_ips"], ["45.238.170.70"])
+        self.assertGreater(ev["pps"], 0)
+        from fmn_filters.bidir_detector import _event_id
+        plain = evaluate_nat(nat, rule, START)[0]
+        self.assertEqual(_event_id(rule, ev), _event_id(rule, plain))      # cooldown/estado nao mudam
+        lonely = enrich_nat(evaluate_nat(nat, rule, START)[0], [], START, START + timedelta(minutes=2))
+        self.assertEqual(lonely["protocol"], "")

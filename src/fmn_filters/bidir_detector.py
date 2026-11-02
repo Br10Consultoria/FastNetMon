@@ -198,15 +198,55 @@ def evaluate_nat(rows, rule, start):
     return events
 
 
+def enrich_nat(ev, rows, start, end):
+    """Evento NAT (contagem de portas do A10) nao tem protocolo/porta: completa com o que o assinante mais
+    usou na saida no mesmo periodo, pelos fluxos amostrados (portas por destinos distintos, taxa e IP publico)."""
+    ip = ev["subscriber_ip"]
+    by_port = defaultdict(lambda: [set(), 0.0, 0.0])
+    publics, minutes = Counter(), set()
+    for row in rows:
+        if row["direction"] != "out" or row["subscriber_ip"] != ip or not start <= row["bucket_utc"] < end:
+            continue
+        item = by_port[(row["protocol"], row["remote_port"])]
+        item[0].add(row["remote_ip"])
+        item[1] += float(row["packets"])
+        item[2] += float(row["bytes"])
+        minutes.add(row["bucket_utc"])
+        if row["scope"] == "cgnat_pool":
+            publics[(row["local_ip"], row["pool"])] += float(row["packets"])
+    if not by_port:
+        ev["details"]["fluxos"] = "sem fluxos amostrados do assinante no periodo"
+        return ev
+    ranked = sorted(by_port.items(), key=lambda kv: (-len(kv[1][0]), -kv[1][1]))
+    (proto, port), (remotes, _, _) = ranked[0]
+    n = max(len(minutes), 1)
+    ev["key_proto_ports"] = (ev["protocol"], ev["local_port"], ev["remote_port"])   # cooldown estavel
+    ev["protocol"], ev["remote_port"] = proto, port
+    ev["remote_ips"] = len(set().union(*(v[0] for _, v in ranked)))
+    ev["pps"] = round(sum(v[1] for _, v in ranked) / 60 / n, 2)
+    ev["mbps"] = round(sum(v[2] for _, v in ranked) * 8 / 60e6 / n, 4)
+    if publics:
+        (pub, pool), _ = publics.most_common(1)[0]
+        ev["pool"] = pool
+        ev["details"]["public_ips"] = [p for (p, _), _ in publics.most_common(3)]
+    ev["details"]["top_portas"] = [{"protocolo": pr, "porta": po or "efemera", "destinos": len(v[0])}
+                                   for (pr, po), v in ranked[:5]]
+    return ev
+
+
+def _key_ports(ev):
+    return ev.get("key_proto_ports", (ev["protocol"], ev["local_port"], ev["remote_port"]))
+
+
 def _event_id(rule, ev):
+    proto, lport, rport = _key_ports(ev)
     return hashlib.sha256(json.dumps(
         [rule["name"], ev["bucket"].isoformat(), ev["direction"], ev["scope"], ev["entity"],
-         ev["protocol"], ev["local_port"], ev["remote_port"]], separators=(",", ":")).encode()).hexdigest()
+         proto, lport, rport], separators=(",", ":")).encode()).hexdigest()
 
 
 def insert_event(cur, source, rule, ev, cooldown):
-    key = (source, rule["name"], ev["direction"], ev["scope"], ev["entity"], ev["protocol"],
-           ev["local_port"], ev["remote_port"])
+    key = (source, rule["name"], ev["direction"], ev["scope"], ev["entity"]) + tuple(_key_ports(ev))
     cur.execute("INSERT IGNORE INTO orby_bidir_rule_state (source,rule_name,direction,scope,entity,"
                 "protocol,local_port,remote_port) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)", key)
     cur.execute("SELECT last_alert_utc FROM orby_bidir_rule_state WHERE " + STATE_KEY + " FOR UPDATE", key)
@@ -276,8 +316,9 @@ def run(config, now=None, dry_run=False):
                     found.extend((rule, ev) for ev in dedupe(evs))
             for rule in config["nat_rules"]:
                 if rule["enabled"]:
-                    for ev in evaluate_nat(nat_rows, rule, end - timedelta(minutes=rule["consecutive_minutes"])):
-                        found.append((rule, ev))
+                    nat_start = end - timedelta(minutes=rule["consecutive_minutes"])
+                    for ev in evaluate_nat(nat_rows, rule, nat_start):
+                        found.append((rule, enrich_nat(ev, rows, nat_start, end)))
             signals = len(found)
             for rule, ev in found:
                 if dry_run:
