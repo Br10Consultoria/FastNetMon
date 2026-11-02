@@ -1095,6 +1095,20 @@ class CliTests(unittest.TestCase):
         self.assertEqual(cli.main(["create-user", "admin"], store=db), 1)
         self.assertEqual(cli.main(["reset-2fa", "admin"], store=db), 0)
 
+    def test_create_user_random_password(self):
+        import contextlib
+        import io
+        from fmn_filters.admin import cli
+        db = FakeStore()
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self.assertEqual(cli.main(["create-user", "noc", "--senha-aleatoria"], store=db), 0)
+        plain = out.getvalue().split("senha inicial de noc: ")[1].split()[0]
+        user = db.user(username="noc")
+        self.assertGreaterEqual(len(plain), 16)
+        self.assertTrue(security.verify_password(plain, user["pw_hash"]))
+        self.assertTrue(user["must_change_password"])
+
 
 @unittest.skipUnless(os.geteuid() == 0, "precisa de root para testar dono do arquivo")
 class RetentionScriptTests(unittest.TestCase):

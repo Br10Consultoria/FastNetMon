@@ -8,6 +8,20 @@
 
 > **Pode instalar num Ubuntu 24.04 LTS ou Debian e receber NetFlow/IPFIX do Huawei e MikroTik.** Isso coleta tráfego normal, mesmo sem qualquer ataque. A consulta inicial funciona com `nfdump`; **a ingestao MariaDB e o provisionamento automatico de dashboards Grafana estao disponiveis em piloto, ainda nao homologados para producao.** Mitigação por blackhole (RTBH) disponível, começando em simulação.
 
+## Instalação automática (recomendada)
+
+Num Ubuntu 22.04/24.04 limpo, um comando instala tudo (MariaDB, coletor, Grafana, detecção, painel, reputação,
+alarmes, saúde, backup e ClickHouse):
+
+```bash
+sudo apt update && sudo apt install -y git
+cd /opt && sudo git clone https://github.com/Br10Consultoria/FastNetMon.git orbymon
+cd /opt/orbymon && sudo bash scripts/install.sh --public-host IP_DO_SERVIDOR --a10-ip IP_DO_A10
+```
+
+Detalhes, opções e o que configurar depois: **[docs/INSTALACAO.md](docs/INSTALACAO.md)**. As seções abaixo
+descrevem a instalação manual, etapa por etapa.
+
 ## Instalar servidor do zero — começar somente pelo Huawei
 
 **Piloto atual:** [Huawei NE8000 primeiro; MikroTik só após calibração](docs/HUAWEI_PILOT.md). O bootstrap prepara ambas as fontes, mas inicie **apenas** o serviço Huawei no primeiro teste.

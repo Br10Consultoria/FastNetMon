@@ -16,12 +16,13 @@ set -euo pipefail
 [[ $EUID -eq 0 ]] || { echo "Execute com sudo" >&2; exit 1; }
 BASE="$(cd "$(dirname "$0")/.." && pwd)"
 PY="$BASE/.venv/bin/python"
-PORT=8443 BIND=0.0.0.0 FIRST_USER=""
+PORT=8443 BIND=0.0.0.0 FIRST_USER="" RANDOM_PW=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --port) PORT="$2"; shift 2 ;;
     --bind) BIND="$2"; shift 2 ;;
     --user) FIRST_USER="$2"; shift 2 ;;
+    --random-password) RANDOM_PW=1; shift ;;   # instalador automatico: senha gerada, troca no 1o acesso
     *) echo "opcao desconhecida: $1" >&2; exit 1 ;;
   esac
 done
@@ -195,8 +196,20 @@ systemctl is-active orbymon-admin.service
 COUNT=$(mariadb orbymon -NBe "SELECT COUNT(*) FROM orby_admin_users")
 if [[ "$COUNT" == 0 ]]; then
   [[ -n "$FIRST_USER" ]] || read -rp "Nome do primeiro usuario administrador: " FIRST_USER
-  sudo -u orbymon-admin env $(sed -e "s/'//g" -e '/^#/d' "$ADMIN_ENV" | xargs) PYTHONPATH="$BASE/src" \
-    "$PY" -m fmn_filters.admin.cli create-user "$FIRST_USER"
+  if (( RANDOM_PW )); then
+    OUT=$(sudo -u orbymon-admin env $(sed -e "s/'//g" -e '/^#/d' "$ADMIN_ENV" | xargs) PYTHONPATH="$BASE/src" \
+      "$PY" -m fmn_filters.admin.cli create-user "$FIRST_USER" --senha-aleatoria)
+    install -m 0600 /dev/stdin /root/orbyflow-painel-acesso.txt <<TXT
+Painel OrbyFlow: https://$(hostname -I | awk '{print $1}'):$PORT
+Usuario: $FIRST_USER
+$(printf '%s\n' "$OUT" | sed -n 's/^senha inicial de [^:]*: /Senha inicial: /p')
+(troca obrigatoria da senha e cadastro do 2FA no primeiro acesso)
+TXT
+    echo "usuario $FIRST_USER criado; senha inicial em /root/orbyflow-painel-acesso.txt (somente root)"
+  else
+    sudo -u orbymon-admin env $(sed -e "s/'//g" -e '/^#/d' "$ADMIN_ENV" | xargs) PYTHONPATH="$BASE/src" \
+      "$PY" -m fmn_filters.admin.cli create-user "$FIRST_USER"
+  fi
 fi
 
 IP=$(hostname -I | awk '{print $1}')

@@ -1,6 +1,7 @@
 """Linha de comando do painel: python -m fmn_filters.admin.cli <comando> <usuario>
 
   create-user NOME   cria usuario (senha pedida no terminal; 2FA ativado no primeiro acesso)
+  create-user NOME --senha-aleatoria   gera a senha, mostra uma vez e exige troca no primeiro acesso
   set-password NOME  redefine a senha (troca obrigatoria no proximo acesso)
   reset-2fa NOME     apaga o 2FA (novo QR code no proximo acesso)
   unlock NOME        limpa as tentativas de login falhas
@@ -44,7 +45,13 @@ def main(argv=None, store=None):
         if cmd == "create-user":
             if user:
                 raise ValueError("usuario ja existe")
-            store.create_user(name, _password(), must_change=False)
+            if "--senha-aleatoria" in argv[2:]:
+                import secrets
+                plain = secrets.token_urlsafe(15)
+                store.create_user(name, security.hash_password(plain), must_change=True)
+                print("senha inicial de %s: %s" % (name, plain))
+            else:
+                store.create_user(name, _password(), must_change=False)
         elif not user:
             raise ValueError("usuario nao encontrado")
         elif cmd == "set-password":
