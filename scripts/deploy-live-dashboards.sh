@@ -23,18 +23,23 @@ if command -v mariadb >/dev/null; then
       "$BASE/.venv/bin/python" -m fmn_filters.net_prefixes --config /etc/orbymon/bidir.json
   fi
 fi
+# com o ClickHouse configurado (setup-clickhouse.sh), os dashboards de trafego leem dele
+CH_DS=/etc/grafana/provisioning/datasources/orbyflow-clickhouse.yaml
+src_of() {
+  if [[ -f "$CH_DS" && -f "$BASE/grafana/dashboards-clickhouse/$1" ]]; then echo "$BASE/grafana/dashboards-clickhouse/$1"
+  else echo "$BASE/grafana/dashboards/$1"; fi
+}
 for name in $DASHBOARDS; do
-  SRC="$BASE/grafana/dashboards/$name"
-  python3 -m json.tool "$SRC" >/dev/null
+  python3 -m json.tool "$(src_of "$name")" >/dev/null
 done
 for name in $DASHBOARDS; do
-  SRC="$BASE/grafana/dashboards/$name"
+  SRC="$(src_of "$name")"
   DEST="$D/$name"
   if [[ -f "$DEST" ]] && ! cmp -s "$SRC" "$DEST"; then
     cp -a "$DEST" "$DEST.bak.$(date -u +%Y%m%dT%H%M%SZ)"
   fi
   install -o grafana -g grafana -m 0644 "$SRC" "$DEST"
-  echo "[OK] $name"
+  echo "[OK] $name$([[ "$SRC" == *dashboards-clickhouse* ]] && echo ' (ClickHouse)')"
 done
 echo "Provisionamento: mesmos UIDs. Grafana atualizara os arquivos em aproximadamente 30s."
 echo "Coleta NetFlow, NTP, A10 e servicos inalterados."

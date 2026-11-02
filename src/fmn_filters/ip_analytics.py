@@ -164,6 +164,17 @@ def prune(db, hours, batch=50000):
     return removed
 
 
+def clickhouse_sink():
+    """Gravacao opcional no ClickHouse (ORBYMON_CH_URL no ambiente); None quando desligado."""
+    from .clickhouse import Sink
+    return Sink.from_env()
+
+
+def sync_dimensions(client,cur):
+    from .clickhouse import sync_dimensions as sync
+    return sync(client,cur)
+
+
 def run(source="huawei",*,max_files=20,max_age_hours=1,min_age=45,
         dry_run=False,folder=None,enricher=None,retention_hours=72,time_budget=150):
     directory=folder if folder is not None else ROOT/source
@@ -173,7 +184,12 @@ def run(source="huawei",*,max_files=20,max_age_hours=1,min_age=45,
                             os.getenv("ORBYMON_CITY_MMDB") or None)
     imported=0
     failed=0
+    sink=None if db is None else clickhouse_sink()
     try:
+        if sink is not None:
+            sent=sink.flush_spool()
+            if sent:
+                print("ClickHouse: %d lote(s) do spool reenviado(s)" % sent,flush=True)
         pending=eligible if db is None else pending_files(db,source,eligible)
         paths=pending[:max_files]
         print("fonte=%s elegiveis=%d pendentes=%d lote=%d dry_run=%s" %
@@ -193,6 +209,8 @@ def run(source="huawei",*,max_files=20,max_age_hours=1,min_age=45,
                 else:
                     ok=save_file(db,source,path,st,rows,count)
                     imported+=int(ok)
+                    if ok and sink is not None:   # depois do commit no MariaDB; falha vai para o spool
+                        sink.write_pairs(sink.token(source,path.name,st.st_size,st.st_mtime_ns),rows)
                     print("%s %s fluxos=%d pares=%d" %
                           ("IMPORTADO" if ok else "JA_IMPORTADO",
                            path.name,count,len(rows)),flush=True)
@@ -200,6 +218,14 @@ def run(source="huawei",*,max_files=20,max_age_hours=1,min_age=45,
                 failed+=1
                 if db: db.rollback()
                 print("ERRO %s: %s" % (path.name,exc),file=sys.stderr,flush=True)
+        if sink is not None and imported:
+            try:
+                with db.cursor() as cur:
+                    copied=sync_dimensions(sink.client,cur)
+                if copied:
+                    print("ClickHouse: tabelas atualizadas %s" % ",".join(copied),flush=True)
+            except Exception as exc:
+                print("AVISO ClickHouse (tabelas auxiliares): %s" % str(exc)[:200],file=sys.stderr,flush=True)
         if db and retention_hours:
             removed=prune(db,retention_hours)
             if removed:

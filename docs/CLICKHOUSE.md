@@ -12,6 +12,10 @@ Quem usa:
 - **Painel → Ataques, filtro "IP remoto"**: com o ClickHouse, procura o IP remoto em **todos** os fluxos (sem ele,
   só entre os principais IPs de cada ataque).
 
+- **Grafana**: os dashboards *Huawei - Tráfego e GeoIP ao Vivo*, *Huawei - IPs, Redes e Interfaces*, *CGNAT* e
+  *Visão geral* passam a ler os pares de IP do ClickHouse (50 painéis). Os poucos painéis de alertas e de arquivos
+  importados continuam no MariaDB. Períodos de 24 h ou 7 dias deixam de pesar no MariaDB.
+
 ## Instalação
 
 ```bash
@@ -30,7 +34,16 @@ O script:
    `orbyflow_reader` (painel, só leitura, 30 s e 2 GB por consulta). O usuário `default` fica bloqueado;
 4. guarda as senhas em `/etc/orbymon/clickhouse-admin.env` (0600 root), `clickhouse.env` (0640 root:orbymon) e
    `clickhouse-reader.env` (0640 root:orbymon-admin). O systemd lê esses arquivos como dados; nunca são executados;
-5. liga o rollup e o painel por *drop-ins* do systemd e dá ao painel leitura das bases GeoLite2 (ASN/país).
+5. liga o rollup, os pares de IP (`orbymon-ip-huawei`) e o painel por *drop-ins* do systemd e dá ao painel leitura
+   das bases GeoLite2 (ASN/país);
+6. no Grafana: instala o plugin `grafana-clickhouse-datasource`, cria a fonte de dados **OrbyFlow ClickHouse**
+   (usuário `orbyflow_grafana`, só leitura, 60 s e 3 GB por consulta) e instala a versão ClickHouse dos dashboards
+   (mesmos UIDs: substituem os atuais). Se o ClickHouse for removido, `deploy-live-dashboards.sh` volta a instalar
+   a versão MariaDB.
+
+Os dashboards ClickHouse são gerados dos dashboards MariaDB (`python3 grafana/clickhouse_sql.py`); os testes rodam
+cada consulta no motor do ClickHouse e comparam com o resultado do MariaDB nos mesmos dados.
+Tabelas pequenas (nomes de interface, países, blocos do provedor) são copiadas para o ClickHouse quando mudam.
 
 Não há cópia do histórico: o ClickHouse começa vazio e, depois de 2 dias, já cobre tudo o que o MariaDB tinha.
 Enquanto isso, o painel usa o MariaDB para os períodos mais antigos.
@@ -53,7 +66,10 @@ tamanho real com `--status` depois de alguns dias.
 
 ```bash
 sudo rm /etc/systemd/system/orbymon-flow-rollup-huawei.service.d/clickhouse.conf \
-        /etc/systemd/system/orbymon-admin.service.d/clickhouse.conf
-sudo systemctl daemon-reload && sudo systemctl restart orbymon-admin
+        /etc/systemd/system/orbymon-ip-huawei.service.d/clickhouse.conf \
+        /etc/systemd/system/orbymon-admin.service.d/clickhouse.conf \
+        /etc/grafana/provisioning/datasources/orbyflow-clickhouse.yaml
+sudo systemctl daemon-reload && sudo systemctl restart orbymon-admin grafana-server
+sudo bash scripts/deploy-live-dashboards.sh               # volta os dashboards para o MariaDB
 sudo systemctl disable --now clickhouse-server
 ```

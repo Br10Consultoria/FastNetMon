@@ -14,7 +14,7 @@ um spool em disco e e reenviado depois, com o mesmo token (o ClickHouse descarta
 from __future__ import annotations
 
 import argparse
-from datetime import datetime
+from datetime import datetime, timezone
 import gzip
 import json
 import os
@@ -30,6 +30,22 @@ TABLE = "flow_minute"
 COLUMNS = ("source", "bucket", "direction", "scope", "pool", "local_ip", "subscriber_ip", "remote_ip", "protocol",
            "local_port", "remote_port", "input_if", "output_if", "packets", "bytes", "syn_packets",
            "zero_port_packets", "flows")
+PAIRS_TABLE = "orby_ip_pairs_minute"
+PAIRS_COLUMNS = ("source", "bucket_utc", "src_ip", "dst_ip", "protocol", "dst_port", "input_if", "output_if",
+                 "netflow_direction", "src_prefix", "dst_prefix", "src_asn", "dst_asn", "src_asn_name", "dst_asn_name",
+                 "src_country", "dst_country", "src_latitude", "src_longitude", "dst_latitude", "dst_longitude",
+                 "total_packets", "total_bytes", "flow_records")
+# tabelas pequenas do MariaDB copiadas para os dashboards (mesmos nomes: o SQL dos paineis muda pouco)
+DIMENSIONS = {
+    "orby_interface_names": ("SELECT source,if_index,if_name FROM orby_interface_names", ("source", "if_index", "if_name"),
+                             "source LowCardinality(String), if_index UInt64, if_name String", "(source, if_index)"),
+    "orby_country_names": ("SELECT code,name FROM orby_country_names", ("code", "name"),
+                           "code String, name String", "code"),
+    "orby_net_prefixes": ("SELECT kind,cidr,name,v_start,v_end FROM orby_net_prefixes",
+                          ("kind", "cidr", "name", "v_start", "v_end"),
+                          "kind LowCardinality(String), cidr String, name String, v_start UInt64, v_end UInt64",
+                          "(kind, v_start)"),
+}
 SPOOL_DIR = "/var/lib/orbymon/clickhouse-spool"
 SPOOL_MAX_BYTES = 2 * 1024 ** 3
 NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,62}$")
@@ -72,7 +88,44 @@ ORDER BY (source, direction, bucket, scope, protocol)
 TTL bucket + INTERVAL %d DAY DELETE
 SETTINGS index_granularity = 8192, non_replicated_deduplication_window = 20000, ttl_only_drop_parts = 1""" % (t, ttl_days),
         "ALTER TABLE %s MODIFY TTL bucket + INTERVAL %d DAY DELETE" % (t, ttl_days),
-    ]
+        """CREATE TABLE IF NOT EXISTS %s.%s (
+ source LowCardinality(String),
+ bucket_utc DateTime('UTC') CODEC(DoubleDelta, ZSTD(1)),
+ src_ip String CODEC(ZSTD(1)),
+ dst_ip String CODEC(ZSTD(1)),
+ protocol LowCardinality(String),
+ dst_port UInt16,
+ input_if UInt32,
+ output_if UInt32,
+ netflow_direction Int16,
+ src_prefix LowCardinality(String),
+ dst_prefix LowCardinality(String),
+ src_asn UInt64,
+ dst_asn UInt64,
+ src_asn_name LowCardinality(String),
+ dst_asn_name LowCardinality(String),
+ src_country LowCardinality(String),
+ dst_country LowCardinality(String),
+ src_latitude Nullable(Float64),
+ src_longitude Nullable(Float64),
+ dst_latitude Nullable(Float64),
+ dst_longitude Nullable(Float64),
+ total_packets Float64 CODEC(ZSTD(1)),
+ total_bytes Float64 CODEC(ZSTD(1)),
+ flow_records UInt64 CODEC(ZSTD(1)),
+ INDEX ix_src src_ip TYPE bloom_filter(0.01) GRANULARITY 2,
+ INDEX ix_dst dst_ip TYPE bloom_filter(0.01) GRANULARITY 2
+) ENGINE = MergeTree
+PARTITION BY toYYYYMMDD(bucket_utc)
+ORDER BY (source, bucket_utc, protocol)
+TTL bucket_utc + INTERVAL %d DAY DELETE
+SETTINGS index_granularity = 8192, non_replicated_deduplication_window = 20000, ttl_only_drop_parts = 1"""
+        % (database, PAIRS_TABLE, ttl_days),
+        "ALTER TABLE %s.%s MODIFY TTL bucket_utc + INTERVAL %d DAY DELETE" % (database, PAIRS_TABLE, ttl_days),
+        "CREATE TABLE IF NOT EXISTS %s.orby_sync_state (name String, value String, updated_at DateTime('UTC')) "
+        "ENGINE = ReplacingMergeTree(updated_at) ORDER BY name" % database,
+    ] + ["CREATE TABLE IF NOT EXISTS %s.%s (%s) ENGINE = MergeTree ORDER BY %s" % (database, name, cols, key)
+         for name, (_, _, cols, key) in DIMENSIONS.items()]
 
 
 class ClickHouseError(RuntimeError):
@@ -80,6 +133,8 @@ class ClickHouseError(RuntimeError):
 
 
 def _tsv(value):
+    if value is None:
+        return "\\N"
     if isinstance(value, datetime):
         return value.strftime("%Y-%m-%d %H:%M:%S")
     if isinstance(value, float):
@@ -184,22 +239,28 @@ class Sink:
     def token(source, name, size, mtime_ns):
         return "%s:%s:%d:%d" % (source, name, size, mtime_ns)
 
-    def write(self, token, rows):
+    def write(self, token, rows, table=None, columns=COLUMNS):
+        table = table or self.table
         try:
-            self.client.insert(self.table, COLUMNS, rows, token)
+            self.client.insert(table, columns, rows, token)
             return True
         except Exception as exc:
-            self._to_spool(token, rows)
+            self._to_spool(token, rows, table, columns)
             self.log("AVISO ClickHouse: %s; lote guardado no spool" % str(exc)[:200])
             return False
 
-    def _to_spool(self, token, rows):
+    def write_pairs(self, token, rows):
+        """Pares de IP por minuto (pipeline ip-huawei) para os dashboards Huawei/CGNAT/Visao geral."""
+        return self.write("pairs:" + token, rows, "%s.%s" % (self.client.database, PAIRS_TABLE), PAIRS_COLUMNS)
+
+    def _to_spool(self, token, rows, table=None, columns=COLUMNS):
         try:
             self.spool.mkdir(parents=True, exist_ok=True)
             name = re.sub(r"[^A-Za-z0-9_.-]+", "_", token)[:200] + ".tsv.gz"
             tmp = self.spool / (".tmp-" + name)
+            head = "#%s\t%s\t%s\n" % (token, table or self.table, ",".join(columns))
             with gzip.open(tmp, "wb") as fh:
-                fh.write(("#" + token + "\n").encode("utf-8") + encode_rows(rows))
+                fh.write(head.encode("utf-8") + encode_rows(rows))
             tmp.replace(self.spool / name)
             self._trim()
         except OSError as exc:
@@ -224,8 +285,12 @@ class Sink:
                 with gzip.open(path, "rb") as fh:
                     head = fh.readline().decode("utf-8").strip()
                     data = fh.read()
-                token = head[1:] if head.startswith("#") else None
-                sql = "INSERT INTO %s (%s) FORMAT TabSeparated" % (self.table, ",".join(COLUMNS))
+                parts = head[1:].split("\t") if head.startswith("#") else [""]
+                token = parts[0] or None
+                table, cols = (parts[1], parts[2]) if len(parts) == 3 else (self.table, ",".join(COLUMNS))
+                if not re.match(r"^[A-Za-z_][\w]*\.[A-Za-z_]\w*$", table) or not re.match(r"^[\w,]+$", cols):
+                    raise ValueError("cabecalho invalido")
+                sql = "INSERT INTO %s (%s) FORMAT TabSeparated" % (table, cols)
                 self.client._send(sql, None, {"insert_deduplication_token": token} if token else {}, data)
             except ClickHouseError as exc:
                 self.log("AVISO ClickHouse ainda indisponivel: %s" % str(exc)[:200])
@@ -240,14 +305,45 @@ class Sink:
         return len(list(self.spool.glob("*.tsv.gz"))) if self.spool.is_dir() else 0
 
 
+def sync_dimensions(client, cur, log=None):
+    """Copia as tabelas pequenas do MariaDB (interfaces, paises, blocos) quando mudam. Retorna as copiadas."""
+    import hashlib
+    done = []
+    state = {r["name"]: r["value"] for r in client.query(
+        "SELECT name, argMax(value, updated_at) AS value FROM %s.orby_sync_state GROUP BY name" % client.database)}
+    for name, (sql, cols, _, _) in DIMENSIONS.items():
+        try:
+            cur.execute(sql)
+            rows = [tuple("" if v is None else v for v in r) for r in cur.fetchall()]
+        except Exception as exc:                     # tabela ainda nao criada no MariaDB
+            if log:
+                log("AVISO %s: %s" % (name, str(exc)[:120]))
+            continue
+        digest = hashlib.sha256(encode_rows(sorted(rows))).hexdigest()
+        if state.get(name) == digest:
+            continue
+        table = "%s.%s" % (client.database, name)
+        client.execute("TRUNCATE TABLE %s" % table)
+        client.insert(table, cols, rows)
+        client.insert("%s.orby_sync_state" % client.database, ("name", "value", "updated_at"),
+                      [(name, digest, datetime.now(timezone.utc).replace(tzinfo=None, microsecond=0))])
+        done.append(name)
+    return done
+
+
 def status(client):
     rows = client.query("SELECT count() AS linhas, min(bucket) AS desde, max(bucket) AS ate FROM %s.%s"
                         % (client.database, TABLE))
     out = dict(rows[0]) if rows else {}
     try:
+        pr = client.query("SELECT count() AS linhas, min(bucket_utc) AS desde, max(bucket_utc) AS ate FROM %s.%s"
+                          % (client.database, PAIRS_TABLE))
+        out["pares_ip"] = pr[0] if pr else {}
+    except ClickHouseError:
+        pass
+    try:
         size = client.query("SELECT sum(bytes_on_disk) AS disco, sum(data_uncompressed_bytes) AS bruto "
-                            "FROM system.parts WHERE active AND database={db:String} AND table={t:String}",
-                            {"db": client.database, "t": TABLE})
+                            "FROM system.parts WHERE active AND database={db:String}", {"db": client.database})
         out.update(size[0] if size else {})
     except ClickHouseError:
         pass                                     # usuario sem leitura de system.*: so as linhas

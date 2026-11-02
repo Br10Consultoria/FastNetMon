@@ -2,6 +2,7 @@
 Usa o chdb (motor do ClickHouse embutido) quando instalado: pip install chdb."""
 from datetime import datetime, timedelta
 import gzip
+import json
 from pathlib import Path
 import shutil
 import tempfile
@@ -181,6 +182,58 @@ class HealthTests(unittest.TestCase):
             self.assertEqual(health.check_clickhouse(tmp, mt + 7200)[0]["status"], health.CRIT)
         finally:
             shutil.rmtree(tmp)
+
+
+@unittest.skipUnless(HAVE_CHDB, "chdb nao instalado")
+class PairsAndDimsTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.sess = chs.Session(str(self.tmp / "db"))
+        for sql in ch.schema(30):
+            self.sess.query(sql)
+        self.client = ch.Client("http://127.0.0.1:8123", "u", "p", transport=chdb_transport(self.sess))
+
+    def tearDown(self):
+        self.sess.close()
+        shutil.rmtree(self.tmp)
+
+    def test_pairs_with_null_coordinates_and_spool_header(self):
+        r = ("huawei", datetime(2026, 11, 1, 10, 0), "2001:db8::1", "187.87.201.40", "udp", 53, 10, 20, 0, "", "",
+             0, 262687, "", "BR10", "", "BR", None, None, -12.9, -38.5, 2048.0, 1e6, 1)
+        state = {"down": True}
+        real = self.client.transport
+
+        def flaky(*a):
+            if state["down"]:
+                raise ch.ClickHouseError("fora")
+            return real(*a)
+        self.client.transport = flaky
+        sink = ch.Sink(self.client, spool_dir=self.tmp / "spool", log=lambda m: None)
+        self.assertFalse(sink.write_pairs("huawei:f:1:1", [r]))
+        state["down"] = False
+        self.assertEqual(sink.flush_spool(), 1)
+        got = json.loads(str(self.sess.query("SELECT src_ip, src_latitude, dst_latitude FROM "
+                                             "orbyflow.orby_ip_pairs_minute FORMAT JSON")))["data"]
+        self.assertEqual(got, [{"src_ip": "2001:db8::1", "src_latitude": None, "dst_latitude": -12.9}])
+
+    def test_dimension_sync_only_when_changed(self):
+        class Cur:
+            data = {"orby_interface_names": [("huawei", 10, "100GE0/1/0")],
+                    "orby_country_names": [("BR", "Brasil")],
+                    "orby_net_prefixes": [("pool", "45.238.170.64/26", "NAT-POOL-08", 1, 2)]}
+
+            def execute(self, sql):
+                self.rows = self.data[sql.split(" FROM ")[1].strip()]
+
+            def fetchall(self):
+                return self.rows
+        self.client.database = "orbyflow"
+        self.assertEqual(len(ch.sync_dimensions(self.client, Cur())), 3)
+        self.assertEqual(ch.sync_dimensions(self.client, Cur()), [])            # sem mudanca: nada
+        Cur.data["orby_interface_names"] = [("huawei", 10, "100GE0/1/0"), ("huawei", 20, "Eth-Trunk1")]
+        self.assertEqual(ch.sync_dimensions(self.client, Cur()), ["orby_interface_names"])
+        n = json.loads(str(self.sess.query("SELECT count() AS n FROM orbyflow.orby_interface_names FORMAT JSON")))
+        self.assertEqual(int(n["data"][0]["n"]), 2)
 
 
 if __name__ == "__main__":

@@ -84,6 +84,9 @@ ADMIN_ENV=/etc/orbymon/clickhouse-admin.env WRITE_ENV=/etc/orbymon/clickhouse.en
 ADMIN_PASS=$(read_pass "$ADMIN_ENV"); [[ "$ADMIN_PASS" =~ ^[0-9a-f]{48}$ ]] || ADMIN_PASS=$(new_pass)
 WRITE_PASS=$(read_pass "$WRITE_ENV"); [[ "$WRITE_PASS" =~ ^[0-9a-f]{48}$ ]] || WRITE_PASS=$(new_pass)
 READ_PASS=$(read_pass "$READ_ENV");  [[ "$READ_PASS" =~ ^[0-9a-f]{48}$ ]] || READ_PASS=$(new_pass)
+GRAF_ENV=/etc/orbymon/grafana-clickhouse.env
+GRAF_PASS=$([[ -f "$GRAF_ENV" ]] && sed -n 's/^ORBYFLOW_CH_GRAFANA_PASSWORD=//p' "$GRAF_ENV" | head -n 1 || true)
+[[ "$GRAF_PASS" =~ ^[0-9a-f]{48}$ ]] || GRAF_PASS=$(new_pass)
 LOCK_PASS=$(new_pass)                      # bloqueia o "default": ninguem guarda essa senha
 sha() { printf '%s' "$1" | sha256sum | cut -d' ' -f1; }
 write_env() {   # arquivo dono grupo usuario senha
@@ -114,6 +117,19 @@ cat > "$TMPX" <<XML
         <max_threads><max>4</max></max_threads>
       </constraints>
     </orbyflow_reader>
+    <orbyflow_grafana>
+      <readonly>2</readonly>
+      <join_use_nulls>1</join_use_nulls>
+      <max_execution_time>60</max_execution_time>
+      <max_memory_usage>3000000000</max_memory_usage>
+      <max_threads>4</max_threads>
+      <constraints>
+        <max_execution_time><max>60</max></max_execution_time>
+        <max_memory_usage><max>3000000000</max></max_memory_usage>
+        <max_threads><max>4</max></max_threads>
+        <join_use_nulls><readonly/></join_use_nulls>
+      </constraints>
+    </orbyflow_grafana>
     <orbyflow_writer>
       <max_memory_usage>1500000000</max_memory_usage>
       <max_threads>2</max_threads>
@@ -136,8 +152,19 @@ cat > "$TMPX" <<XML
       <password_sha256_hex>$(sha "$WRITE_PASS")</password_sha256_hex>
       <networks><ip>127.0.0.1</ip></networks>
       <profile>orbyflow_writer</profile><quota>default</quota>
-      <grants><query>GRANT SELECT, INSERT ON orbyflow.*</query></grants>
+      <grants>
+        <query>GRANT SELECT, INSERT ON orbyflow.*</query>
+        <query>GRANT TRUNCATE ON orbyflow.orby_interface_names</query>
+        <query>GRANT TRUNCATE ON orbyflow.orby_country_names</query>
+        <query>GRANT TRUNCATE ON orbyflow.orby_net_prefixes</query>
+      </grants>
     </orbyflow_writer>
+    <orbyflow_grafana>
+      <password_sha256_hex>$(sha "$GRAF_PASS")</password_sha256_hex>
+      <networks><ip>127.0.0.1</ip></networks>
+      <profile>orbyflow_grafana</profile><quota>default</quota>
+      <grants><query>GRANT SELECT ON orbyflow.*</query></grants>
+    </orbyflow_grafana>
     <orbyflow_reader>
       <password_sha256_hex>$(sha "$READ_PASS")</password_sha256_hex>
       <networks><ip>127.0.0.1</ip></networks>
@@ -163,10 +190,16 @@ echo "=== Banco e retencao (${TTL} dias) ==="
 ORBYMON_CH_URL=http://127.0.0.1:8123 ORBYMON_CH_USER=orbyflow_admin ORBYMON_CH_PASSWORD="$ADMIN_PASS" \
   ORBYMON_CH_DATABASE=orbyflow PYTHONPATH="$BASE/src" "$BASE/.venv/bin/python" -m fmn_filters.clickhouse --init --ttl-days "$TTL"
 
-echo "=== Ligando rollup e painel ==="
+echo "=== Ligando rollup, pares de IP e painel ==="
 install -d -m 0750 -o orbymon -g orbymon /var/lib/orbymon/clickhouse-spool
 install -d -m 0755 /etc/systemd/system/orbymon-flow-rollup-huawei.service.d /etc/systemd/system/orbymon-admin.service.d
 cat > /etc/systemd/system/orbymon-flow-rollup-huawei.service.d/clickhouse.conf <<'UNIT'
+[Service]
+EnvironmentFile=-/etc/orbymon/clickhouse.env
+ReadWritePaths=-/var/lib/orbymon/clickhouse-spool
+UNIT
+install -d -m 0755 /etc/systemd/system/orbymon-ip-huawei.service.d
+cat > /etc/systemd/system/orbymon-ip-huawei.service.d/clickhouse.conf <<'UNIT'
 [Service]
 EnvironmentFile=-/etc/orbymon/clickhouse.env
 ReadWritePaths=-/var/lib/orbymon/clickhouse-spool
@@ -183,7 +216,51 @@ if [[ -d /var/lib/orbymon/geoip ]] && command -v setfacl >/dev/null; then
 fi
 systemctl daemon-reload
 systemctl restart orbymon-admin
-echo "rollup grava no ClickHouse a partir da proxima execucao (1 min)"
+echo "rollup e pares de IP gravam no ClickHouse a partir da proxima execucao (1 min)"
+
+echo "=== Grafana (plugin, fonte de dados e dashboards) ==="
+GCLI=""
+command -v grafana-cli >/dev/null && GCLI="grafana-cli"
+[[ -z "$GCLI" ]] && command -v grafana >/dev/null && GCLI="grafana cli"
+if [[ -n "$GCLI" ]] && id grafana >/dev/null 2>&1; then
+  if [[ ! -d /var/lib/grafana/plugins/grafana-clickhouse-datasource ]]; then
+    $GCLI --pluginsDir /var/lib/grafana/plugins plugins install grafana-clickhouse-datasource >/dev/null
+    chown -R grafana:grafana /var/lib/grafana/plugins/grafana-clickhouse-datasource
+  fi
+  tmp=$(mktemp "$GRAF_ENV.XXXXXX")
+  printf 'ORBYFLOW_CH_GRAFANA_PASSWORD=%s\n' "$GRAF_PASS" > "$tmp"
+  chown root:grafana "$tmp"; chmod 0640 "$tmp"; mv -f "$tmp" "$GRAF_ENV"
+  install -d -m 0755 /etc/systemd/system/grafana-server.service.d
+  cat > /etc/systemd/system/grafana-server.service.d/zz-orbyflow-clickhouse.conf <<'UNIT'
+[Service]
+EnvironmentFile=-/etc/orbymon/grafana-clickhouse.env
+UNIT
+  install -d -m 0755 /etc/grafana/provisioning/datasources
+  cat > /etc/grafana/provisioning/datasources/orbyflow-clickhouse.yaml <<'YAML'
+apiVersion: 1
+datasources:
+  - name: OrbyFlow ClickHouse
+    uid: orbyflow-clickhouse
+    type: grafana-clickhouse-datasource
+    editable: false
+    jsonData:
+      host: 127.0.0.1
+      port: 9000
+      protocol: native
+      secure: false
+      username: orbyflow_grafana
+      defaultDatabase: orbyflow
+    secureJsonData:
+      password: $ORBYFLOW_CH_GRAFANA_PASSWORD
+YAML
+  chown root:grafana /etc/grafana/provisioning/datasources/orbyflow-clickhouse.yaml
+  chmod 0640 /etc/grafana/provisioning/datasources/orbyflow-clickhouse.yaml
+  systemctl daemon-reload
+  systemctl restart grafana-server
+  bash "$BASE/scripts/deploy-live-dashboards.sh" >/dev/null && echo "dashboards Huawei/IPs/CGNAT/Visao geral no ClickHouse"
+else
+  echo "Grafana nao encontrado: dashboards nao alterados"
+fi
 
 echo "=== Estado ==="
 sleep 2
