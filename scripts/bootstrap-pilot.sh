@@ -17,7 +17,8 @@ apt-get update
 DEBIAN_FRONTEND=noninteractive apt-get install -y python3 git nfdump tcpdump
 id -u orbymon >/dev/null 2>&1 || useradd --system --home-dir /var/lib/orbymon --shell /usr/sbin/nologin --user-group orbymon
 install -d -m 0750 -o orbymon -g orbymon /var/lib/orbymon /var/lib/orbymon/flows /var/lib/orbymon/flows/huawei /var/lib/orbymon/flows/mikrotik /var/lib/orbymon/state
-install -d -m 0750 -o root -g orbymon /etc/orbymon
+# so cria se faltar: reaplicar 0750 tira o "x" que o Grafana usa para ler o certificado TLS
+[[ -d /etc/orbymon ]] || install -d -m 0750 -o root -g orbymon /etc/orbymon
 for name in huawei mikrotik; do
   case "$name" in huawei) port=2056;; mikrotik) port=2057;; esac
   if [[ ! -e "/etc/orbymon/$name.env" ]]; then

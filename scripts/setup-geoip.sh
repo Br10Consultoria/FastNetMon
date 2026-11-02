@@ -37,7 +37,8 @@ if ! runuser -u orbymon -- "$BASE/.venv/bin/python" -c 'import geoip2.database; 
   echo "Python nao importavel como orbymon; execute sudo bash scripts/repair-geoip-python.sh" >&2
   exit 1
 fi
-install -d -m 0750 -o root -g orbymon /etc/orbymon
+# so cria se faltar: reaplicar 0750 tira o "x" que o Grafana usa para ler o certificado TLS
+[[ -d /etc/orbymon ]] || install -d -m 0750 -o root -g orbymon /etc/orbymon
 TMP="$(mktemp /etc/orbymon/.geoip-XXXXXXXX)"
 trap 'rm -f "$TMP"' EXIT
 if [[ -f "$ENV_FILE" ]]; then
