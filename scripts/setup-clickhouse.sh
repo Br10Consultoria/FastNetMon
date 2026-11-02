@@ -259,13 +259,23 @@ echo "rollup e pares de IP gravam no ClickHouse a partir da proxima execucao (1 
 
 echo "=== Grafana (plugin, fonte de dados e dashboards) ==="
 GCLI=""
-command -v grafana-cli >/dev/null && GCLI="grafana-cli"
-[[ -z "$GCLI" ]] && command -v grafana >/dev/null && GCLI="grafana cli"
+command -v grafana >/dev/null && GCLI="grafana cli"
+[[ -z "$GCLI" ]] && command -v grafana-cli >/dev/null && GCLI="grafana-cli"
+PLUGIN_OK=0
 if [[ -n "$GCLI" ]] && id grafana >/dev/null 2>&1; then
-  if [[ ! -d /var/lib/grafana/plugins/grafana-clickhouse-datasource ]]; then
-    $GCLI --pluginsDir /var/lib/grafana/plugins plugins install grafana-clickhouse-datasource >/dev/null
-    chown -R grafana:grafana /var/lib/grafana/plugins/grafana-clickhouse-datasource
+  if ls -d /var/lib/grafana/plugins/*clickhouse* >/dev/null 2>&1; then
+    PLUGIN_OK=1
+  elif $GCLI --homepath /usr/share/grafana --pluginsDir /var/lib/grafana/plugins plugins install grafana-clickhouse-datasource 2>&1 \
+       | grep -v -i deprecat | tail -n 5; then
+    ls -d /var/lib/grafana/plugins/*clickhouse* >/dev/null 2>&1 && PLUGIN_OK=1
   fi
+  if (( ! PLUGIN_OK )); then
+    echo "AVISO: plugin ClickHouse do Grafana nao instalado (veja a mensagem acima); dashboards continuam no MariaDB." >&2
+    echo "O ClickHouse ja esta gravando e o painel ja usa; rode este script de novo depois de resolver." >&2
+  fi
+fi
+if (( PLUGIN_OK )); then
+  chown -R grafana:grafana /var/lib/grafana/plugins/*clickhouse*
   tmp=$(mktemp "$GRAF_ENV.XXXXXX")
   printf 'ORBYFLOW_CH_GRAFANA_PASSWORD=%s\n' "$GRAF_PASS" > "$tmp"
   chown root:grafana "$tmp"; chmod 0640 "$tmp"; mv -f "$tmp" "$GRAF_ENV"
@@ -297,7 +307,7 @@ YAML
   systemctl daemon-reload
   systemctl restart grafana-server
   bash "$BASE/scripts/deploy-live-dashboards.sh" >/dev/null && echo "dashboards Huawei/IPs/CGNAT/Visao geral no ClickHouse"
-else
+elif [[ -z "$GCLI" ]]; then
   echo "Grafana nao encontrado: dashboards nao alterados"
 fi
 
