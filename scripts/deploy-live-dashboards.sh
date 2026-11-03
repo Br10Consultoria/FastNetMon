@@ -5,7 +5,7 @@ set -euo pipefail
 [[ $EUID -eq 0 ]] || { echo "Execute como root/sudo" >&2; exit 1; }
 BASE="$(cd "$(dirname "$0")/.." && pwd)"
 D=/var/lib/grafana/dashboards/orbymon
-DASHBOARDS="orbyflow-huawei-live.json orbyflow-overview.json orbyflow-ip-analytics.json orbyflow-cgnat.json orbyflow-f4-ataques.json orbyflow-reputacao.json orbyflow-cgnat-portas.json orbyflow-cgnat-assinantes.json orbyflow-ataques-originados.json"
+DASHBOARDS="orbyflow-huawei-live.json orbyflow-overview.json orbyflow-ip-analytics.json orbyflow-cgnat.json orbyflow-f4-ataques.json orbyflow-reputacao.json orbyflow-cgnat-portas.json orbyflow-cgnat-assinantes.json orbyflow-ataques-originados.json orbyflow-alarmes.json"
 [[ -d "$D" ]] || { echo "Diretorio Grafana ausente: $D" >&2; exit 1; }
 id grafana >/dev/null || { echo "Usuario grafana ausente" >&2; exit 1; }
 if command -v mariadb >/dev/null; then

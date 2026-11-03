@@ -1,0 +1,625 @@
+{
+  "id": null,
+  "uid": "orbyflow-alarmes",
+  "title": "Alarmes por filtro",
+  "description": "Alarmes ligados no painel web (página Alarmes): situação agora, incidentes e a medida minuto a minuto de cada um.",
+  "tags": [
+    "orbyflow",
+    "alarmes",
+    "filtros"
+  ],
+  "editable": true,
+  "schemaVersion": 41,
+  "version": 1,
+  "graphTooltip": 1,
+  "links": [],
+  "liveNow": false,
+  "timezone": "browser",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "refresh": "1m",
+  "fiscalYearStartMonth": 0,
+  "timepicker": {
+    "refresh_intervals": [
+      "1m",
+      "5m",
+      "15m"
+    ]
+  },
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "templating": {
+    "list": [
+      {
+        "type": "query",
+        "name": "alarme",
+        "label": "Alarme",
+        "datasource": {
+          "type": "mysql",
+          "uid": "orbyflow-mysql"
+        },
+        "query": "SELECT name AS __text, id AS __value FROM orby_filter_rules WHERE enabled=1 ORDER BY name",
+        "definition": "SELECT name AS __text, id AS __value FROM orby_filter_rules WHERE enabled=1 ORDER BY name",
+        "refresh": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": "SELECT id FROM orby_filter_rules",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "hide": 0,
+        "skipUrlSync": false,
+        "sort": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Alarmes ligados",
+      "description": "",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbyflow-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbyflow-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS value FROM orby_filter_rules WHERE enabled=1"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "blue"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Incidentes abertos agora",
+      "description": "",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbyflow-mysql"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbyflow-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS value FROM orby_filter_incidents WHERE status IN ('open','cooling')"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "green"
+              },
+              {
+                "value": 1,
+                "color": "red"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Incidentes no período",
+      "description": "",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbyflow-mysql"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbyflow-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS value FROM orby_filter_incidents WHERE $__timeFilter(started_at)"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "green"
+              },
+              {
+                "value": 1,
+                "color": "orange"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Alarmes com erro",
+      "description": "Filtro inválido ou atalho (@rede, @pools...) vazio: veja a coluna Erro abaixo.",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbyflow-mysql"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbyflow-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS value FROM orby_filter_rules r JOIN orby_filter_rule_state s ON s.rule_id=r.id WHERE r.enabled=1 AND s.last_error<>''"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "green"
+              },
+              {
+                "value": 1,
+                "color": "red"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "Alarmes agora",
+      "description": "Liga/desliga e limites: painel web > Alarmes. Cada alarme ligado é avaliado a cada minuto (24x7).",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbyflow-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 24,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbyflow-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT r.name AS 'Alarme',IF(r.enabled,'ligado','desligado') AS 'Ligado',CASE WHEN NOT r.enabled THEN '—' WHEN s.status='open' THEN 'INCIDENTE' WHEN s.status='cooling' THEN 'resfriando' WHEN s.last_bucket IS NULL THEN 'aguardando' ELSE 'normal' END AS 'Situação',CASE r.direction WHEN 'in' THEN 'recebido' WHEN 'out' THEN 'originado' ELSE 'ambos' END AS 'Sentido',r.severity AS 'Severidade',s.last_bucket AS 'Último minuto (UTC)',s.last_bps AS 'Taxa',s.last_pps AS 'Pacotes/s',s.last_flows AS 'Fluxos/min',NULLIF(s.last_error,'') AS 'Erro',r.expr AS 'Filtro' FROM orby_filter_rules r LEFT JOIN orby_filter_rule_state s ON s.rule_id=r.id ORDER BY r.enabled DESC,(s.status='open') DESC,r.name"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": []
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true,
+            "align": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Taxa"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bps"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Pacotes/s"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "pps"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "Incidentes no período",
+      "description": "Top = quem mais pesou no alarme (destino, origem, porta... conforme o relatório do alarme). Detalhe por IP: painel web > Ataques (tipo 'Filtro: ...').",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbyflow-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbyflow-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT i.rule_name AS 'Alarme',i.severity AS 'Severidade',CASE i.status WHEN 'open' THEN 'aberto' WHEN 'cooling' THEN 'resfriando' ELSE 'encerrado' END AS 'Situação',i.started_at AS 'Início (UTC)',i.resolved_at AS 'Fim (UTC)',TIMESTAMPDIFF(MINUTE,i.started_at,COALESCE(i.resolved_at,UTC_TIMESTAMP())) AS 'Duração (min)',i.peak_bps AS 'Pico taxa',i.peak_pps AS 'Pico pacotes/s',i.matches AS 'Minutos casados',CONCAT_WS(', ',JSON_VALUE(i.top,'$[0].key'),JSON_VALUE(i.top,'$[1].key'),JSON_VALUE(i.top,'$[2].key')) AS 'Top (IPs/portas)',COALESCE(JSON_VALUE(i.top,'$[0].assinantes[0]'),JSON_VALUE(i.top,'$[1].assinantes[0]'),JSON_VALUE(i.top,'$[2].assinantes[0]')) AS 'Assinante (CGNAT)' FROM orby_filter_incidents i JOIN orby_filter_rules r ON r.id=i.rule_id WHERE r.id IN (${alarme:csv}) AND i.started_at<$__timeTo() AND (i.resolved_at IS NULL OR i.resolved_at>=$__timeFrom()) ORDER BY i.started_at DESC LIMIT 300"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": []
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true,
+            "align": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Pico taxa"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bps"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Pico pacotes/s"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "pps"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Taxa medida por alarme (Mbps)",
+      "description": "O que cada alarme mediu minuto a minuto (soma do tráfego que casa com o filtro).",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbyflow-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbyflow-mysql"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT $__timeGroupAlias(x.bucket_utc,'1m'),r.name AS metric,x.bps/1000000 AS value FROM orby_filter_rule_samples x JOIN orby_filter_rules r ON r.id=x.rule_id WHERE r.id IN (${alarme:csv}) AND $__timeFilter(x.bucket_utc) ORDER BY 1"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Mbps",
+          "decimals": 0,
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Pacotes/s medidos por alarme",
+      "description": "",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbyflow-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbyflow-mysql"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT $__timeGroupAlias(x.bucket_utc,'1m'),r.name AS metric,x.pps AS value FROM orby_filter_rule_samples x JOIN orby_filter_rules r ON r.id=x.rule_id WHERE r.id IN (${alarme:csv}) AND $__timeFilter(x.bucket_utc) ORDER BY 1"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "pps",
+          "decimals": 0,
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Minutos em que a condição casou",
+      "description": "1 = a condição do alarme foi atendida naquele minuto. O incidente abre depois dos 'minutos seguidos' configurados no alarme.",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbyflow-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbyflow-mysql"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT $__timeGroupAlias(x.bucket_utc,'1m'),r.name AS metric,x.matched AS value FROM orby_filter_rule_samples x JOIN orby_filter_rules r ON r.id=x.rule_id WHERE r.id IN (${alarme:csv}) AND $__timeFilter(x.bucket_utc) ORDER BY 1"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 80,
+            "showPoints": "never",
+            "spanNulls": true,
+            "drawStyle": "bars"
+          },
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      }
+    }
+  ]
+}

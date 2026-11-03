@@ -20,7 +20,8 @@ class DashboardImportTests(unittest.TestCase):
                                       "orbyflow-huawei-live.json", "orbyflow-reputacao.json", "orbyflow-overview.json",
                                       "orbyflow-cgnat-portas.json",       # gerado por grafana/build_cgnat_ports.py
                                       "orbyflow-cgnat-assinantes.json",  # gerado por grafana/build_cgnat_subscribers.py
-                                      "orbyflow-ataques-originados.json"})  # separado da reputacao pelo import_v2
+                                      "orbyflow-ataques-originados.json",  # separado da reputacao pelo import_v2
+                                      "orbyflow-alarmes.json"})  # gerado por grafana/build_alarms.py
 
     def test_no_provider_specific_blocks(self):
         for path in DASH.glob("*.json"):
@@ -41,13 +42,16 @@ class DashboardImportTests(unittest.TestCase):
             for p in d["panels"]:
                 for t in p.get("targets", []):
                     self.assertEqual(t["datasource"], {"type": "mysql", "uid": "orbyflow-mysql"})
-        self.assertEqual(len(uids), 9)
+        self.assertEqual(len(uids), 10)
 
     def test_cgnat_ports_dashboard_is_generated(self):
         sys.path.insert(0, str(ROOT / "grafana"))
         import build_cgnat_ports as b
         self.assertEqual(json.loads((DASH / "orbyflow-cgnat-portas.json").read_text()), b.build(),
                          "rode python3 grafana/build_cgnat_ports.py")
+        import build_alarms as a
+        self.assertEqual(json.loads((DASH / "orbyflow-alarmes.json").read_text()), a.build(),
+                         "rode python3 grafana/build_alarms.py")
         import build_cgnat_subscribers as s
         self.assertEqual(json.loads((DASH / "orbyflow-cgnat-assinantes.json").read_text()), s.build(),
                          "rode python3 grafana/build_cgnat_subscribers.py")
