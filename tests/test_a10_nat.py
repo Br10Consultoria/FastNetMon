@@ -354,3 +354,19 @@ class PublicPortsTests(unittest.TestCase):
             self.assertTrue(a10_nat.PUBLIC_STATE["disabled"])
         finally:
             a10_nat.PUBLIC_STATE.update(state)
+
+
+class HeavyUserTests(unittest.TestCase):
+    def test_heavy_subscriber_share_of_public_ip(self):
+        svc = NatService(SCOPES, allowed_sources=["127.0.0.1"])
+        sp = StreamSplitter()
+        text = "".join(msg(inside="100.64.70.39", pub_port=1000 + n) for n in range(30))
+        text += msg(inside="100.64.64.5", pub_port=9) + msg(inside="100.64.70.39", proto="UDP", pub_port=5)
+        svc.ingest_text(text, sp, now=600.0)
+        pub, heavy = svc.usage_rows(now=670.0, capacity=100, heavy_min=20)
+        self.assertEqual(len(heavy), 1)
+        h = heavy[0]
+        self.assertEqual((h[1], h[2], h[3]), ("100.64.70.39", "45.238.170.70", "NAT-POOL-08"))
+        self.assertEqual((h[4], h[5]), (30, 1))
+        self.assertEqual(h[7], 30.0)                         # 30 de 100 portas TCP do IP
+        self.assertEqual(svc.public_rows(now=670.0, capacity=100), pub)

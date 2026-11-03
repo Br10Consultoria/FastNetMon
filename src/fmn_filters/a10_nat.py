@@ -344,15 +344,25 @@ class NatService:
         return rows
 
     def public_rows(self, now: float, capacity: int = None):
-        """Uso de portas por IP publico do pool agora (foto da tabela NAT) + alocacoes do ultimo minuto completo.
-        Linhas para orby_nat_public_minute: (minuto, ip, pool, tcp, udp, outras, assinantes, alocacoes, capacidade)."""
+        return self.usage_rows(now, capacity)[0]
+
+    def usage_rows(self, now: float, capacity: int = None, heavy_min: int = None):
+        """Foto da tabela NAT a cada minuto.
+        1) por IP publico do pool: (minuto, ip, pool, tcp, udp, outras, assinantes, alocacoes, capacidade)
+        2) assinantes com muitas portas (>= heavy_min): (minuto, ip privado, IP publico principal, pool, tcp, udp,
+           outras, % da capacidade do IP publico ocupada por ele) -- quem esta esgotando o IP dos vizinhos."""
         capacity = capacity or PORTS_PER_IP
+        heavy_min = HEAVY_MIN_PORTS if heavy_min is None else heavy_min
         minute = int(now // 60) - 1
         ports = defaultdict(lambda: [0, 0, 0])
         subs = defaultdict(set)
+        per_user = defaultdict(Counter)                      # ip privado -> (ip publico, proto) -> portas
         for (pub, _port, proto), cur in self.table.active.items():
-            ports[pub][0 if proto == "tcp" else 1 if proto == "udp" else 2] += 1
+            i = 0 if proto == "tcp" else 1 if proto == "udp" else 2
+            ports[pub][i] += 1
             subs[pub].add(cur[0])
+            if self.table.users.get(cur[0], 0) >= heavy_min:
+                per_user[cur[0]][(pub, i)] += 1
         for key in [k for k in self.pub_allocs if k[0] < minute]:
             if key[0] < minute - 1:
                 self.pub_allocs.pop(key, None)
@@ -366,7 +376,23 @@ class NatService:
             t, u, o = ports.get(pub, (0, 0, 0))
             rows.append((bucket, pub, pool[:64], t, u, o, len(subs.get(pub, ())),
                          self.pub_allocs.get((minute, pub), 0), capacity))
-        return rows
+        heavy = []
+        for inside, cnt in per_user.items():
+            by_pub = Counter()
+            proto = [0, 0, 0]
+            for (pub, i), n in cnt.items():
+                by_pub[pub] += n
+                proto[i] += n
+            if sum(proto) < heavy_min:
+                continue
+            pub = by_pub.most_common(1)[0][0]
+            try:
+                pool = self.scopes.classify(pub)[1] or ""
+            except Exception:
+                pool = ""
+            share = 100.0 * max(cnt.get((pub, 0), 0), cnt.get((pub, 1), 0)) / max(1, capacity)
+            heavy.append((bucket, inside, pub, pool[:64], proto[0], proto[1], proto[2], round(share, 2)))
+        return rows, heavy
 
     def lookup_many(self, keys):
         out = []
@@ -392,12 +418,18 @@ NAT_PUBLIC_SQL = """INSERT INTO orby_nat_public_minute
 (%s,%s,%s,%s,%s,%s,%s,%s,%s) ON DUPLICATE KEY UPDATE tcp_ports=GREATEST(tcp_ports,VALUES(tcp_ports)),
 udp_ports=GREATEST(udp_ports,VALUES(udp_ports)),other_ports=GREATEST(other_ports,VALUES(other_ports)),
 subscribers=GREATEST(subscribers,VALUES(subscribers)),allocs=GREATEST(allocs,VALUES(allocs))"""
+HEAVY_MIN_PORTS = int(os.environ.get("ORBYMON_NAT_HEAVY_PORTS", "1000"))
+NAT_HEAVY_SQL = """INSERT INTO orby_nat_heavy_minute
+(bucket_utc,inside_ip,public_ip,pool,tcp_ports,udp_ports,other_ports,share_pct) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+ON DUPLICATE KEY UPDATE public_ip=VALUES(public_ip),pool=VALUES(pool),tcp_ports=GREATEST(tcp_ports,VALUES(tcp_ports)),
+udp_ports=GREATEST(udp_ports,VALUES(udp_ports)),other_ports=GREATEST(other_ports,VALUES(other_ports)),
+share_pct=GREATEST(share_pct,VALUES(share_pct))"""
 PUBLIC_RETENTION_DAYS = 7
-PUBLIC_STATE = {"disabled": False, "pruned": 0.0}
+PUBLIC_STATE = {"disabled": False, "pruned": 0.0, "heavy_off": False}
 
 
-def save_public(rows, now=None):
-    """Uso de portas por IP publico (tabela opcional: sem ela, desliga em silencio e o resto segue)."""
+def save_public(rows, now=None, heavy=None):
+    """Uso de portas por IP publico e assinantes pesados (tabelas opcionais: sem elas, desliga em silencio)."""
     if PUBLIC_STATE["disabled"] or not rows:
         return
     from .mysql_sink import connection_from_env
@@ -406,10 +438,20 @@ def save_public(rows, now=None):
         with db.cursor() as cur:
             for n in range(0, len(rows), 500):
                 cur.executemany(NAT_PUBLIC_SQL, rows[n:n + 500])
+            if heavy and not PUBLIC_STATE["heavy_off"]:
+                try:
+                    cur.executemany(NAT_HEAVY_SQL, heavy)
+                except Exception as exc:
+                    if "orby_nat_heavy_minute" not in str(exc):
+                        raise
+                    PUBLIC_STATE["heavy_off"] = True     # tabela nova ainda nao criada (setup-cgnat-ports.sh)
             now = time.time() if now is None else now
             if now - PUBLIC_STATE["pruned"] > 3600:
                 cur.execute("DELETE FROM orby_nat_public_minute WHERE bucket_utc < UTC_TIMESTAMP() - INTERVAL %s DAY "
                             "LIMIT 100000", (PUBLIC_RETENTION_DAYS,))
+                if not PUBLIC_STATE["heavy_off"]:
+                    cur.execute("DELETE FROM orby_nat_heavy_minute WHERE bucket_utc < UTC_TIMESTAMP() - INTERVAL %s "
+                                "DAY LIMIT 100000", (PUBLIC_RETENTION_DAYS,))
                 PUBLIC_STATE["pruned"] = now
         db.commit()
     except Exception as exc:
@@ -559,7 +601,8 @@ async def serve(service: NatService, host, port, socket_path, *, use_db=True, wa
                         print("ERRO gravando agregados NAT: %s" % exc, file=sys.stderr, flush=True)
                 if use_db and not PUBLIC_STATE["disabled"]:
                     try:                          # uso de portas por IP publico (independente do acima)
-                        await loop.run_in_executor(None, save_public, service.public_rows(now))
+                        pub_rows, heavy = service.usage_rows(now)
+                        await loop.run_in_executor(None, save_public, pub_rows, None, heavy)
                     except Exception as exc:
                         service.stats["falhas_portas_publicas"] += 1
                         print("ERRO gravando portas por IP publico: %s" % exc, file=sys.stderr, flush=True)

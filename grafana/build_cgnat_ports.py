@@ -97,17 +97,20 @@ def build():
               "'Assinantes (máx)',MAX(allocs) AS 'Alocações/min (máx)' FROM orby_nat_public_minute WHERE "
               "$__timeFilter(bucket_utc) GROUP BY public_ip ORDER BY 3 DESC LIMIT 50" % PCT,
               41, 10, "", "Pico de uso (%)"),
-        table(10, "Assinantes com mais portas abertas",
-              "SELECT inside_ip AS 'IP privado (assinante)',MAX(active_ports) AS 'Portas ativas (máx)',"
-              "MAX(allocs) AS 'Alocações/min (máx)',SUM(allocs) AS 'Alocações no período' FROM orby_nat_user_minute "
-              "WHERE $__timeFilter(bucket_utc) GROUP BY inside_ip ORDER BY 2 DESC LIMIT 30",
-              51, 10, "Quem mais consome portas do pool (equipamento infectado, P2P, muitas conexões)."),
+        table(10, "Quem está ocupando cada IP público (pico no período)",
+              "SELECT public_ip AS 'IP público',MAX(pool) AS 'Pool',inside_ip AS 'Assinante (IP privado)',"
+              "MAX(share_pct) AS 'Ocupa do IP (%%)',MAX(GREATEST(tcp_ports,udp_ports)) AS 'Portas (máx)' FROM "
+              "orby_nat_heavy_minute WHERE $__timeFilter(bucket_utc) GROUP BY public_ip,inside_ip "
+              "ORDER BY 4 DESC LIMIT 30",
+              51, 10, "Assinantes com 1.000+ portas e quanto do IP público eles ocupam sozinhos. Sem cota por "
+              "assinante no A10, um só cliente pode esgotar o IP dos vizinhos. Detalhe: dashboard CGNAT - Assinantes.",
+              "Ocupa do IP (%)"),
         series(11, "Alocações de portas por minuto (por pool)",
                "SELECT $__timeGroupAlias(bucket_utc,'1m'),pool AS metric,SUM(allocs) AS value FROM orby_nat_public_minute "
                "WHERE $__timeFilter(bucket_utc) GROUP BY 1,pool ORDER BY 1", 61),
     ]
     return {"id": None, "uid": "orbymon-cgnat-portas", "title": "CGNAT - Portas por IP público",
-            "description": "Uso de portas NAT por IP público do pool (log do A10, sem amostragem). Um IP público com "
+            "description": "Capacidade: uso de portas NAT por IP público do pool (log do A10, sem amostragem). Um IP público com "
                            "portas esgotadas faz as novas conexões dos assinantes que o compartilham falharem.",
             "tags": ["orbymon", "cgnat", "a10", "portas"], "editable": True, "schemaVersion": 41, "version": 1,
             "graphTooltip": 1, "links": [], "liveNow": False, "timezone": "browser",

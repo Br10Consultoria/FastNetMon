@@ -193,5 +193,24 @@ class NatPortsTests(unittest.TestCase):
         self.assertIn("UDP", crit[0]["value"])
 
 
+class NatCulpritTests(unittest.TestCase):
+    def test_names_subscriber_holding_the_ip(self):
+        from datetime import datetime
+        from fmn_filters import health
+        now = datetime(2026, 11, 3, 12, 0)
+        answers = [[("45.238.170.164", "NAT-POOL-10", 56600, 300, 22, 64512, now)],
+                   [("45.238.170.164", "100.64.70.39", 56000, 86.8)]]
+
+        class Cur:
+            def execute(self, sql, params=None):
+                self.rows = answers.pop(0)
+
+            def fetchall(self):
+                return self.rows
+        item = health.check_nat_ports(Cur(), now)[0]
+        self.assertEqual(item["status"], health.WARN)
+        self.assertIn("assinante 100.64.70.39 com 56000 portas (87% do IP)", item["detail"])
+
+
 if __name__ == "__main__":
     unittest.main()

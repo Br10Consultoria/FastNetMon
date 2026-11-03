@@ -223,9 +223,22 @@ def check_nat_ports(cur, now):
     proto = "TCP" if int(worst[2]) >= int(worst[3]) else "UDP"
     detail = ""
     if st != OK:
-        detail = ("IPs públicos perto do limite: " + ", ".join("%s (%s) %.0f%%, %d assinantes" % (r[0], r[1] or "?", pct(r), int(r[4]))
-                                                                for r in hot) +
-                  ". Novas conexões desses assinantes podem falhar: veja o dashboard CGNAT - Portas.")
+        culprits = {}
+        try:                                   # quem esta ocupando o IP (assinante pesado no mesmo minuto)
+            ph = ",".join(["%s"] * len(hot))
+            cur.execute("SELECT public_ip,inside_ip,GREATEST(tcp_ports,udp_ports),share_pct FROM orby_nat_heavy_minute "
+                        "WHERE bucket_utc=%s AND public_ip IN (" + ph + ") ORDER BY share_pct DESC",
+                        [worst[6]] + [r[0] for r in hot])
+            for pub, inside, n, share in cur.fetchall():
+                culprits.setdefault(pub, (inside, int(n), float(share)))
+        except Exception:
+            pass
+        def who(r):
+            c = culprits.get(r[0])
+            return (" — assinante %s com %d portas (%.0f%% do IP)" % c) if c else ""
+        detail = ("IPs públicos perto do limite: " + "; ".join("%s (%s) %.0f%%, %d assinantes%s" % (
+            r[0], r[1] or "?", pct(r), int(r[4]), who(r)) for r in hot) +
+                  ". Novas conexões dos outros assinantes desse IP podem falhar: veja o dashboard CGNAT - Assinantes.")
     return [item("cgnat_ports", "CGNAT: portas por IP público", st,
                  "maior uso %.0f%% (%s %s, %s, %d assinantes)" % (p, worst[0], proto, worst[1] or "?", int(worst[4])),
                  detail)]

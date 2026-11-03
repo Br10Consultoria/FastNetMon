@@ -1,0 +1,845 @@
+{
+  "id": null,
+  "uid": "orbymon-cgnat-assinantes",
+  "title": "CGNAT - Assinantes (portas e abuso)",
+  "description": "Uso de portas NAT por assinante (log do A10, sem amostragem): quem ocupa o IP público dos vizinhos, quem abre conexões em massa e os alertas de NAT. Capacidade dos IPs públicos: dashboard CGNAT - Portas por IP público.",
+  "tags": [
+    "orbymon",
+    "cgnat",
+    "a10",
+    "assinantes"
+  ],
+  "editable": true,
+  "schemaVersion": 41,
+  "version": 1,
+  "graphTooltip": 1,
+  "links": [],
+  "liveNow": false,
+  "timezone": "browser",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "refresh": "1m",
+  "fiscalYearStartMonth": 0,
+  "timepicker": {
+    "refresh_intervals": [
+      "1m",
+      "5m",
+      "15m"
+    ]
+  },
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "templating": {
+    "list": [
+      {
+        "type": "textbox",
+        "name": "assinante",
+        "label": "Assinante (IP privado)",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        },
+        "hide": 0,
+        "skipUrlSync": false,
+        "description": "IP privado do assinante (100.64.x.x) para os painéis de baixo"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Assinantes com 10 mil+ portas agora",
+      "description": "Um assinante com 10 mil portas ocupa ~15% de um IP público inteiro.",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS value FROM orby_nat_heavy_minute WHERE bucket_utc=(SELECT MAX(bucket_utc) FROM orby_nat_heavy_minute WHERE $__timeFilter(bucket_utc)) AND GREATEST(tcp_ports,udp_ports)>=10000"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "green"
+              },
+              {
+                "value": 1,
+                "color": "orange"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Maior fatia de um IP ocupada por 1 assinante",
+      "description": "",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT MAX(share_pct) AS value FROM orby_nat_heavy_minute WHERE bucket_utc=(SELECT MAX(bucket_utc) FROM orby_nat_heavy_minute WHERE $__timeFilter(bucket_utc))"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "green"
+              },
+              {
+                "value": 15,
+                "color": "yellow"
+              },
+              {
+                "value": 30,
+                "color": "orange"
+              },
+              {
+                "value": 50,
+                "color": "red"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Assinantes com 1.000+ portas agora",
+      "description": "",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS value FROM orby_nat_heavy_minute WHERE bucket_utc=(SELECT MAX(bucket_utc) FROM orby_nat_heavy_minute WHERE $__timeFilter(bucket_utc))"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "blue"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Alertas de NAT no período",
+      "description": "",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS value FROM orby_attack_events WHERE detection='nat' AND $__timeFilter(event_time)"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "green"
+              },
+              {
+                "value": 1,
+                "color": "orange"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "Assinantes que mais ocupam portas — agora",
+      "description": "Rotatividade = portas novas por minuto sobre as portas abertas. Alta (dezenas de %) = abre e fecha sem parar: típico de bot/varredura. Baixa com muitas portas = conexões longas (P2P, muitos aparelhos). Para ver um assinante, digite o IP no filtro do topo.",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT h.inside_ip AS 'Assinante (IP privado)',h.public_ip AS 'IP público',h.pool AS 'Pool',h.tcp_ports AS 'Portas TCP',h.udp_ports AS 'Portas UDP',h.share_pct AS 'Ocupa do IP (%)',u.allocs AS 'Alocações/min',ROUND(u.allocs/GREATEST(1,u.active_ports)*100,1) AS 'Rotatividade (%/min)' FROM orby_nat_heavy_minute h LEFT JOIN orby_nat_user_minute u ON u.inside_ip=h.inside_ip AND u.bucket_utc=h.bucket_utc WHERE h.bucket_utc=(SELECT MAX(bucket_utc) FROM orby_nat_heavy_minute WHERE $__timeFilter(bucket_utc)) ORDER BY GREATEST(h.tcp_ports,h.udp_ports) DESC LIMIT 50"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": []
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true,
+            "align": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Ocupa do IP (%)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "value": null,
+                      "color": "green"
+                    },
+                    {
+                      "value": 60,
+                      "color": "yellow"
+                    },
+                    {
+                      "value": 80,
+                      "color": "orange"
+                    },
+                    {
+                      "value": 95,
+                      "color": "red"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "Pico no período por assinante",
+      "description": "Quem passa mais tempo com muitas portas: candidato a contato do suporte (equipamento infectado, P2P) ou a uma cota por assinante no A10.",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 15,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT inside_ip AS 'Assinante (IP privado)',MAX(public_ip) AS 'IP público',MAX(GREATEST(tcp_ports,udp_ports)) AS 'Portas (máx)',MAX(share_pct) AS 'Ocupa do IP (máx %%)',SUM(GREATEST(tcp_ports,udp_ports)>=10000) AS 'Minutos com 10 mil+',COUNT(*) AS 'Minutos com 1.000+' FROM orby_nat_heavy_minute WHERE $__timeFilter(bucket_utc) GROUP BY inside_ip ORDER BY 3 DESC LIMIT 50"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": []
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true,
+            "align": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Ocupa do IP (máx %)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "value": null,
+                      "color": "green"
+                    },
+                    {
+                      "value": 60,
+                      "color": "yellow"
+                    },
+                    {
+                      "value": 80,
+                      "color": "orange"
+                    },
+                    {
+                      "value": 95,
+                      "color": "red"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Portas abertas — 10 assinantes que mais ocupam",
+      "description": "",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 25,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT $__timeGroupAlias(h.bucket_utc,'1m'),h.inside_ip AS metric,GREATEST(h.tcp_ports,h.udp_ports) AS value FROM orby_nat_heavy_minute h JOIN (SELECT inside_ip FROM orby_nat_heavy_minute WHERE $__timeFilter(bucket_utc) GROUP BY inside_ip ORDER BY MAX(GREATEST(tcp_ports,udp_ports)) DESC LIMIT 10) t ON t.inside_ip=h.inside_ip WHERE $__timeFilter(h.bucket_utc) ORDER BY 1"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Alocações de portas por minuto — 10 assinantes mais ativos",
+      "description": "Muitas alocações por minuto, sustentadas, indicam conexões novas em massa (varredura, bot).",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 33,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT $__timeGroupAlias(u.bucket_utc,'1m'),u.inside_ip AS metric,u.allocs AS value FROM orby_nat_user_minute u JOIN (SELECT inside_ip FROM orby_nat_user_minute WHERE $__timeFilter(bucket_utc) GROUP BY inside_ip ORDER BY SUM(allocs) DESC LIMIT 10) t ON t.inside_ip=u.inside_ip WHERE $__timeFilter(u.bucket_utc) ORDER BY 1"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 9,
+      "type": "table",
+      "title": "Alertas de NAT (detecção)",
+      "description": "",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 41,
+        "w": 24,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT event_time AS 'Hora',rule_name AS 'Regra',severity AS 'Severidade',subscriber_ip AS 'Assinante',COALESCE(JSON_VALUE(details,'$.public_ips[0]'),'') AS 'IP público',CAST(JSON_VALUE(details,'$.allocs_per_min') AS UNSIGNED) AS 'Alocações/min',CAST(JSON_VALUE(details,'$.active_ports') AS UNSIGNED) AS 'Portas ativas',COALESCE(CONCAT(JSON_VALUE(details,'$.top_portas[0].protocolo'),'/',JSON_VALUE(details,'$.top_portas[0].porta'),' → ',JSON_VALUE(details,'$.top_portas[0].destinos'),' destinos'),'') AS 'Principal saída' FROM orby_attack_events WHERE detection='nat' AND $__timeFilter(event_time) ORDER BY event_time DESC LIMIT 200"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": []
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true,
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Assinante selecionado: portas abertas e alocações/min",
+      "description": "Digite o IP privado no filtro 'Assinante' no topo.",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 50,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),'portas abertas' AS metric,active_ports AS value FROM orby_nat_user_minute WHERE inside_ip=${assinante:sqlstring} AND $__timeFilter(bucket_utc) UNION ALL SELECT $__timeGroupAlias(bucket_utc,'1m'),'alocações/min',allocs FROM orby_nat_user_minute WHERE inside_ip=${assinante:sqlstring} AND $__timeFilter(bucket_utc) ORDER BY 1"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 11,
+      "type": "table",
+      "title": "Assinante selecionado: IP público, TCP e UDP (quando passa de 1.000 portas)",
+      "description": "",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 58,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT bucket_utc AS 'Minuto',public_ip AS 'IP público',tcp_ports AS 'TCP',udp_ports AS 'UDP',share_pct AS 'Ocupa do IP (%)' FROM orby_nat_heavy_minute WHERE inside_ip=${assinante:sqlstring} AND $__timeFilter(bucket_utc) ORDER BY bucket_utc DESC LIMIT 300"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": []
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true,
+            "align": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Ocupa do IP (%)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "value": null,
+                      "color": "green"
+                    },
+                    {
+                      "value": 60,
+                      "color": "yellow"
+                    },
+                    {
+                      "value": 80,
+                      "color": "orange"
+                    },
+                    {
+                      "value": 95,
+                      "color": "red"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 12,
+      "type": "table",
+      "title": "Assinante selecionado: para onde ele sai (fluxos amostrados, últimos 2 dias)",
+      "description": "Muitos destinos distintos na mesma porta (23, 22, 445, 3389) = varredura. Portas altas e variadas com poucos destinos = P2P.",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbymon-mysql"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 58,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbymon-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT protocol AS 'Proto',remote_port AS 'Porta destino',COUNT(DISTINCT remote_ip) AS 'Destinos distintos',SUM(packets) AS 'Pacotes (estim.)',SUM(bytes) AS 'Bytes (estim.)' FROM orby_flow_minute WHERE subscriber_ip=${assinante:sqlstring} AND direction='out' AND $__timeFilter(bucket_utc) GROUP BY protocol,remote_port ORDER BY 3 DESC LIMIT 20"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": []
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true,
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      }
+    }
+  ]
+}

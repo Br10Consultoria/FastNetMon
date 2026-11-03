@@ -13,6 +13,7 @@ DB_USER=$(sed -n 's/^ORBYMON_DB_USER=//p' /etc/orbymon/pipeline.env | tr -d '"'"
 [[ "$DB_USER" =~ ^[A-Za-z0-9_]+$ ]] || { echo "ORBYMON_DB_USER invalido em pipeline.env" >&2; exit 1; }
 for host in $(mariadb -NBe "SELECT Host FROM mysql.user WHERE User='$DB_USER'"); do
   mariadb -e "GRANT SELECT, INSERT, UPDATE, DELETE ON orbymon.orby_nat_public_minute TO '$DB_USER'@'$host'"
+  mariadb -e "GRANT SELECT, INSERT, UPDATE, DELETE ON orbymon.orby_nat_heavy_minute TO '$DB_USER'@'$host'"
 done
 echo "permissao de gravacao para $DB_USER"
 

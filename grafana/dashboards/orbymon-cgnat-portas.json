@@ -2,7 +2,7 @@
   "id": null,
   "uid": "orbymon-cgnat-portas",
   "title": "CGNAT - Portas por IP público",
-  "description": "Uso de portas NAT por IP público do pool (log do A10, sem amostragem). Um IP público com portas esgotadas faz as novas conexões dos assinantes que o compartilham falharem.",
+  "description": "Capacidade: uso de portas NAT por IP público do pool (log do A10, sem amostragem). Um IP público com portas esgotadas faz as novas conexões dos assinantes que o compartilham falharem.",
   "tags": [
     "orbymon",
     "cgnat",
@@ -701,8 +701,8 @@
     {
       "id": 10,
       "type": "table",
-      "title": "Assinantes com mais portas abertas",
-      "description": "Quem mais consome portas do pool (equipamento infectado, P2P, muitas conexões).",
+      "title": "Quem está ocupando cada IP público (pico no período)",
+      "description": "Assinantes com 1.000+ portas e quanto do IP público eles ocupam sozinhos. Sem cota por assinante no A10, um só cliente pode esgotar o IP dos vizinhos. Detalhe: dashboard CGNAT - Assinantes.",
       "datasource": {
         "type": "mysql",
         "uid": "orbymon-mysql"
@@ -723,7 +723,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT inside_ip AS 'IP privado (assinante)',MAX(active_ports) AS 'Portas ativas (máx)',MAX(allocs) AS 'Alocações/min (máx)',SUM(allocs) AS 'Alocações no período' FROM orby_nat_user_minute WHERE $__timeFilter(bucket_utc) GROUP BY inside_ip ORDER BY 2 DESC LIMIT 30"
+          "rawSql": "SELECT public_ip AS 'IP público',MAX(pool) AS 'Pool',inside_ip AS 'Assinante (IP privado)',MAX(share_pct) AS 'Ocupa do IP (%%)',MAX(GREATEST(tcp_ports,udp_ports)) AS 'Portas (máx)' FROM orby_nat_heavy_minute WHERE $__timeFilter(bucket_utc) GROUP BY public_ip,inside_ip ORDER BY 4 DESC LIMIT 30"
         }
       ],
       "options": {
@@ -738,7 +738,55 @@
             "align": "auto"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Ocupa do IP (%)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "value": null,
+                      "color": "green"
+                    },
+                    {
+                      "value": 60,
+                      "color": "yellow"
+                    },
+                    {
+                      "value": 80,
+                      "color": "orange"
+                    },
+                    {
+                      "value": 95,
+                      "color": "red"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
       }
     },
     {
