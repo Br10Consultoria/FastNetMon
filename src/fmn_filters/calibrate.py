@@ -259,7 +259,9 @@ def run(cfg, hours=24, factor=2.0, now=None, max_down=0.5, max_up=4.0, save_base
     end = (now or datetime.now(timezone.utc)).astimezone(timezone.utc).replace(
         tzinfo=None, second=0, microsecond=0) - timedelta(minutes=cfg["settle_minutes"] + 1)
     start = end - timedelta(hours=hours)
-    db = connection_from_env()
+    # uma hora do detalhado pode levar mais de 30 s para comecar a chegar com o banco ocupado (ordenacao no
+    # servidor): o padrao de 30 s derrubava a conexao ("Lost connection ... timed out") e a calibracao falhava
+    db = connection_from_env(read_timeout=900)
     try:
         with db.cursor() as cur:
             cur.execute(EVENTS_SQL, (start, end))
