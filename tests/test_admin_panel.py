@@ -997,6 +997,30 @@ class PanelTests(unittest.TestCase):
         r = self.c.get("/relatorio?alvo=10.0.0.0/8")
         self.assertIn("amplo demais".encode(), r.data)
 
+    def test_attacks_export_csv(self):
+        from fmn_filters import attacks as at
+        self.login()
+        t0 = datetime(2026, 11, 1, 10, 0)
+        events = [{"event_time": t0, "rule_name": "OUT varredura", "severity": "critical", "detection": "flow",
+                   "direction": "out", "scope": "cgnat_private", "pool": "NAT-POOL-08", "local_ip": "45.238.170.10",
+                   "subscriber_ip": "100.64.65.10", "protocol": "tcp", "local_port": 0, "remote_port": 23,
+                   "pps": 900.0, "mbps": 1.2, "remote_ips": 180, "syn_ratio": 0.9,
+                   "details": {"minutes": 2, "top_remote_ips": ["198.51.100.9"]}}]
+        with mock.patch.object(at, "fetch_events", return_value=events):
+            page = self.c.get("/ataques?tz=UTC")
+        with mock.patch.object(at, "fetch_events", return_value=events):
+            r = self.c.get("/ataques?sentido=out&porta=23&tz=UTC&export=csv")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"Exportar CSV", page.data)
+        for grupo in (b"Monitoramento", b"Detec", b"Investiga", b"Sistema"):
+            self.assertIn(grupo, page.data)                            # menus agrupados no cabecalho
+        self.assertIn("text/csv", r.headers["Content-Type"])
+        self.assertIn("attachment", r.headers["Content-Disposition"])
+        body = r.data.decode("utf-8-sig").splitlines()
+        self.assertEqual(len(body), 2)
+        self.assertIn("originado", body[1])
+        self.assertIn("01/11/2026", body[1])
+
     def test_attacks_page_and_detail(self):
         from fmn_filters import attacks as at
         self.login()
