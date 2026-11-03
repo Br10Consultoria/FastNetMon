@@ -23,6 +23,14 @@
 {% endif %}
 <form method="post">
   {% include "_csrf.html" %}
+  <section class="card">
+    <p><b>{{ cfg.rules|selectattr('enabled')|list|length }} de {{ cfg.rules|length }}</b> regras de tráfego e
+      <b>{{ cfg.nat_rules|selectattr('enabled')|list|length }} de {{ cfg.nat_rules|length }}</b> regras de portas NAT ligadas
+      (avaliadas a cada minuto, 24x7).</p>
+    <p class="muted">Para ligar ou desligar: marque ou desmarque a caixa ao lado do nome de cada regra abaixo e clique em
+      <b>Salvar regras</b>. Os limites (pps, Mbps, IPs remotos) de cada tipo de IP também são editados aqui.</p>
+    <button>Salvar regras</button>
+  </section>
   <section class="card inline">
     <label>Intervalo entre alertas do mesmo alvo (min) <input name="cooldown_minutes" type="number" min="1" max="1440" value="{{ cfg.cooldown_minutes }}"></label>
     <label>Espera pelos dados (min) <input name="settle_minutes" type="number" min="0" max="30" value="{{ cfg.settle_minutes }}"></label>

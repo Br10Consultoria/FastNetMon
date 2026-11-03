@@ -1,10 +1,10 @@
 {% extends "base.html" %}{% block title %}Alarmes{% endblock %}
 {% block body %}
 <div class="titlebar"><h1>Alarmes por filtro</h1><a class="button" href="{{ url_for('alarm_edit', rid=0) }}">Novo alarme</a></div>
-<p class="muted">Cada alarme mede um filtro nfdump minuto a minuto e abre um incidente quando as condições se mantêm. Os modelos vêm desligados: abra, use <b>Testar</b> com o tráfego real e ligue.</p>
+<p class="muted">Cada alarme mede um filtro nfdump minuto a minuto (24x7) e abre um incidente quando as condições se mantêm. Os modelos vêm desligados: use <b>Ligar</b> na coluna da direita, ou abra o alarme para <b>Testar</b> com o tráfego real e ajustar o limite antes.</p>
 {% set st = {'open': ('Incidente', 'bad'), 'cooling': ('Resfriando', 'sev-high'), 'normal': ('Normal', 'ok')} %}
 <section class="card"><div class="scroll"><table>
-  <tr><th>Alarme</th><th>Situação</th><th>Condição</th><th class="num">Último minuto</th><th class="num">Incidentes 7 d</th></tr>
+  <tr><th>Alarme</th><th>Situação</th><th>Condição</th><th class="num">Último minuto</th><th class="num">Incidentes 7 d</th><th>Ligado</th></tr>
   {% for r in rules %}{% set s = st.get(r.status) if r.enabled else ('Desligado', 'idle') %}
   <tr>
     <td><a href="{{ url_for('alarm_edit', rid=r.id) }}"><b>{{ r.name }}</b></a><br><small class="muted">{{ {'in':'recebido','out':'originado','any':'ambos'}[r.direction] }} · {{ {'warning':'aviso','high':'alta','critical':'crítica'}.get(r.severity, r.severity) }} · <code>{{ r.expr[:80] }}</code></small>
@@ -13,8 +13,10 @@
     <td><small>{{ r.desc }}</small></td>
     <td class="num">{% if r.last_bucket %}{{ human(r.last_bps, 'bps') }}<br><small>{{ human(r.last_pps, 'pps') }} · {{ '%.0f'|format(r.last_flows) }} fluxos</small>{% else %}—{% endif %}</td>
     <td class="num">{{ r.incidents_7d }}</td>
+    <td><form method="post" action="{{ url_for('alarm_toggle', rid=r.id) }}">{% include "_csrf.html" %}
+      <button class="{{ 'secondary small' if r.enabled else 'small' }}">{{ 'Desligar' if r.enabled else 'Ligar' }}</button></form></td>
   </tr>
-  {% else %}<tr><td colspan="5" class="muted">Nenhum alarme. Rode scripts/setup-filter-rules.sh para instalar os modelos.</td></tr>{% endfor %}
+  {% else %}<tr><td colspan="6" class="muted">Nenhum alarme. Rode scripts/setup-filter-rules.sh para instalar os modelos.</td></tr>{% endfor %}
 </table></div></section>
 
 <section class="card">

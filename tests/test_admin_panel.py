@@ -721,6 +721,17 @@ class PanelTests(unittest.TestCase):
         self.assertTrue([x for x in self.db.saved if x["id"] == 1])
 
 
+    def test_alarm_toggle_from_list(self):
+        self.login()
+        page = self.c.get("/alarmes")
+        self.assertIn(b"Desligar", page.data)
+        r = self.post("/alarmes/1/alternar")
+        self.assertEqual(r.status_code, 302)
+        self.assertFalse(self.db.alarm_rules[1]["enabled"])
+        self.assertEqual(self.db.audits[-1][1], "alarme_desligado")
+        self.assertIn(b"Ligar", self.c.get("/alarmes").data)
+        self.assertEqual(self.post("/alarmes/99/alternar").status_code, 404)
+
     def test_alarm_pages(self):
         self.login()
         page = self.c.get("/alarmes")

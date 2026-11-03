@@ -617,6 +617,16 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
         return render_template("alarms.html", rules=rules, incidents=store.filter_incidents(limit=30),
                                human=fq.human, aggs=fr.AGGS)
 
+    @app.route("/alarmes/<int:rid>/alternar", methods=["POST"])
+    def alarm_toggle(rid):
+        rule = next((r for r in store.filter_rules() if r["id"] == rid), None)
+        if not rule:
+            abort(404)
+        store.set_filter_rule_enabled(rid, not rule["enabled"])
+        audit("alarme_" + ("desligado" if rule["enabled"] else "ligado"), rule["name"])
+        flash("Alarme %s: %s." % ("desligado" if rule["enabled"] else "ligado", rule["name"]))
+        return redirect(url_for("alarms"))
+
     @app.route("/alarmes/nova", methods=["GET", "POST"], defaults={"rid": 0})
     @app.route("/alarmes/<int:rid>", methods=["GET", "POST"])
     def alarm_edit(rid):
