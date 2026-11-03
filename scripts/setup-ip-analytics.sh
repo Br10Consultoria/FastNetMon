@@ -25,7 +25,7 @@ echo "=== Importando dashboard Grafana ==="
 DASH_DIR=/var/lib/grafana/dashboards/orbymon
 if [[ -d "$DASH_DIR" ]] && id grafana >/dev/null 2>&1; then
   install -o grafana -g grafana -m 0644 \
-    "$BASE/grafana/dashboards/orbymon-ip-analytics.json" "$DASH_DIR/"
+    "$BASE/grafana/dashboards/orbyflow-ip-analytics.json" "$DASH_DIR/"
   systemctl try-restart grafana-server
   echo "Dashboard OrbyFlow - IPs, Redes e Interfaces importado por provisioning."
 else

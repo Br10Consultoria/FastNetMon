@@ -18,7 +18,7 @@ import re
 import sys
 
 ROOT = Path(__file__).resolve().parent.parent
-DASHBOARDS = ("orbymon-huawei-live", "orbymon-ip-analytics", "orbymon-cgnat", "orbymon-overview")
+DASHBOARDS = ("orbyflow-huawei-live", "orbyflow-ip-analytics", "orbyflow-cgnat", "orbyflow-overview")
 DS = {"type": "grafana-clickhouse-datasource", "uid": "orbyflow-clickhouse"}
 CH_TABLES = ("orby_ip_pairs_minute",)
 MARIADB_ONLY = ("orby_alerts", "orby_ip_ingested_files", "orby_attack_events", "orby_flow_minute")

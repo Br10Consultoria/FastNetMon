@@ -1,6 +1,6 @@
-# Gera grafana/dashboards/orbymon-f4-ataques.json. Uso: python3 grafana/build_f4_dashboard.py
+# Gera grafana/dashboards/orbyflow-f4-ataques.json. Uso: python3 grafana/build_f4_dashboard.py
 import json
-DS = {"type": "mysql", "uid": "orbymon-mysql"}
+DS = {"type": "mysql", "uid": "orbyflow-mysql"}
 IP = "${ip:sqlstring}"; REM = "${remoto:sqlstring}"; PORT = "${porta:sqlstring}"
 DIR = "${direcao:sqlstring}"; PROTO = "${proto:sqlstring}"
 F = ("source='huawei' AND $__timeFilter(bucket_utc)"
@@ -138,9 +138,9 @@ panel("CGNAT: alocações de porta do assinante (log A10, sem amostragem)", "tim
       desc="Sem IP no filtro: os 10 assinantes com mais alocações. Muitas alocações por minuto indicam varredura, flood ou malware.")
 
 dash = {
-    "id": None, "uid": "orbymon-f4-ataques", "title": "OrbyFlow | F4 - Ataques e investigação por IP",
+    "id": None, "uid": "orbyflow-f4-ataques", "title": "OrbyFlow | F4 - Ataques e investigação por IP",
     "timezone": "browser", "schemaVersion": 40, "version": 1, "refresh": "1m",
-    "time": {"from": "now-1h", "to": "now"}, "tags": ["orbymon", "f4", "ataques"],
+    "time": {"from": "now-1h", "to": "now"}, "tags": ["orbyflow", "f4", "ataques"],
     "description": "Ataques recebidos e originados, com filtro por IP público, IP privado CGNAT, IP remoto, porta, protocolo e sentido.",
     "templating": {"list": [
         {"name": "ip", "label": "IP (público ou 100.64.x)", "type": "textbox", "query": "", "current": {"text": "", "value": ""}},
@@ -158,5 +158,5 @@ dash = {
     ]},
     "panels": panels,
 }
-open("grafana/dashboards/orbymon-f4-ataques.json", "w").write(json.dumps(dash, ensure_ascii=False, indent=2) + "\n")
+open("grafana/dashboards/orbyflow-f4-ataques.json", "w").write(json.dumps(dash, ensure_ascii=False, indent=2) + "\n")
 print(len(panels), "paineis")

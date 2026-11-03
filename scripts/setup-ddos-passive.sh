@@ -26,7 +26,7 @@ echo "=== Importando dashboard OrbyFlow F3 ==="
 DASH_DIR=/var/lib/grafana/dashboards/orbymon
 if [[ -d "$DASH_DIR" ]] && id grafana >/dev/null 2>&1; then
   install -o grafana -g grafana -m 0644 \
-    "$BASE/grafana/legacy/orbymon-ddos-passive.json" "$DASH_DIR/"
+    "$BASE/grafana/legacy/orbyflow-ddos-passive.json" "$DASH_DIR/"
   systemctl try-restart grafana-server
 else
   echo "Grafana nao localizado; dashboard disponivel no repositorio"

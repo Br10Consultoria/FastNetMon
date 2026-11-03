@@ -111,9 +111,12 @@ TMP="$(mktemp)"
 trap 'rm -f "$TMP"' EXIT
 cat > "$TMP" <<'YAML'
 apiVersion: 1
+deleteDatasources:            # nome antigo (OrbyMon): substituido pela fonte OrbyFlow abaixo
+  - name: OrbyMon MariaDB
+    orgId: 1
 datasources:
-  - name: OrbyMon MariaDB   # nome mantido: o Grafana identifica a fonte provisionada pelo nome
-    uid: orbymon-mysql
+  - name: OrbyFlow MariaDB
+    uid: orbyflow-mysql
     type: mysql
     access: proxy
     url: 127.0.0.1:3306
@@ -129,7 +132,13 @@ datasources:
     secureJsonData:
       password: $ORBYMON_GRAFANA_DB_PASSWORD
 YAML
-DS_DEST="$DS_DIR/orbymon-mysql.yml"
+DS_DEST="$DS_DIR/orbyflow-mysql.yml"
+# arquivo do nome antigo recriaria a fonte OrbyMon: guarda fora do provisionamento
+OLD_DS="$DS_DIR/orbymon-mysql.yml"
+if [[ -f "$OLD_DS" ]]; then
+  install -d -m 0750 /var/lib/orbymon/grafana-antigos
+  mv -f "$OLD_DS" "/var/lib/orbymon/grafana-antigos/orbymon-mysql.yml.$(date -u +%Y%m%dT%H%M%SZ)"
+fi
 backup_if_different "$DS_DEST" "$TMP"
 install -m 0644 "$TMP" "$DS_DEST"
 PROVIDER_SRC="$PROJECT_DIR/grafana/provisioning/dashboards/orbymon.yml"

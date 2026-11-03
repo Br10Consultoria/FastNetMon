@@ -9,7 +9,7 @@ echo "=== Instalando tabela de referencia para IF-MIB ==="
 mariadb orbymon < "$BASE/sql/interface_names.sql"
 D=/var/lib/grafana/dashboards/orbymon
 if [[ -d "$D" ]] && id grafana >/dev/null 2>&1; then
-  for dash in orbymon-ip-analytics.json orbymon-cgnat.json orbymon-overview.json; do
+  for dash in orbyflow-ip-analytics.json orbyflow-cgnat.json orbyflow-overview.json; do
     if [[ -f "$D/$dash" ]] && ! cmp -s "$BASE/grafana/dashboards/$dash" "$D/$dash"; then
       cp -a "$D/$dash" "$D/$dash.bak.$(date -u +%Y%m%dT%H%M%SZ)"
     fi

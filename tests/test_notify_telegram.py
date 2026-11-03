@@ -37,7 +37,7 @@ class FormatTests(unittest.TestCase):
         for part in ("🚨", "Ataque recebido", "alta", "<code>45.238.170.70</code> (NAT-POOL-08)",
                      "Assinante: <code>100.64.80.227</code>", "porta remota 53", "459,2 Mb/s", "41,0 mil pps",
                      "30 IPs de origem", "Entrou por: Vlanif2511", "Início: 01/11 07:52",
-                     "[POP &lt;Teste&gt;]", "/d/orbymon-f4-ataques?var-ip=100.64.80.227"):
+                     "[POP &lt;Teste&gt;]", "/d/orbyflow-f4-ataques?var-ip=100.64.80.227"):
             self.assertIn(part, text)
         self.assertNotIn("3000//d", text)
 

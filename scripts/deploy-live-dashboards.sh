@@ -5,7 +5,7 @@ set -euo pipefail
 [[ $EUID -eq 0 ]] || { echo "Execute como root/sudo" >&2; exit 1; }
 BASE="$(cd "$(dirname "$0")/.." && pwd)"
 D=/var/lib/grafana/dashboards/orbymon
-DASHBOARDS="orbymon-huawei-live.json orbymon-overview.json orbymon-ip-analytics.json orbymon-cgnat.json orbymon-f4-ataques.json orbymon-reputacao.json orbymon-cgnat-portas.json orbymon-cgnat-assinantes.json"
+DASHBOARDS="orbyflow-huawei-live.json orbyflow-overview.json orbyflow-ip-analytics.json orbyflow-cgnat.json orbyflow-f4-ataques.json orbyflow-reputacao.json orbyflow-cgnat-portas.json orbyflow-cgnat-assinantes.json orbyflow-ataques-originados.json"
 [[ -d "$D" ]] || { echo "Diretorio Grafana ausente: $D" >&2; exit 1; }
 id grafana >/dev/null || { echo "Usuario grafana ausente" >&2; exit 1; }
 if command -v mariadb >/dev/null; then
@@ -32,6 +32,15 @@ src_of() {
 for name in $DASHBOARDS; do
   python3 -m json.tool "$(src_of "$name")" >/dev/null
 done
+# nomes antigos (orbymon-*.json): saem do provisionamento para nao duplicar os dashboards OrbyFlow
+shopt -s nullglob
+OLD=( "$D"/orbymon-*.json )
+if (( ${#OLD[@]} )); then
+  install -d -m 0750 /var/lib/orbymon/grafana-antigos
+  mv -f "${OLD[@]}" /var/lib/orbymon/grafana-antigos/
+  echo "[OK] ${#OLD[@]} dashboard(s) com nome antigo movido(s) para /var/lib/orbymon/grafana-antigos"
+fi
+shopt -u nullglob
 for name in $DASHBOARDS; do
   SRC="$(src_of "$name")"
   DEST="$D/$name"

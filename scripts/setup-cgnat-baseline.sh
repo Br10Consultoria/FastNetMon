@@ -23,7 +23,7 @@ systemctl daemon-reload
 D=/var/lib/grafana/dashboards/orbymon
 if [[ -d "$D" ]] && id grafana >/dev/null 2>&1; then
   install -o grafana -g grafana -m 0644 \
-    "$BASE/grafana/dashboards/orbymon-cgnat.json" "$D/"
+    "$BASE/grafana/dashboards/orbyflow-cgnat.json" "$D/"
   echo "Dashboard CGNAT provisionado, sem reiniciar Grafana."
 else
   echo "Grafana nao localizado; dashboard disponivel no repositorio."

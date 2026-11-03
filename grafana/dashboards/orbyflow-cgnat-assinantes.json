@@ -1,10 +1,10 @@
 {
   "id": null,
-  "uid": "orbymon-cgnat-assinantes",
+  "uid": "orbyflow-cgnat-assinantes",
   "title": "CGNAT - Assinantes (portas e abuso)",
   "description": "Uso de portas NAT por assinante (log do A10, sem amostragem): quem ocupa o IP público dos vizinhos, quem abre conexões em massa e os alertas de NAT. Capacidade dos IPs públicos: dashboard CGNAT - Portas por IP público.",
   "tags": [
-    "orbymon",
+    "orbyflow",
     "cgnat",
     "a10",
     "assinantes"
@@ -70,7 +70,7 @@
       "description": "Um assinante com 10 mil portas ocupa ~15% de um IP público inteiro.",
       "datasource": {
         "type": "mysql",
-        "uid": "orbymon-mysql"
+        "uid": "orbyflow-mysql"
       },
       "gridPos": {
         "x": 0,
@@ -83,7 +83,7 @@
           "refId": "A",
           "datasource": {
             "type": "mysql",
-            "uid": "orbymon-mysql"
+            "uid": "orbyflow-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -131,7 +131,7 @@
       "description": "",
       "datasource": {
         "type": "mysql",
-        "uid": "orbymon-mysql"
+        "uid": "orbyflow-mysql"
       },
       "gridPos": {
         "x": 6,
@@ -144,7 +144,7 @@
           "refId": "A",
           "datasource": {
             "type": "mysql",
-            "uid": "orbymon-mysql"
+            "uid": "orbyflow-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -200,7 +200,7 @@
       "description": "",
       "datasource": {
         "type": "mysql",
-        "uid": "orbymon-mysql"
+        "uid": "orbyflow-mysql"
       },
       "gridPos": {
         "x": 12,
@@ -213,7 +213,7 @@
           "refId": "A",
           "datasource": {
             "type": "mysql",
-            "uid": "orbymon-mysql"
+            "uid": "orbyflow-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -257,7 +257,7 @@
       "description": "",
       "datasource": {
         "type": "mysql",
-        "uid": "orbymon-mysql"
+        "uid": "orbyflow-mysql"
       },
       "gridPos": {
         "x": 18,
@@ -270,7 +270,7 @@
           "refId": "A",
           "datasource": {
             "type": "mysql",
-            "uid": "orbymon-mysql"
+            "uid": "orbyflow-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -318,7 +318,7 @@
       "description": "Rotatividade = portas novas por minuto sobre as portas abertas. Alta (dezenas de %) = abre e fecha sem parar: típico de bot/varredura. Baixa com muitas portas = conexões longas (P2P, muitos aparelhos). Para ver um assinante, digite o IP no filtro do topo.",
       "datasource": {
         "type": "mysql",
-        "uid": "orbymon-mysql"
+        "uid": "orbyflow-mysql"
       },
       "gridPos": {
         "x": 0,
@@ -331,7 +331,7 @@
           "refId": "A",
           "datasource": {
             "type": "mysql",
-            "uid": "orbymon-mysql"
+            "uid": "orbyflow-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -409,7 +409,7 @@
       "description": "Quem passa mais tempo com muitas portas: candidato a contato do suporte (equipamento infectado, P2P) ou a uma cota por assinante no A10.",
       "datasource": {
         "type": "mysql",
-        "uid": "orbymon-mysql"
+        "uid": "orbyflow-mysql"
       },
       "gridPos": {
         "x": 0,
@@ -422,7 +422,7 @@
           "refId": "A",
           "datasource": {
             "type": "mysql",
-            "uid": "orbymon-mysql"
+            "uid": "orbyflow-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -500,7 +500,7 @@
       "description": "",
       "datasource": {
         "type": "mysql",
-        "uid": "orbymon-mysql"
+        "uid": "orbyflow-mysql"
       },
       "gridPos": {
         "x": 0,
@@ -513,7 +513,7 @@
           "refId": "A",
           "datasource": {
             "type": "mysql",
-            "uid": "orbymon-mysql"
+            "uid": "orbyflow-mysql"
           },
           "editorMode": "code",
           "format": "time_series",
@@ -557,7 +557,7 @@
       "description": "Muitas alocações por minuto, sustentadas, indicam conexões novas em massa (varredura, bot).",
       "datasource": {
         "type": "mysql",
-        "uid": "orbymon-mysql"
+        "uid": "orbyflow-mysql"
       },
       "gridPos": {
         "x": 0,
@@ -570,7 +570,7 @@
           "refId": "A",
           "datasource": {
             "type": "mysql",
-            "uid": "orbymon-mysql"
+            "uid": "orbyflow-mysql"
           },
           "editorMode": "code",
           "format": "time_series",
@@ -614,7 +614,7 @@
       "description": "",
       "datasource": {
         "type": "mysql",
-        "uid": "orbymon-mysql"
+        "uid": "orbyflow-mysql"
       },
       "gridPos": {
         "x": 0,
@@ -627,7 +627,7 @@
           "refId": "A",
           "datasource": {
             "type": "mysql",
-            "uid": "orbymon-mysql"
+            "uid": "orbyflow-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -657,7 +657,7 @@
       "description": "Digite o IP privado no filtro 'Assinante' no topo.",
       "datasource": {
         "type": "mysql",
-        "uid": "orbymon-mysql"
+        "uid": "orbyflow-mysql"
       },
       "gridPos": {
         "x": 0,
@@ -670,7 +670,7 @@
           "refId": "A",
           "datasource": {
             "type": "mysql",
-            "uid": "orbymon-mysql"
+            "uid": "orbyflow-mysql"
           },
           "editorMode": "code",
           "format": "time_series",
@@ -714,7 +714,7 @@
       "description": "",
       "datasource": {
         "type": "mysql",
-        "uid": "orbymon-mysql"
+        "uid": "orbyflow-mysql"
       },
       "gridPos": {
         "x": 0,
@@ -727,7 +727,7 @@
           "refId": "A",
           "datasource": {
             "type": "mysql",
-            "uid": "orbymon-mysql"
+            "uid": "orbyflow-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -805,7 +805,7 @@
       "description": "Muitos destinos distintos na mesma porta (23, 22, 445, 3389) = varredura. Portas altas e variadas com poucos destinos = P2P.",
       "datasource": {
         "type": "mysql",
-        "uid": "orbymon-mysql"
+        "uid": "orbyflow-mysql"
       },
       "gridPos": {
         "x": 12,
@@ -818,7 +818,7 @@
           "refId": "A",
           "datasource": {
             "type": "mysql",
-            "uid": "orbymon-mysql"
+            "uid": "orbyflow-mysql"
           },
           "editorMode": "code",
           "format": "table",

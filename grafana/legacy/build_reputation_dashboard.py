@@ -1,6 +1,6 @@
-# Gera grafana/dashboards/orbymon-reputacao.json. Uso: python3 grafana/build_reputation_dashboard.py
+# Gera grafana/dashboards/orbyflow-reputacao.json. Uso: python3 grafana/build_reputation_dashboard.py
 import json
-DS = {"type": "mysql", "uid": "orbymon-mysql"}
+DS = {"type": "mysql", "uid": "orbyflow-mysql"}
 IP = "${ip:sqlstring}"
 panels = []
 pid = [0]
@@ -107,13 +107,13 @@ panel("Situação das fontes", "table",
       14, 45, 10, 8)
 
 dash = {
-    "id": None, "uid": "orbymon-reputacao", "title": "OrbyFlow | Reputação e ataques originados",
+    "id": None, "uid": "orbyflow-reputacao", "title": "OrbyFlow | Reputação e ataques originados",
     "timezone": "browser", "schemaVersion": 40, "version": 1, "refresh": "5m",
-    "time": {"from": "now-7d", "to": "now"}, "tags": ["orbymon", "reputacao", "abuso"],
+    "time": {"from": "now-7d", "to": "now"}, "tags": ["orbyflow", "reputacao", "abuso"],
     "description": "IPs do provedor em listas de bloqueio, assinante provável (CGNAT) e quem origina ataques.",
     "templating": {"list": [
         {"name": "ip", "label": "IP (público ou 100.64.x)", "type": "textbox", "query": "", "current": {"text": "", "value": ""}}]},
     "panels": panels,
 }
-open("grafana/dashboards/orbymon-reputacao.json", "w").write(json.dumps(dash, ensure_ascii=False, indent=2) + "\n")
+open("grafana/dashboards/orbyflow-reputacao.json", "w").write(json.dumps(dash, ensure_ascii=False, indent=2) + "\n")
 print(len(panels), "paineis")

@@ -14,7 +14,7 @@ O script:
 - instala Grafana se necessario, desde que o repositorio APT Grafana esteja configurado;
 - cria usuario MariaDB orbymon_grafana apenas com SELECT;
 - gera senha forte para datasource, protegida em /etc/orbymon/grafana.env;
-- configura datasource MySQL/MariaDB UID orbymon-mysql e timezone +00:00;
+- configura datasource MySQL/MariaDB UID orbyflow-mysql e timezone +00:00;
 - instala TODOS os arquivos JSON da pasta grafana/dashboards/;
 - provisiona a pasta OrbyFlow no Grafana, sem importacao manual;
 - habilita Grafana no boot e publica HTTPS na porta 3000;

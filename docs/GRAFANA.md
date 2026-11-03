@@ -25,7 +25,7 @@ CREATE DATABASE orbymon CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 -- Criar um usuário distinto para a aplicação e outro read-only no Grafana.
 ```
 
-Variáveis de ambiente do processo `orbymon-mysql-sink`:
+Variáveis de ambiente do processo `orbyflow-mysql-sink`:
 
 ```bash
 export ORBYMON_DB_HOST=127.0.0.1
@@ -63,13 +63,13 @@ O exemplo poderá gerar zero alertas: é uma demonstração das regras, e não u
 
 ## Importar no Grafana
 
-Manual: Grafana → Dashboards → New → Import → carregar `grafana/dashboards/orbymon-overview.json` e selecionar datasource MariaDB com UID `orbymon-mysql`.
+Manual: Grafana → Dashboards → New → Import → carregar `grafana/dashboards/orbyflow-overview.json` e selecionar datasource MariaDB com UID `orbyflow-mysql`.
 
 Provisionamento (mantenha cópia das configurações existentes):
 
-- `grafana/provisioning/datasources/orbymon-mysql.yml` → `/etc/grafana/provisioning/datasources/`
+- `grafana/provisioning/datasources/orbyflow-mysql.yml` → `/etc/grafana/provisioning/datasources/`
 - `grafana/provisioning/dashboards/orbymon.yml` → `/etc/grafana/provisioning/dashboards/`
-- `grafana/dashboards/orbymon-overview.json` → `/var/lib/grafana/dashboards/orbymon/`
+- `grafana/dashboards/orbyflow-overview.json` → `/var/lib/grafana/dashboards/orbymon/`
 
 As variáveis de ambiente de datasource precisam estar disponíveis **ao serviço Grafana**, usando o leitor de somente leitura. Nunca exporte a senha de escritor para o serviço Grafana. Revise permissão de importação e UID antes do primeiro provisionamento para evitar sobrescrever dashboards existentes.
 

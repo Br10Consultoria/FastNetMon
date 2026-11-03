@@ -1,10 +1,10 @@
 {
   "id": null,
-  "uid": "orbymon-huawei-live",
+  "uid": "orbyflow-huawei-live",
   "title": "Huawei - Tráfego e GeoIP ao Vivo",
-  "description": "Visão quase em tempo real de NetFlow Huawei: taxa estimada por minuto a partir de buckets do fim do fluxo (amostragem/sampling), GeoLite2 offline e atualização Grafana de 30s. Não é captura instantânea nem detector de ataque.",
+  "description": "Visão quase em tempo real de NetFlow Huawei: taxa estimada por minuto a partir de buckets do fim do fluxo (amostragem/sampling), GeoLite2 offline e atualização Grafana de 30s. Não é captura instantânea nem detector de ataque. Dados de tráfego no ClickHouse.",
   "tags": [
-    "orbymon",
+    "orbyflow",
     "huawei"
   ],
   "editable": true,
@@ -157,17 +157,18 @@
         {
           "refId": "A",
           "datasource": {
-            "type": "mysql",
-            "uid": "orbymon-mysql"
+            "type": "grafana-clickhouse-datasource",
+            "uid": "orbyflow-clickhouse"
           },
-          "editorMode": "code",
-          "format": "table",
-          "rawSql": "SELECT t.asn AS 'ASN',t.nome AS 'Nome',t.blocos AS 'Blocos / IPs',t.ips AS 'IPs',CASE WHEN t.paises>1 THEN 'Vários' ELSE COALESCE(cn.name,NULLIF(t.pais,''),'Não informado') END AS 'País',t.vol AS 'Volume',t.bps AS 'Taxa média',t.pps AS 'Pacotes/s médio' FROM (SELECT src_asn AS asn,COALESCE(MAX(NULLIF(src_asn_name,'')),'Não identificado') AS nome,COALESCE(NULLIF(GROUP_CONCAT(DISTINCT NULLIF(src_prefix,'') ORDER BY src_prefix SEPARATOR ', ' LIMIT 3),''),GROUP_CONCAT(DISTINCT src_ip ORDER BY src_ip SEPARATOR ', ' LIMIT 3)) AS blocos,COUNT(DISTINCT src_ip) AS ips,COUNT(DISTINCT NULLIF(src_country,'')) AS paises,MAX(NULLIF(src_country,'')) AS pais,SUM(total_bytes) AS vol,SUM(total_bytes)*8/GREATEST(1,$__unixEpochTo()-$__unixEpochFrom()) AS bps,SUM(total_packets)/GREATEST(1,$__unixEpochTo()-$__unixEpochFrom()) AS pps FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND src_asn>0 GROUP BY src_asn ORDER BY SUM(total_bytes) DESC LIMIT 20) AS t LEFT JOIN orby_country_names AS cn ON cn.code=t.pais ORDER BY t.vol DESC"
+          "rawSql": "SELECT t.asn AS \"ASN\",t.nome AS \"Nome\",t.blocos AS \"Blocos / IPs\",t.ips AS \"IPs\",CASE WHEN t.paises>1 THEN 'Vários' ELSE COALESCE(cn.name,nullIf(t.pais,''),'Não informado') END AS \"País\",t.vol AS \"Volume\",t.bps AS \"Taxa média\",t.pps AS \"Pacotes/s médio\" FROM (SELECT src_asn AS asn,COALESCE(MAX(nullIf(src_asn_name,'')),'Não identificado') AS nome,COALESCE(nullIf(arrayStringConcat(arraySlice(arraySort(groupUniqArray(nullIf(src_prefix,''))), 1, 3), ', '),''),arrayStringConcat(arraySlice(arraySort(groupUniqArray(src_ip)), 1, 3), ', ')) AS blocos,COUNT(DISTINCT src_ip) AS ips,COUNT(DISTINCT nullIf(src_country,'')) AS paises,MAX(nullIf(src_country,'')) AS pais,SUM(total_bytes) AS vol,SUM(total_bytes)*8/GREATEST(1,toUnixTimestamp($__toTime)-toUnixTimestamp($__fromTime)) AS bps,SUM(total_packets)/GREATEST(1,toUnixTimestamp($__toTime)-toUnixTimestamp($__fromTime)) AS pps FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND src_asn>0 GROUP BY src_asn ORDER BY SUM(total_bytes) DESC LIMIT 20) AS t LEFT JOIN orby_country_names AS cn ON cn.code=t.pais ORDER BY t.vol DESC",
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1
         }
       ],
       "datasource": {
-        "type": "mysql",
-        "uid": "orbymon-mysql"
+        "type": "grafana-clickhouse-datasource",
+        "uid": "orbyflow-clickhouse"
       }
     },
     {
@@ -252,7 +253,8 @@
             "thresholdsStyle": {
               "mode": "off"
             }
-          }
+          },
+          "displayName": "${__field.labels.metric}"
         },
         "overrides": []
       },
@@ -261,17 +263,18 @@
         {
           "refId": "A",
           "datasource": {
-            "type": "mysql",
-            "uid": "orbymon-mysql"
+            "type": "grafana-clickhouse-datasource",
+            "uid": "orbyflow-clickhouse"
           },
-          "editorMode": "code",
-          "format": "time_series",
-          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),protocol AS metric,ROUND(SUM(total_bytes)*8/60,3) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) GROUP BY 1,protocol ORDER BY 1"
+          "rawSql": "SELECT toStartOfMinute(bucket_utc) AS time,protocol AS metric,ROUND(SUM(total_bytes)*8/60,3) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) GROUP BY 1,protocol ORDER BY 1",
+          "editorType": "sql",
+          "queryType": "timeseries",
+          "format": 0
         }
       ],
       "datasource": {
-        "type": "mysql",
-        "uid": "orbymon-mysql"
+        "type": "grafana-clickhouse-datasource",
+        "uid": "orbyflow-clickhouse"
       }
     },
     {
@@ -356,7 +359,8 @@
             "thresholdsStyle": {
               "mode": "off"
             }
-          }
+          },
+          "displayName": "${__field.labels.metric}"
         },
         "overrides": []
       },
@@ -365,17 +369,18 @@
         {
           "refId": "A",
           "datasource": {
-            "type": "mysql",
-            "uid": "orbymon-mysql"
+            "type": "grafana-clickhouse-datasource",
+            "uid": "orbyflow-clickhouse"
           },
-          "editorMode": "code",
-          "format": "time_series",
-          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),protocol AS metric,ROUND(SUM(total_packets)/60,1) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) GROUP BY 1,protocol ORDER BY 1"
+          "rawSql": "SELECT toStartOfMinute(bucket_utc) AS time,protocol AS metric,ROUND(SUM(total_packets)/60,1) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) GROUP BY 1,protocol ORDER BY 1",
+          "editorType": "sql",
+          "queryType": "timeseries",
+          "format": 0
         }
       ],
       "datasource": {
-        "type": "mysql",
-        "uid": "orbymon-mysql"
+        "type": "grafana-clickhouse-datasource",
+        "uid": "orbyflow-clickhouse"
       }
     },
     {
@@ -450,17 +455,18 @@
         {
           "refId": "A",
           "datasource": {
-            "type": "mysql",
-            "uid": "orbymon-mysql"
+            "type": "grafana-clickhouse-datasource",
+            "uid": "orbyflow-clickhouse"
           },
-          "editorMode": "code",
-          "format": "table",
-          "rawSql": "SELECT protocol AS Protocolo,dst_port AS Porta,ROUND(SUM(total_bytes),0) AS 'Volume estimado' FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND dst_port>0 AND protocol IN ('tcp','udp') GROUP BY protocol,dst_port ORDER BY SUM(total_bytes) DESC LIMIT 20"
+          "rawSql": "SELECT protocol AS Protocolo,dst_port AS Porta,ROUND(SUM(total_bytes),0) AS \"Volume estimado\" FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND dst_port>0 AND protocol IN ('tcp','udp') GROUP BY protocol,dst_port ORDER BY SUM(total_bytes) DESC LIMIT 20",
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1
         }
       ],
       "datasource": {
-        "type": "mysql",
-        "uid": "orbymon-mysql"
+        "type": "grafana-clickhouse-datasource",
+        "uid": "orbyflow-clickhouse"
       }
     },
     {
@@ -517,17 +523,18 @@
         {
           "refId": "A",
           "datasource": {
-            "type": "mysql",
-            "uid": "orbymon-mysql"
+            "type": "grafana-clickhouse-datasource",
+            "uid": "orbyflow-clickhouse"
           },
-          "editorMode": "code",
-          "format": "table",
-          "rawSql": "SELECT ROUND(COALESCE(SUM(total_bytes),0),0) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc)"
+          "rawSql": "SELECT ROUND(COALESCE(SUM(total_bytes),0),0) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc)",
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1
         }
       ],
       "datasource": {
-        "type": "mysql",
-        "uid": "orbymon-mysql"
+        "type": "grafana-clickhouse-datasource",
+        "uid": "orbyflow-clickhouse"
       }
     },
     {
@@ -584,17 +591,18 @@
         {
           "refId": "A",
           "datasource": {
-            "type": "mysql",
-            "uid": "orbymon-mysql"
+            "type": "grafana-clickhouse-datasource",
+            "uid": "orbyflow-clickhouse"
           },
-          "editorMode": "code",
-          "format": "table",
-          "rawSql": "SELECT ROUND(COALESCE(SUM(total_packets),0)/300,1) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND bucket_utc >= UTC_TIMESTAMP() - INTERVAL 90 MINUTE AND bucket_utc >= (SELECT MAX(bucket_utc) FROM orby_ip_pairs_minute WHERE source='huawei') - INTERVAL 5 MINUTE AND bucket_utc < (SELECT MAX(bucket_utc) FROM orby_ip_pairs_minute WHERE source='huawei')"
+          "rawSql": "SELECT ROUND(COALESCE(SUM(total_packets),0)/300,1) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND bucket_utc >= now('UTC') - INTERVAL 90 MINUTE AND bucket_utc >= (SELECT MAX(bucket_utc) FROM orby_ip_pairs_minute WHERE source='huawei') - INTERVAL 5 MINUTE AND bucket_utc < (SELECT MAX(bucket_utc) FROM orby_ip_pairs_minute WHERE source='huawei')",
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1
         }
       ],
       "datasource": {
-        "type": "mysql",
-        "uid": "orbymon-mysql"
+        "type": "grafana-clickhouse-datasource",
+        "uid": "orbyflow-clickhouse"
       }
     },
     {
@@ -651,17 +659,18 @@
         {
           "refId": "A",
           "datasource": {
-            "type": "mysql",
-            "uid": "orbymon-mysql"
+            "type": "grafana-clickhouse-datasource",
+            "uid": "orbyflow-clickhouse"
           },
-          "editorMode": "code",
-          "format": "table",
-          "rawSql": "SELECT ROUND(COALESCE(SUM(total_bytes),0)*8/300,3) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND bucket_utc >= UTC_TIMESTAMP() - INTERVAL 90 MINUTE AND bucket_utc >= (SELECT MAX(bucket_utc) FROM orby_ip_pairs_minute WHERE source='huawei') - INTERVAL 5 MINUTE AND bucket_utc < (SELECT MAX(bucket_utc) FROM orby_ip_pairs_minute WHERE source='huawei')"
+          "rawSql": "SELECT ROUND(COALESCE(SUM(total_bytes),0)*8/300,3) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND bucket_utc >= now('UTC') - INTERVAL 90 MINUTE AND bucket_utc >= (SELECT MAX(bucket_utc) FROM orby_ip_pairs_minute WHERE source='huawei') - INTERVAL 5 MINUTE AND bucket_utc < (SELECT MAX(bucket_utc) FROM orby_ip_pairs_minute WHERE source='huawei')",
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1
         }
       ],
       "datasource": {
-        "type": "mysql",
-        "uid": "orbymon-mysql"
+        "type": "grafana-clickhouse-datasource",
+        "uid": "orbyflow-clickhouse"
       }
     },
     {
@@ -717,7 +726,7 @@
           "refId": "A",
           "datasource": {
             "type": "mysql",
-            "uid": "orbymon-mysql"
+            "uid": "orbyflow-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -726,7 +735,7 @@
       ],
       "datasource": {
         "type": "mysql",
-        "uid": "orbymon-mysql"
+        "uid": "orbyflow-mysql"
       }
     },
     {
@@ -811,7 +820,8 @@
             "thresholdsStyle": {
               "mode": "off"
             }
-          }
+          },
+          "displayName": "${__field.labels.metric}"
         },
         "overrides": []
       },
@@ -820,17 +830,18 @@
         {
           "refId": "A",
           "datasource": {
-            "type": "mysql",
-            "uid": "orbymon-mysql"
+            "type": "grafana-clickhouse-datasource",
+            "uid": "orbyflow-clickhouse"
           },
-          "editorMode": "code",
-          "format": "time_series",
-          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),protocol AS metric,SUM(flow_records) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) GROUP BY 1,protocol ORDER BY 1"
+          "rawSql": "SELECT toStartOfMinute(bucket_utc) AS time,protocol AS metric,SUM(flow_records) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) GROUP BY 1,protocol ORDER BY 1",
+          "editorType": "sql",
+          "queryType": "timeseries",
+          "format": 0
         }
       ],
       "datasource": {
-        "type": "mysql",
-        "uid": "orbymon-mysql"
+        "type": "grafana-clickhouse-datasource",
+        "uid": "orbyflow-clickhouse"
       }
     },
     {
@@ -920,17 +931,18 @@
         {
           "refId": "A",
           "datasource": {
-            "type": "mysql",
-            "uid": "orbymon-mysql"
+            "type": "grafana-clickhouse-datasource",
+            "uid": "orbyflow-clickhouse"
           },
-          "editorMode": "code",
-          "format": "table",
-          "rawSql": "SELECT bucket_utc AS 'Minuto UTC',protocol AS Protocolo,ROUND(SUM(total_bytes)*8/60,3) AS 'Taxa estimada',ROUND(SUM(total_packets)/60,1) AS 'Pacotes/s',SUM(flow_records) AS 'Fluxos' FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) GROUP BY bucket_utc,protocol ORDER BY bucket_utc DESC LIMIT 60"
+          "rawSql": "SELECT bucket_utc AS \"Minuto UTC\",protocol AS Protocolo,ROUND(SUM(total_bytes)*8/60,3) AS \"Taxa estimada\",ROUND(SUM(total_packets)/60,1) AS \"Pacotes/s\",SUM(flow_records) AS \"Fluxos\" FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) GROUP BY bucket_utc,protocol ORDER BY bucket_utc DESC LIMIT 60",
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1
         }
       ],
       "datasource": {
-        "type": "mysql",
-        "uid": "orbymon-mysql"
+        "type": "grafana-clickhouse-datasource",
+        "uid": "orbyflow-clickhouse"
       }
     },
     {
@@ -1036,17 +1048,18 @@
         {
           "refId": "A",
           "datasource": {
-            "type": "mysql",
-            "uid": "orbymon-mysql"
+            "type": "grafana-clickhouse-datasource",
+            "uid": "orbyflow-clickhouse"
           },
-          "editorMode": "code",
-          "format": "table",
-          "rawSql": "SELECT COALESCE(cn.name,NULLIF(t.pais,''),'Não informado') AS 'País',t.ips AS 'IPs de origem',t.vol AS 'Volume',t.bps AS 'Taxa média',t.pps AS 'Pacotes/s médio' FROM (SELECT src_country AS pais,COUNT(DISTINCT src_ip) AS ips,SUM(total_bytes) AS vol,SUM(total_bytes)*8/GREATEST(1,$__unixEpochTo()-$__unixEpochFrom()) AS bps,SUM(total_packets)/GREATEST(1,$__unixEpochTo()-$__unixEpochFrom()) AS pps FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND src_country<>'' GROUP BY src_country ORDER BY SUM(total_bytes) DESC LIMIT 20) AS t LEFT JOIN orby_country_names AS cn ON cn.code=t.pais ORDER BY t.vol DESC"
+          "rawSql": "SELECT COALESCE(cn.name,nullIf(t.pais,''),'Não informado') AS \"País\",t.ips AS \"IPs de origem\",t.vol AS \"Volume\",t.bps AS \"Taxa média\",t.pps AS \"Pacotes/s médio\" FROM (SELECT src_country AS pais,COUNT(DISTINCT src_ip) AS ips,SUM(total_bytes) AS vol,SUM(total_bytes)*8/GREATEST(1,toUnixTimestamp($__toTime)-toUnixTimestamp($__fromTime)) AS bps,SUM(total_packets)/GREATEST(1,toUnixTimestamp($__toTime)-toUnixTimestamp($__fromTime)) AS pps FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND src_country<>'' GROUP BY src_country ORDER BY SUM(total_bytes) DESC LIMIT 20) AS t LEFT JOIN orby_country_names AS cn ON cn.code=t.pais ORDER BY t.vol DESC",
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1
         }
       ],
       "datasource": {
-        "type": "mysql",
-        "uid": "orbymon-mysql"
+        "type": "grafana-clickhouse-datasource",
+        "uid": "orbyflow-clickhouse"
       }
     },
     {
@@ -1171,17 +1184,18 @@
         {
           "refId": "A",
           "datasource": {
-            "type": "mysql",
-            "uid": "orbymon-mysql"
+            "type": "grafana-clickhouse-datasource",
+            "uid": "orbyflow-clickhouse"
           },
-          "editorMode": "code",
-          "format": "table",
-          "rawSql": "SELECT t.latitude,t.longitude,COALESCE(cn.name,NULLIF(t.pais,''),'Não informado') AS 'País',t.asn AS 'ASN',t.nome AS 'Nome',t.ips AS 'IPs de origem',t.vol AS 'Volume' FROM (SELECT src_latitude AS latitude,src_longitude AS longitude,src_asn AS asn,COALESCE(MAX(NULLIF(src_asn_name,'')),'Não identificado') AS nome,MAX(NULLIF(src_country,'')) AS pais,COUNT(DISTINCT src_ip) AS ips,SUM(total_bytes) AS vol FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND src_latitude IS NOT NULL AND src_longitude IS NOT NULL GROUP BY src_latitude,src_longitude,src_asn ORDER BY SUM(total_bytes) DESC LIMIT 300) AS t LEFT JOIN orby_country_names AS cn ON cn.code=t.pais ORDER BY t.vol DESC"
+          "rawSql": "SELECT t.latitude,t.longitude,COALESCE(cn.name,nullIf(t.pais,''),'Não informado') AS \"País\",t.asn AS \"ASN\",t.nome AS \"Nome\",t.ips AS \"IPs de origem\",t.vol AS \"Volume\" FROM (SELECT src_latitude AS latitude,src_longitude AS longitude,src_asn AS asn,COALESCE(MAX(nullIf(src_asn_name,'')),'Não identificado') AS nome,MAX(nullIf(src_country,'')) AS pais,COUNT(DISTINCT src_ip) AS ips,SUM(total_bytes) AS vol FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND src_latitude IS NOT NULL AND src_longitude IS NOT NULL GROUP BY src_latitude,src_longitude,src_asn ORDER BY SUM(total_bytes) DESC LIMIT 300) AS t LEFT JOIN orby_country_names AS cn ON cn.code=t.pais ORDER BY t.vol DESC",
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1
         }
       ],
       "datasource": {
-        "type": "mysql",
-        "uid": "orbymon-mysql"
+        "type": "grafana-clickhouse-datasource",
+        "uid": "orbyflow-clickhouse"
       }
     },
     {
@@ -1269,7 +1283,8 @@
             "thresholdsStyle": {
               "mode": "off"
             }
-          }
+          },
+          "displayName": "${__field.labels.metric}"
         },
         "overrides": []
       },
@@ -1278,17 +1293,18 @@
         {
           "refId": "A",
           "datasource": {
-            "type": "mysql",
-            "uid": "orbymon-mysql"
+            "type": "grafana-clickhouse-datasource",
+            "uid": "orbyflow-clickhouse"
           },
-          "editorMode": "code",
-          "format": "time_series",
-          "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),CASE WHEN input_if=0 THEN 'sem interface (0)' ELSE COALESCE(CONCAT(im.if_name,' (',input_if,')'),CONCAT('ifIndex ',input_if,' (sem nome)')) END AS metric,ROUND(SUM(total_bytes)*8/60,3) AS value FROM orby_ip_pairs_minute AS p LEFT JOIN orby_interface_names AS im ON im.source=p.source AND im.if_index=p.input_if WHERE p.source='huawei' AND $__timeFilter(p.bucket_utc) GROUP BY 1,p.input_if,im.if_name ORDER BY 1"
+          "rawSql": "SELECT toStartOfMinute(bucket_utc) AS time,CASE WHEN input_if=0 THEN 'sem interface (0)' ELSE COALESCE(CONCAT(im.if_name,' (',input_if,')'),CONCAT('ifIndex ',input_if,' (sem nome)')) END AS metric,ROUND(SUM(total_bytes)*8/60,3) AS value FROM orby_ip_pairs_minute AS p LEFT JOIN orby_interface_names AS im ON im.source=p.source AND im.if_index=p.input_if WHERE p.source='huawei' AND $__timeFilter(p.bucket_utc) GROUP BY 1,p.input_if,im.if_name ORDER BY 1",
+          "editorType": "sql",
+          "queryType": "timeseries",
+          "format": 0
         }
       ],
       "datasource": {
-        "type": "mysql",
-        "uid": "orbymon-mysql"
+        "type": "grafana-clickhouse-datasource",
+        "uid": "orbyflow-clickhouse"
       }
     }
   ]

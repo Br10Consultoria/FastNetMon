@@ -10,8 +10,8 @@ def dash(name):
 
 class LiveDashboardTests(unittest.TestCase):
     def test_huawei_live_sources_new_enriched_rollup_only(self):
-        j=dash("orbymon-huawei-live.json")
-        self.assertEqual(j["uid"],"orbymon-huawei-live")
+        j=dash("orbyflow-huawei-live.json")
+        self.assertEqual(j["uid"],"orbyflow-huawei-live")
         self.assertEqual(j["refresh"],"1m")
         for p in j["panels"]:
             s=p["targets"][0]["rawSql"]
@@ -23,14 +23,14 @@ class LiveDashboardTests(unittest.TestCase):
         self.assertTrue(any(p["fieldConfig"]["defaults"].get("unit")=="bps" and p["type"]=="timeseries"
                             for p in j["panels"]))
     def test_latest_sample_and_recent_average_do_not_depend_on_clock(self):
-        j=dash("orbymon-huawei-live.json")
+        j=dash("orbyflow-huawei-live.json")
         # o painel "Última amostra" saiu no padrão validado em produção; as médias recentes ficam
         avg=[p for p in j["panels"] if "média dos 5 min mais recentes" in p["title"]]
         self.assertEqual(len(avg),2)
         for p in avg:
             self.assertIn("SELECT MAX(bucket_utc)",p["targets"][0]["rawSql"])
     def test_overview_keeps_alert_map_separate_from_normal_traffic(self):
-        j=dash("orbymon-overview.json")
+        j=dash("orbyflow-overview.json")
         alerts=[p for p in j["panels"] if p["id"]==7][0]
         traffic=[p for p in j["panels"] if p["id"]==21][0]
         self.assertEqual(alerts["type"],"geomap")
@@ -40,7 +40,7 @@ class LiveDashboardTests(unittest.TestCase):
         self.assertNotIn("orby_alerts",traffic["targets"][0]["rawSql"])
         self.assertNotEqual(alerts["gridPos"],traffic["gridPos"])
     def test_map_has_coordinates_and_bounds(self):
-        for name,pid in [("orbymon-huawei-live.json",11),("orbymon-overview.json",21)]:
+        for name,pid in [("orbyflow-huawei-live.json",11),("orbyflow-overview.json",21)]:
             p=next(x for x in dash(name)["panels"] if x["id"]==pid)
             q=p["targets"][0]["rawSql"]
             self.assertIn("src_latitude AS latitude",q)
@@ -48,9 +48,9 @@ class LiveDashboardTests(unittest.TestCase):
             self.assertIn("LIMIT 300",q)
             self.assertEqual(p["options"]["layers"][0]["location"]["mode"],"coords")
     def test_panel_uids_stable_and_unique(self):
-        for name,uid in (("orbymon-huawei-live.json","orbymon-huawei-live"),
-                         ("orbymon-overview.json","orbymon-ddos-overview"),
-                         ("orbymon-ip-analytics.json","orbymon-ip-analytics")):
+        for name,uid in (("orbyflow-huawei-live.json","orbyflow-huawei-live"),
+                         ("orbyflow-overview.json","orbyflow-ddos-overview"),
+                         ("orbyflow-ip-analytics.json","orbyflow-ip-analytics")):
             j=dash(name)
             self.assertEqual(j["uid"],uid)
             ids=[p["id"] for p in j["panels"]]

@@ -151,7 +151,7 @@ def overview(p):
         p["fieldConfig"]["overrides"] = [ov("Pacotes/s", "pps", 0)]
 
 
-edit("grafana/dashboards/orbymon-huawei-live.json", live)
-edit("grafana/dashboards/orbymon-ip-analytics.json", ipa)
-edit("grafana/dashboards/orbymon-overview.json", overview)
+edit("grafana/dashboards/orbyflow-huawei-live.json", live)
+edit("grafana/dashboards/orbyflow-ip-analytics.json", ipa)
+edit("grafana/dashboards/orbyflow-overview.json", overview)
 print("ok")

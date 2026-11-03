@@ -88,8 +88,8 @@ sudo mariadb orbymon -e "SELECT bucket_utc, protocol, ROUND(SUM(total_bytes)*8/6
 ~~~
 
 A tabela usa UTC. Grafana deve ler o banco via usuario somente SELECT e
-o datasource com UID orbymon-mysql. O JSON inicial esta em
-grafana/dashboards/orbymon-overview.json. Ainda nao validado em Grafana real.
+o datasource com UID orbyflow-mysql. O JSON inicial esta em
+grafana/dashboards/orbyflow-overview.json. Ainda nao validado em Grafana real.
 
 ## Pendencias
 

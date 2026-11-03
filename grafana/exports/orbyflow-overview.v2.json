@@ -2,7 +2,7 @@
   "apiVersion": "dashboard.grafana.app/v2",
   "kind": "Dashboard",
   "metadata": {
-    "name": "orbymon-huawei-live"
+    "name": "orbyflow-ddos-overview"
   },
   "spec": {
     "annotations": [
@@ -26,15 +26,15 @@
         }
       }
     ],
-    "cursorSync": "Off",
-    "description": "Visão quase em tempo real de NetFlow Huawei: taxa estimada por minuto a partir de buckets do fim do fluxo (amostragem/sampling), GeoLite2 offline e atualização Grafana de 30s. Não é captura instantânea nem detector de ataque.",
+    "cursorSync": "Crosshair",
+    "description": "Painel OrbyFlow v0.2, eventos detectados e fluxos agregados; geolocalização aproximada (MaxMind).",
     "editable": true,
     "elements": {
       "panel-1": {
         "kind": "Panel",
         "spec": {
           "id": 1,
-          "title": "Taxa estimada por protocolo — Huawei",
+          "title": "Alertas detectados",
           "description": "",
           "links": [],
           "data": {
@@ -49,12 +49,12 @@
                       "group": "mysql",
                       "version": "v0",
                       "datasource": {
-                        "name": "orbymon-mysql"
+                        "name": "orbyflow-mysql"
                       },
                       "spec": {
                         "editorMode": "code",
-                        "format": "time_series",
-                        "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),protocol AS metric,ROUND(SUM(total_bytes)*8/60,3) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) GROUP BY 1,protocol ORDER BY 1"
+                        "format": "table",
+                        "rawSql": "SELECT COUNT(*) AS value FROM orby_alerts WHERE $__timeFilter(event_time)"
                       }
                     },
                     "refId": "A",
@@ -68,26 +68,39 @@
           },
           "vizConfig": {
             "kind": "VizConfig",
-            "group": "timeseries",
+            "group": "gauge",
             "version": "13.3.0",
             "spec": {
               "options": {
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "table",
-                  "placement": "bottom",
-                  "showLegend": true
+                "barShape": "rounded",
+                "barWidthFactor": 0.25,
+                "effects": {
+                  "barGlow": true,
+                  "centerGlow": true,
+                  "gradient": true
                 },
-                "tooltip": {
-                  "hideZeros": false,
-                  "mode": "single",
-                  "sort": "none"
-                }
+                "endpointMarker": "glow",
+                "minVizHeight": 75,
+                "minVizWidth": 75,
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "segmentCount": 10,
+                "segmentSpacing": 0.15,
+                "shape": "circle",
+                "showThresholdLabels": false,
+                "showThresholdMarkers": false,
+                "sizing": "auto",
+                "sparkline": true,
+                "textMode": "auto"
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "bps",
-                  "decimals": 2,
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -102,45 +115,8 @@
                     ]
                   },
                   "color": {
-                    "mode": "continuous-BlYlRd",
-                    "seriesBy": "last"
-                  },
-                  "custom": {
-                    "axisBorderShow": false,
-                    "axisCenteredZero": false,
-                    "axisColorMode": "text",
-                    "axisLabel": "",
-                    "axisPlacement": "auto",
-                    "barAlignment": 0,
-                    "barWidthFactor": 0.6,
-                    "drawStyle": "line",
-                    "fillOpacity": 19,
-                    "gradientMode": "scheme",
-                    "hideFrom": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": false
-                    },
-                    "insertNulls": false,
-                    "lineInterpolation": "smooth",
-                    "lineStyle": {
-                      "fill": "solid"
-                    },
-                    "lineWidth": 2,
-                    "pointSize": 5,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "showPoints": "never",
-                    "showValues": false,
-                    "spanNulls": false,
-                    "stacking": {
-                      "group": "A",
-                      "mode": "none"
-                    },
-                    "thresholdsStyle": {
-                      "mode": "off"
-                    }
+                    "mode": "fixed",
+                    "fixedColor": "blue"
                   }
                 },
                 "overrides": []
@@ -154,7 +130,7 @@
         "kind": "Panel",
         "spec": {
           "id": 10,
-          "title": "Minutos recentes processados (UTC)",
+          "title": "Top portas de destino Huawei (volume)",
           "description": "",
           "links": [],
           "data": {
@@ -169,12 +145,224 @@
                       "group": "mysql",
                       "version": "v0",
                       "datasource": {
-                        "name": "orbymon-mysql"
+                        "name": "orbyflow-mysql"
                       },
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
-                        "rawSql": "SELECT bucket_utc AS 'Minuto UTC',protocol AS Protocolo,ROUND(SUM(total_bytes)*8/60,3) AS 'Taxa estimada',ROUND(SUM(total_packets)/60,1) AS 'Pacotes/s',SUM(flow_records) AS 'Fluxos' FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) GROUP BY bucket_utc,protocol ORDER BY bucket_utc DESC LIMIT 60"
+                        "rawSql": "SELECT CAST(dst_port AS CHAR) AS 'Porta',ROUND(SUM(total_bytes),0) AS 'Volume estimado' FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) GROUP BY dst_port ORDER BY SUM(total_bytes) DESC LIMIT 15"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "barchart",
+            "version": "13.3.0",
+            "spec": {
+              "options": {
+                "barRadius": 0,
+                "barWidth": 0.9,
+                "fullHighlight": false,
+                "groupWidth": 0.8,
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "orientation": "horizontal",
+                "showValue": "auto",
+                "stacking": "none",
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                },
+                "xField": "time",
+                "xTickLabelRotation": 0,
+                "xTickLabelSpacing": 100
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      },
+                      {
+                        "value": 80,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "#ad46ff"
+                  },
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "",
+                    "axisPlacement": "auto",
+                    "fillOpacity": 100,
+                    "gradientMode": "hue",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "lineWidth": 1,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Volume estimado"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "decbytes"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 1
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "transparent": true
+        }
+      },
+      "panel-11": {
+        "kind": "Panel",
+        "spec": {
+          "id": 11,
+          "title": "Alertas por regra",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "orbyflow-mysql"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawSql": "SELECT rule_name AS 'Regra', COUNT(*) AS 'Alertas' FROM orby_alerts WHERE $__timeFilter(event_time) GROUP BY rule_name ORDER BY COUNT(*) DESC LIMIT 12"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "piechart",
+            "version": "13.3.0",
+            "spec": {
+              "options": {
+                "legend": {
+                  "displayMode": "table",
+                  "placement": "right",
+                  "showLegend": true
+                },
+                "pieType": "donut",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "sort": "desc",
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic",
+                    "fixedColor": "#73BF69"
+                  },
+                  "custom": {
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    }
+                  }
+                },
+                "overrides": []
+              }
+            }
+          },
+          "transparent": true
+        }
+      },
+      "panel-12": {
+        "kind": "Panel",
+        "spec": {
+          "id": 12,
+          "title": "Últimos ataques detectados (recebidos e originados)",
+          "description": "Detecção bidirecional (F4): origem/destino do lado da rede, IP público usado no CGNAT, protocolo e porta, principais IPs remotos. Detalhe completo, ASN e país dos remotos: painel web > Ataques.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "orbyflow-mysql"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawSql": "SELECT event_time AS 'Hora',CASE direction WHEN 'in' THEN 'recebido' ELSE 'originado' END AS 'Sentido',rule_name AS 'Regra',severity AS 'Severidade',CASE scope WHEN 'dedicated' THEN 'IP dedicado' WHEN 'cgnat_pool' THEN 'Pool CGNAT' ELSE 'Assinante CGNAT' END AS 'Tipo de IP',IF(subscriber_ip<>'' AND scope<>'cgnat_pool',subscriber_ip,local_ip) AS 'IP da rede',COALESCE(NULLIF(JSON_VALUE(details,'$.public_ips[0]'),''),IF(scope='cgnat_pool',local_ip,'')) AS 'IP público (CGNAT)',CASE WHEN detection='nat' THEN COALESCE(CONCAT(JSON_VALUE(details,'$.top_portas[0].protocolo'),'/',JSON_VALUE(details,'$.top_portas[0].porta'),' → ',JSON_VALUE(details,'$.top_portas[0].destinos'),' destinos'),'sem fluxo amostrado') ELSE CONCAT(protocol,IF(remote_port>0,CONCAT(IF(direction='in',' origem ',' destino '),remote_port),''),IF(local_port>0,CONCAT(' local ',local_port),'')) END AS 'Protocolo / porta',CONCAT_WS(', ',JSON_VALUE(details,'$.top_remote_ips[0]'),JSON_VALUE(details,'$.top_remote_ips[1]'),JSON_VALUE(details,'$.top_remote_ips[2]')) AS 'IPs remotos (principais)',remote_ips AS 'Qtd. remotos',pps AS 'Pacotes/s',mbps*1000000 AS 'Taxa',CAST(JSON_VALUE(details,'$.allocs_per_min') AS UNSIGNED) AS 'Alocações NAT/min',CAST(JSON_VALUE(details,'$.active_ports') AS UNSIGNED) AS 'Portas NAT ativas' FROM orby_attack_events WHERE $__timeFilter(event_time) ORDER BY event_time DESC LIMIT 500"
                       }
                     },
                     "refId": "A",
@@ -217,9 +405,8 @@
                   "custom": {
                     "align": "auto",
                     "cellOptions": {
-                      "type": "color-background"
+                      "type": "auto"
                     },
-                    "filterable": true,
                     "footer": {
                       "reducers": []
                     },
@@ -230,7 +417,23 @@
                   {
                     "matcher": {
                       "id": "byName",
-                      "options": "Taxa estimada"
+                      "options": "Pacotes/s"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "pps"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 0
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Taxa"
                     },
                     "properties": [
                       {
@@ -246,16 +449,12 @@
                   {
                     "matcher": {
                       "id": "byName",
-                      "options": "Pacotes/s"
+                      "options": "Hora"
                     },
                     "properties": [
                       {
                         "id": "unit",
-                        "value": "pps"
-                      },
-                      {
-                        "id": "decimals",
-                        "value": 1
+                        "value": "dateTimeAsLocal"
                       }
                     ]
                   }
@@ -266,11 +465,95 @@
           "transparent": true
         }
       },
-      "panel-11": {
+      "panel-2": {
         "kind": "Panel",
         "spec": {
-          "id": 11,
-          "title": "Mapa de tráfego observado — GeoLite2 (não são alertas)",
+          "id": 2,
+          "title": "ASNs distintos em alertas atribuídos",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "orbyflow-mysql"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawSql": "SELECT COUNT(DISTINCT src_asn) AS value FROM orby_alerts WHERE $__timeFilter(event_time) AND src_asn IS NOT NULL AND src_asn > 0"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "13.3.0",
+            "spec": {
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      },
+                      {
+                        "value": 80,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          },
+          "transparent": true
+        }
+      },
+      "panel-21": {
+        "kind": "Panel",
+        "spec": {
+          "id": 21,
+          "title": "Mapa de origens do tráfego Huawei — GeoLite2",
           "description": "Origens públicas observadas no NetFlow Huawei, localizadas aproximadamente pela GeoLite2. Não são alertas nem locais exatos. A atualização depende da importação nfcapd → MariaDB.",
           "links": [],
           "data": {
@@ -285,7 +568,7 @@
                       "group": "mysql",
                       "version": "v0",
                       "datasource": {
-                        "name": "orbymon-mysql"
+                        "name": "orbyflow-mysql"
                       },
                       "spec": {
                         "editorMode": "code",
@@ -416,12 +699,12 @@
           }
         }
       },
-      "panel-12": {
+      "panel-22": {
         "kind": "Panel",
         "spec": {
-          "id": 12,
-          "title": "Países e origens observadas",
-          "description": "País e coordenadas aproximados da base GeoLite2 para IPs públicos",
+          "id": 22,
+          "title": "PPS estimados por protocolo — Huawei",
+          "description": "Taxa estimada em bucket de um minuto, não medição instantânea.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -435,144 +718,12 @@
                       "group": "mysql",
                       "version": "v0",
                       "datasource": {
-                        "name": "orbymon-mysql"
-                      },
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawSql": "SELECT COALESCE(cn.name,NULLIF(t.pais,''),'Não informado') AS 'País',t.ips AS 'IPs de origem',t.vol AS 'Volume',t.bps AS 'Taxa média',t.pps AS 'Pacotes/s médio' FROM (SELECT src_country AS pais,COUNT(DISTINCT src_ip) AS ips,SUM(total_bytes) AS vol,SUM(total_bytes)*8/GREATEST(1,$__unixEpochTo()-$__unixEpochFrom()) AS bps,SUM(total_packets)/GREATEST(1,$__unixEpochTo()-$__unixEpochFrom()) AS pps FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND src_country<>'' GROUP BY src_country ORDER BY SUM(total_bytes) DESC LIMIT 20) AS t LEFT JOIN orby_country_names AS cn ON cn.code=t.pais ORDER BY t.vol DESC"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "table",
-            "version": "13.3.0",
-            "spec": {
-              "options": {
-                "cellHeight": "sm",
-                "showHeader": true,
-                "zebraStriping": false
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "green"
-                      },
-                      {
-                        "value": 80,
-                        "color": "red"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "palette-classic"
-                  },
-                  "custom": {
-                    "align": "auto",
-                    "cellOptions": {
-                      "type": "color-background"
-                    },
-                    "filterable": true,
-                    "footer": {
-                      "reducers": []
-                    },
-                    "inspect": false
-                  }
-                },
-                "overrides": [
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "Volume"
-                    },
-                    "properties": [
-                      {
-                        "id": "unit",
-                        "value": "decbytes"
-                      },
-                      {
-                        "id": "decimals",
-                        "value": 1
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "Taxa média"
-                    },
-                    "properties": [
-                      {
-                        "id": "unit",
-                        "value": "bps"
-                      },
-                      {
-                        "id": "decimals",
-                        "value": 2
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "Pacotes/s médio"
-                    },
-                    "properties": [
-                      {
-                        "id": "unit",
-                        "value": "pps"
-                      },
-                      {
-                        "id": "decimals",
-                        "value": 1
-                      }
-                    ]
-                  }
-                ]
-              }
-            }
-          },
-          "transparent": true
-        }
-      },
-      "panel-13": {
-        "kind": "Panel",
-        "spec": {
-          "id": 13,
-          "title": "Taxa estimada por interface Huawei (entrada)",
-          "description": "Interfaces SNMP ifName confirmadas; 'Não informado' corresponde ao ifIndex 0. A direção bruta do NetFlow não corresponde necessariamente a upload/download.",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "mysql",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "orbymon-mysql"
+                        "name": "orbyflow-mysql"
                       },
                       "spec": {
                         "editorMode": "code",
                         "format": "time_series",
-                        "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),CASE WHEN input_if=0 THEN 'sem interface (0)' ELSE COALESCE(CONCAT(im.if_name,' (',input_if,')'),CONCAT('ifIndex ',input_if,' (sem nome)')) END AS metric,ROUND(SUM(total_bytes)*8/60,3) AS value FROM orby_ip_pairs_minute AS p LEFT JOIN orby_interface_names AS im ON im.source=p.source AND im.if_index=p.input_if WHERE p.source='huawei' AND $__timeFilter(p.bucket_utc) GROUP BY 1,p.input_if,im.if_name ORDER BY 1"
+                        "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),protocol AS metric,ROUND(SUM(total_packets)/60,1) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) GROUP BY 1,protocol ORDER BY 1"
                       }
                     },
                     "refId": "A",
@@ -603,6 +754,285 @@
                   "hideZeros": false,
                   "mode": "multi",
                   "sort": "desc"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "pps",
+                  "decimals": 2,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      },
+                      {
+                        "value": 80,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "",
+                    "axisPlacement": "auto",
+                    "barAlignment": 0,
+                    "barWidthFactor": 0.6,
+                    "drawStyle": "line",
+                    "fillOpacity": 12,
+                    "gradientMode": "none",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "insertNulls": false,
+                    "lineInterpolation": "linear",
+                    "lineWidth": 2,
+                    "pointSize": 5,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "showPoints": "never",
+                    "showValues": false,
+                    "spanNulls": false,
+                    "stacking": {
+                      "group": "A",
+                      "mode": "none"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-3": {
+        "kind": "Panel",
+        "spec": {
+          "id": 3,
+          "title": "Países distintos",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "orbyflow-mysql"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawSql": "SELECT COUNT(DISTINCT src_country) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND src_country<>''"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "13.3.0",
+            "spec": {
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds",
+                    "fixedColor": "#ad46ff"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          },
+          "transparent": true
+        }
+      },
+      "panel-4": {
+        "kind": "Panel",
+        "spec": {
+          "id": 4,
+          "title": "Volume estimado Huawei",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "orbyflow-mysql"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawSql": "SELECT ROUND(COALESCE(SUM(total_bytes),0),0) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc)"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "13.3.0",
+            "spec": {
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "decbytes",
+                  "decimals": 1,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds",
+                    "fixedColor": "#ad46ff"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          },
+          "transparent": true
+        }
+      },
+      "panel-5": {
+        "kind": "Panel",
+        "spec": {
+          "id": 5,
+          "title": "Taxa estimada por protocolo — Huawei",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "orbyflow-mysql"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "time_series",
+                        "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),protocol AS metric,ROUND(SUM(total_bytes)*8/60,3) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) GROUP BY 1,protocol ORDER BY 1"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "13.3.0",
+            "spec": {
+              "options": {
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "table",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
                 }
               },
               "fieldConfig": {
@@ -671,11 +1101,11 @@
           "transparent": true
         }
       },
-      "panel-2": {
+      "panel-6": {
         "kind": "Panel",
         "spec": {
-          "id": 2,
-          "title": "PPS estimados por protocolo — Huawei",
+          "id": 6,
+          "title": "Alertas ao longo do tempo",
           "description": "",
           "links": [],
           "data": {
@@ -690,12 +1120,12 @@
                       "group": "mysql",
                       "version": "v0",
                       "datasource": {
-                        "name": "orbymon-mysql"
+                        "name": "orbyflow-mysql"
                       },
                       "spec": {
                         "editorMode": "code",
                         "format": "time_series",
-                        "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),protocol AS metric,ROUND(SUM(total_packets)/60,1) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) GROUP BY 1,protocol ORDER BY 1"
+                        "rawSql": "SELECT $__timeGroupAlias(event_time,'1m'), COUNT(*) AS value FROM orby_alerts WHERE $__timeFilter(event_time) GROUP BY 1 ORDER BY 1"
                       }
                     },
                     "refId": "A",
@@ -709,26 +1139,39 @@
           },
           "vizConfig": {
             "kind": "VizConfig",
-            "group": "timeseries",
+            "group": "gauge",
             "version": "13.3.0",
             "spec": {
               "options": {
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "table",
-                  "placement": "bottom",
-                  "showLegend": true
+                "barShape": "rounded",
+                "barWidthFactor": 0.25,
+                "effects": {
+                  "barGlow": true,
+                  "centerGlow": true,
+                  "gradient": true
                 },
-                "tooltip": {
-                  "hideZeros": false,
-                  "mode": "single",
-                  "sort": "none"
-                }
+                "endpointMarker": "glow",
+                "minVizHeight": 75,
+                "minVizWidth": 75,
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "segmentCount": 10,
+                "segmentSpacing": 0.15,
+                "shape": "circle",
+                "showThresholdLabels": false,
+                "showThresholdMarkers": false,
+                "sizing": "auto",
+                "sparkline": true,
+                "textMode": "auto"
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "pps",
-                  "decimals": 1,
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -743,45 +1186,8 @@
                     ]
                   },
                   "color": {
-                    "mode": "continuous-BlYlRd",
-                    "seriesBy": "last"
-                  },
-                  "custom": {
-                    "axisBorderShow": false,
-                    "axisCenteredZero": false,
-                    "axisColorMode": "text",
-                    "axisLabel": "",
-                    "axisPlacement": "auto",
-                    "barAlignment": 0,
-                    "barWidthFactor": 0.6,
-                    "drawStyle": "line",
-                    "fillOpacity": 19,
-                    "gradientMode": "scheme",
-                    "hideFrom": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": false
-                    },
-                    "insertNulls": false,
-                    "lineInterpolation": "smooth",
-                    "lineStyle": {
-                      "fill": "solid"
-                    },
-                    "lineWidth": 2,
-                    "pointSize": 5,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "showPoints": "never",
-                    "showValues": false,
-                    "spanNulls": false,
-                    "stacking": {
-                      "group": "A",
-                      "mode": "none"
-                    },
-                    "thresholdsStyle": {
-                      "mode": "off"
-                    }
+                    "mode": "fixed",
+                    "fixedColor": "blue"
                   }
                 },
                 "overrides": []
@@ -791,12 +1197,12 @@
           "transparent": true
         }
       },
-      "panel-3": {
+      "panel-7": {
         "kind": "Panel",
         "spec": {
-          "id": 3,
-          "title": "Top 20 ASNs observados (ASN, nome, blocos, país)",
-          "description": "",
+          "id": 7,
+          "title": "Mapa de alertas DDoS — apenas quando houver alertas",
+          "description": "Este painel mostra apenas incidentes com IP de origem geolocalizado. Ficar vazio quando não existem alertas é esperado.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -810,12 +1216,12 @@
                       "group": "mysql",
                       "version": "v0",
                       "datasource": {
-                        "name": "orbymon-mysql"
+                        "name": "orbyflow-mysql"
                       },
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
-                        "rawSql": "SELECT t.asn AS 'ASN',t.nome AS 'Nome',t.blocos AS 'Blocos / IPs',t.ips AS 'IPs',CASE WHEN t.paises>1 THEN 'Vários' ELSE COALESCE(cn.name,NULLIF(t.pais,''),'Não informado') END AS 'País',t.vol AS 'Volume',t.bps AS 'Taxa média',t.pps AS 'Pacotes/s médio' FROM (SELECT src_asn AS asn,COALESCE(MAX(NULLIF(src_asn_name,'')),'Não identificado') AS nome,COALESCE(NULLIF(GROUP_CONCAT(DISTINCT NULLIF(src_prefix,'') ORDER BY src_prefix SEPARATOR ', ' LIMIT 3),''),GROUP_CONCAT(DISTINCT src_ip ORDER BY src_ip SEPARATOR ', ' LIMIT 3)) AS blocos,COUNT(DISTINCT src_ip) AS ips,COUNT(DISTINCT NULLIF(src_country,'')) AS paises,MAX(NULLIF(src_country,'')) AS pais,SUM(total_bytes) AS vol,SUM(total_bytes)*8/GREATEST(1,$__unixEpochTo()-$__unixEpochFrom()) AS bps,SUM(total_packets)/GREATEST(1,$__unixEpochTo()-$__unixEpochFrom()) AS pps FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND src_asn>0 GROUP BY src_asn ORDER BY SUM(total_bytes) DESC LIMIT 20) AS t LEFT JOIN orby_country_names AS cn ON cn.code=t.pais ORDER BY t.vol DESC"
+                        "rawSql": "SELECT a.src_latitude AS latitude,a.src_longitude AS longitude,COALESCE(cn.name,NULLIF(a.src_country,''),'Não informado') AS 'País',a.src_asn AS 'ASN',a.src_asn_name AS 'Nome',a.src_ip AS 'IP origem',a.dst_ip AS 'IP destino',a.rule_name AS 'Regra',a.pps AS 'Pacotes/s',a.event_time AS 'Data UTC' FROM orby_alerts AS a LEFT JOIN orby_country_names AS cn ON cn.code=a.src_country WHERE $__timeFilter(a.event_time) AND a.src_ip IS NOT NULL AND a.src_latitude IS NOT NULL AND a.src_longitude IS NOT NULL ORDER BY a.event_time DESC LIMIT 3000"
                       }
                     },
                     "refId": "A",
@@ -829,13 +1235,66 @@
           },
           "vizConfig": {
             "kind": "VizConfig",
-            "group": "table",
+            "group": "geomap",
             "version": "13.3.0",
             "spec": {
               "options": {
-                "cellHeight": "sm",
-                "showHeader": true,
-                "zebraStriping": false
+                "basemap": {
+                  "name": "Open Street Map",
+                  "type": "default"
+                },
+                "controls": {
+                  "mouseWheelZoom": true,
+                  "showAttribution": true,
+                  "showDebug": false,
+                  "showMeasure": false,
+                  "showScale": false,
+                  "showZoom": true
+                },
+                "layers": [
+                  {
+                    "config": {
+                      "showLegend": true,
+                      "style": {
+                        "color": {
+                          "fixed": "#E02F44"
+                        },
+                        "opacity": 0.7,
+                        "size": {
+                          "fixed": 7,
+                          "max": 26,
+                          "min": 5
+                        },
+                        "symbol": {
+                          "fixed": "img/icons/marker/circle.svg",
+                          "mode": "fixed"
+                        }
+                      }
+                    },
+                    "location": {
+                      "latitude": "latitude",
+                      "longitude": "longitude",
+                      "mode": "coords"
+                    },
+                    "name": "Alertas por origem (IP)",
+                    "tooltip": true,
+                    "type": "markers"
+                  }
+                ],
+                "tooltip": {
+                  "mode": "details"
+                },
+                "view": {
+                  "allLayers": true,
+                  "dashboardVariable": false,
+                  "id": "fit",
+                  "lat": -14,
+                  "lon": -51,
+                  "maxZoom": 6,
+                  "noRepeat": false,
+                  "padding": 10,
+                  "zoom": 3
+                }
               },
               "fieldConfig": {
                 "defaults": {
@@ -853,57 +1312,21 @@
                     ]
                   },
                   "color": {
-                    "mode": "palette-classic"
+                    "mode": "continuous-YlRd"
                   },
                   "custom": {
-                    "align": "auto",
-                    "cellOptions": {
-                      "type": "color-background"
-                    },
-                    "filterable": true,
-                    "footer": {
-                      "reducers": []
-                    },
-                    "inspect": false
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    }
                   }
                 },
                 "overrides": [
                   {
                     "matcher": {
                       "id": "byName",
-                      "options": "Volume"
-                    },
-                    "properties": [
-                      {
-                        "id": "unit",
-                        "value": "decbytes"
-                      },
-                      {
-                        "id": "decimals",
-                        "value": 1
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "Taxa média"
-                    },
-                    "properties": [
-                      {
-                        "id": "unit",
-                        "value": "bps"
-                      },
-                      {
-                        "id": "decimals",
-                        "value": 2
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "Pacotes/s médio"
+                      "options": "Pacotes/s"
                     },
                     "properties": [
                       {
@@ -912,22 +1335,21 @@
                       },
                       {
                         "id": "decimals",
-                        "value": 1
+                        "value": 0
                       }
                     ]
                   }
                 ]
               }
             }
-          },
-          "transparent": true
+          }
         }
       },
-      "panel-4": {
+      "panel-8": {
         "kind": "Panel",
         "spec": {
-          "id": 4,
-          "title": "Top portas TCP/UDP",
+          "id": 8,
+          "title": "Top ASNs de origem — Huawei (enriquecido)",
           "description": "",
           "links": [],
           "data": {
@@ -942,12 +1364,12 @@
                       "group": "mysql",
                       "version": "v0",
                       "datasource": {
-                        "name": "orbymon-mysql"
+                        "name": "orbyflow-mysql"
                       },
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
-                        "rawSql": "SELECT protocol AS Protocolo,dst_port AS Porta,ROUND(SUM(total_bytes),0) AS 'Volume estimado' FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND dst_port>0 AND protocol IN ('tcp','udp') GROUP BY protocol,dst_port ORDER BY SUM(total_bytes) DESC LIMIT 20"
+                        "rawSql": "SELECT t.asn AS 'ASN',t.nome AS 'Nome',t.blocos AS 'Blocos / IPs',t.ips AS 'IPs',CASE WHEN t.paises>1 THEN 'Vários' ELSE COALESCE(cn.name,NULLIF(t.pais,''),'Não informado') END AS 'País',t.vol AS 'Volume',t.bps AS 'Taxa média',t.pps AS 'Pacotes/s médio' FROM (SELECT src_asn AS asn,COALESCE(MAX(NULLIF(src_asn_name,'')),'Não identificado') AS nome,COALESCE(NULLIF(GROUP_CONCAT(DISTINCT NULLIF(src_prefix,'') ORDER BY src_prefix SEPARATOR ', ' LIMIT 3),''),GROUP_CONCAT(DISTINCT src_ip ORDER BY src_ip SEPARATOR ', ' LIMIT 3)) AS blocos,COUNT(DISTINCT src_ip) AS ips,COUNT(DISTINCT NULLIF(src_country,'')) AS paises,MAX(NULLIF(src_country,'')) AS pais,SUM(total_bytes) AS vol,SUM(total_bytes)*8/GREATEST(1,$__unixEpochTo()-$__unixEpochFrom()) AS bps,SUM(total_packets)/GREATEST(1,$__unixEpochTo()-$__unixEpochFrom()) AS pps FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND src_asn>0 GROUP BY src_asn ORDER BY SUM(total_bytes) DESC LIMIT 25) AS t LEFT JOIN orby_country_names AS cn ON cn.code=t.pais ORDER BY t.vol DESC"
                       }
                     },
                     "refId": "A",
@@ -1004,7 +1426,169 @@
                   {
                     "matcher": {
                       "id": "byName",
-                      "options": "Volume estimado"
+                      "options": "Volume"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "decbytes"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 1
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Taxa média"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "bps"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 2
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Pacotes/s médio"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "pps"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 1
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "transparent": true
+        }
+      },
+      "panel-9": {
+        "kind": "Panel",
+        "spec": {
+          "id": 9,
+          "title": "Países de origem — Huawei (enriquecido)",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "orbyflow-mysql"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawSql": "SELECT COALESCE(cn.name,NULLIF(t.pais,''),'Não informado') AS 'País',t.vol AS 'Volume' FROM (SELECT src_country AS pais,SUM(total_bytes) AS vol FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) AND src_country<>'' GROUP BY src_country ORDER BY SUM(total_bytes) DESC LIMIT 15) AS t LEFT JOIN orby_country_names AS cn ON cn.code=t.pais ORDER BY t.vol DESC"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "barchart",
+            "version": "13.3.0",
+            "spec": {
+              "options": {
+                "barRadius": 0,
+                "barWidth": 0.9,
+                "fullHighlight": false,
+                "groupWidth": 0.8,
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "hidden",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "orientation": "horizontal",
+                "showValue": "auto",
+                "stacking": "none",
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                },
+                "xField": "time",
+                "xTickLabelRotation": 0,
+                "xTickLabelSpacing": 100
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "decbytes",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      },
+                      {
+                        "value": 80,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "#ad46ff"
+                  },
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "",
+                    "axisPlacement": "auto",
+                    "fillOpacity": 100,
+                    "gradientMode": "hue",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "lineWidth": 1,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Volume"
                     },
                     "properties": [
                       {
@@ -1023,456 +1607,6 @@
           },
           "transparent": true
         }
-      },
-      "panel-5": {
-        "kind": "Panel",
-        "spec": {
-          "id": 5,
-          "title": "Volume estimado no período",
-          "description": "",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "mysql",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "orbymon-mysql"
-                      },
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawSql": "SELECT ROUND(COALESCE(SUM(total_bytes),0),0) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc)"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "stat",
-            "version": "13.3.0",
-            "spec": {
-              "options": {
-                "colorMode": "background",
-                "graphMode": "area",
-                "justifyMode": "auto",
-                "orientation": "auto",
-                "percentChangeColorMode": "standard",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "showPercentChange": false,
-                "textMode": "auto",
-                "wideLayout": true
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "decbytes",
-                  "decimals": 1,
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "green"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "thresholds",
-                    "fixedColor": "#ad46ff"
-                  }
-                },
-                "overrides": []
-              }
-            }
-          },
-          "transparent": true
-        }
-      },
-      "panel-6": {
-        "kind": "Panel",
-        "spec": {
-          "id": 6,
-          "title": "PPS estimados — média dos 5 min mais recentes",
-          "description": "",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "mysql",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "orbymon-mysql"
-                      },
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawSql": "SELECT ROUND(COALESCE(SUM(total_packets),0)/300,1) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND bucket_utc >= UTC_TIMESTAMP() - INTERVAL 90 MINUTE AND bucket_utc >= (SELECT MAX(bucket_utc) FROM orby_ip_pairs_minute WHERE source='huawei') - INTERVAL 5 MINUTE AND bucket_utc < (SELECT MAX(bucket_utc) FROM orby_ip_pairs_minute WHERE source='huawei')"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "stat",
-            "version": "13.3.0",
-            "spec": {
-              "options": {
-                "colorMode": "background",
-                "graphMode": "area",
-                "justifyMode": "auto",
-                "orientation": "auto",
-                "percentChangeColorMode": "standard",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "showPercentChange": false,
-                "textMode": "auto",
-                "wideLayout": true
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "pps",
-                  "decimals": 1,
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "green"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "thresholds",
-                    "fixedColor": "#ad46ff"
-                  }
-                },
-                "overrides": []
-              }
-            }
-          },
-          "transparent": true
-        }
-      },
-      "panel-7": {
-        "kind": "Panel",
-        "spec": {
-          "id": 7,
-          "title": "Taxa estimada — média dos 5 min mais recentes",
-          "description": "",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "mysql",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "orbymon-mysql"
-                      },
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawSql": "SELECT ROUND(COALESCE(SUM(total_bytes),0)*8/300,3) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND bucket_utc >= UTC_TIMESTAMP() - INTERVAL 90 MINUTE AND bucket_utc >= (SELECT MAX(bucket_utc) FROM orby_ip_pairs_minute WHERE source='huawei') - INTERVAL 5 MINUTE AND bucket_utc < (SELECT MAX(bucket_utc) FROM orby_ip_pairs_minute WHERE source='huawei')"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "stat",
-            "version": "13.3.0",
-            "spec": {
-              "options": {
-                "colorMode": "background",
-                "graphMode": "area",
-                "justifyMode": "auto",
-                "orientation": "auto",
-                "percentChangeColorMode": "standard",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "showPercentChange": false,
-                "textMode": "auto",
-                "wideLayout": true
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "bps",
-                  "decimals": 2,
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "green"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "thresholds",
-                    "fixedColor": "#ad46ff"
-                  }
-                },
-                "overrides": []
-              }
-            }
-          },
-          "transparent": true
-        }
-      },
-      "panel-8": {
-        "kind": "Panel",
-        "spec": {
-          "id": 8,
-          "title": "IP Huawei importados",
-          "description": "",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "mysql",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "orbymon-mysql"
-                      },
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawSql": "SELECT COUNT(*) AS value FROM orby_ip_ingested_files WHERE source='huawei'"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "stat",
-            "version": "13.3.0",
-            "spec": {
-              "options": {
-                "colorMode": "background",
-                "graphMode": "area",
-                "justifyMode": "auto",
-                "orientation": "auto",
-                "percentChangeColorMode": "standard",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "showPercentChange": false,
-                "textMode": "auto",
-                "wideLayout": true
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "green"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "thresholds",
-                    "fixedColor": "#ad46ff"
-                  }
-                },
-                "overrides": []
-              }
-            }
-          },
-          "transparent": true
-        }
-      },
-      "panel-9": {
-        "kind": "Panel",
-        "spec": {
-          "id": 9,
-          "title": "Fluxos Huawei por minuto — amostrados",
-          "description": "",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "mysql",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "orbymon-mysql"
-                      },
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "time_series",
-                        "rawSql": "SELECT $__timeGroupAlias(bucket_utc,'1m'),protocol AS metric,SUM(flow_records) AS value FROM orby_ip_pairs_minute WHERE source='huawei' AND $__timeFilter(bucket_utc) GROUP BY 1,protocol ORDER BY 1"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "timeseries",
-            "version": "13.3.0",
-            "spec": {
-              "options": {
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "table",
-                  "placement": "bottom",
-                  "showLegend": true
-                },
-                "tooltip": {
-                  "hideZeros": false,
-                  "mode": "single",
-                  "sort": "none"
-                }
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "short",
-                  "decimals": 0,
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "green"
-                      },
-                      {
-                        "value": 80,
-                        "color": "red"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "continuous-BlYlRd",
-                    "seriesBy": "last"
-                  },
-                  "custom": {
-                    "axisBorderShow": false,
-                    "axisCenteredZero": false,
-                    "axisColorMode": "text",
-                    "axisLabel": "",
-                    "axisPlacement": "auto",
-                    "barAlignment": 0,
-                    "barWidthFactor": 0.6,
-                    "drawStyle": "line",
-                    "fillOpacity": 19,
-                    "gradientMode": "scheme",
-                    "hideFrom": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": false
-                    },
-                    "insertNulls": false,
-                    "lineInterpolation": "smooth",
-                    "lineStyle": {
-                      "fill": "solid"
-                    },
-                    "lineWidth": 2,
-                    "pointSize": 5,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "showPoints": "never",
-                    "showValues": false,
-                    "spanNulls": false,
-                    "stacking": {
-                      "group": "A",
-                      "mode": "none"
-                    },
-                    "thresholdsStyle": {
-                      "mode": "off"
-                    }
-                  }
-                },
-                "overrides": []
-              }
-            }
-          },
-          "transparent": true
-        }
       }
     },
     "layout": {
@@ -1484,21 +1618,8 @@
             "spec": {
               "x": 0,
               "y": 0,
-              "width": 24,
-              "height": 9,
-              "element": {
-                "kind": "ElementReference",
-                "name": "panel-3"
-              }
-            }
-          },
-          {
-            "kind": "GridLayoutItem",
-            "spec": {
-              "x": 0,
-              "y": 9,
-              "width": 24,
-              "height": 9,
+              "width": 4,
+              "height": 4,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-1"
@@ -1508,10 +1629,10 @@
           {
             "kind": "GridLayoutItem",
             "spec": {
-              "x": 0,
-              "y": 18,
-              "width": 24,
-              "height": 9,
+              "x": 5,
+              "y": 0,
+              "width": 5,
+              "height": 4,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-2"
@@ -1521,10 +1642,23 @@
           {
             "kind": "GridLayoutItem",
             "spec": {
-              "x": 0,
-              "y": 27,
-              "width": 24,
-              "height": 9,
+              "x": 10,
+              "y": 0,
+              "width": 4,
+              "height": 4,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-3"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 14,
+              "y": 0,
+              "width": 4,
+              "height": 4,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-4"
@@ -1534,21 +1668,8 @@
           {
             "kind": "GridLayoutItem",
             "spec": {
-              "x": 0,
-              "y": 36,
-              "width": 6,
-              "height": 4,
-              "element": {
-                "kind": "ElementReference",
-                "name": "panel-5"
-              }
-            }
-          },
-          {
-            "kind": "GridLayoutItem",
-            "spec": {
-              "x": 6,
-              "y": 36,
+              "x": 18,
+              "y": 0,
               "width": 6,
               "height": 4,
               "element": {
@@ -1560,23 +1681,23 @@
           {
             "kind": "GridLayoutItem",
             "spec": {
-              "x": 12,
-              "y": 36,
-              "width": 6,
-              "height": 4,
+              "x": 0,
+              "y": 4,
+              "width": 24,
+              "height": 9,
               "element": {
                 "kind": "ElementReference",
-                "name": "panel-7"
+                "name": "panel-5"
               }
             }
           },
           {
             "kind": "GridLayoutItem",
             "spec": {
-              "x": 18,
-              "y": 36,
-              "width": 6,
-              "height": 4,
+              "x": 0,
+              "y": 13,
+              "width": 24,
+              "height": 10,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-8"
@@ -1587,7 +1708,20 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 0,
-              "y": 40,
+              "y": 23,
+              "width": 24,
+              "height": 11,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-21"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 0,
+              "y": 34,
               "width": 24,
               "height": 8,
               "element": {
@@ -1600,7 +1734,7 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 0,
-              "y": 48,
+              "y": 42,
               "width": 24,
               "height": 8,
               "element": {
@@ -1613,22 +1747,9 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 0,
-              "y": 56,
+              "y": 50,
               "width": 24,
-              "height": 13,
-              "element": {
-                "kind": "ElementReference",
-                "name": "panel-12"
-              }
-            }
-          },
-          {
-            "kind": "GridLayoutItem",
-            "spec": {
-              "x": 0,
-              "y": 69,
-              "width": 24,
-              "height": 9,
+              "height": 5,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-11"
@@ -1639,12 +1760,38 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 0,
-              "y": 78,
+              "y": 55,
               "width": 24,
-              "height": 10,
+              "height": 5,
               "element": {
                 "kind": "ElementReference",
-                "name": "panel-13"
+                "name": "panel-12"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 0,
+              "y": 60,
+              "width": 12,
+              "height": 11,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-7"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 12,
+              "y": 60,
+              "width": 12,
+              "height": 11,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-22"
               }
             }
           }
@@ -1655,8 +1802,11 @@
     "liveNow": false,
     "preload": false,
     "tags": [
-      "orbymon",
-      "huawei"
+      "orbyflow",
+      "fastnetmon",
+      "ddos",
+      "asn",
+      "geoip"
     ],
     "timeSettings": {
       "timezone": "browser",
@@ -1678,7 +1828,7 @@
       "hideTimepicker": false,
       "fiscalYearStartMonth": 0
     },
-    "title": "Huawei - Tráfego e GeoIP ao Vivo",
+    "title": "Trafego, ASN e Defesa DDoS",
     "variables": [],
     "preferences": {
       "layout": {

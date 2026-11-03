@@ -118,7 +118,7 @@ class RunTests(unittest.TestCase):
         self.assertLessEqual(len(empty), 2, empty)
 
     def test_pool_and_interface_names_resolved(self):
-        dash = json.loads((ROOT / "grafana" / "dashboards-clickhouse" / "orbymon-cgnat.json").read_text())
+        dash = json.loads((ROOT / "grafana" / "dashboards-clickhouse" / "orbyflow-cgnat.json").read_text())
         p = next(p for p in dash["panels"] if "Pool publico na ORIGEM" in p["title"])
         res = json.loads(str(self.s.query(expand(p["targets"][0]["rawSql"]) +
                                           " SETTINGS join_use_nulls=1 FORMAT JSON")))

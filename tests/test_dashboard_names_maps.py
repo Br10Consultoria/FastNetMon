@@ -17,9 +17,9 @@ def columns(sql):
 
 class NamesAndMapsTests(unittest.TestCase):
     def test_asn_tables_start_with_asn_name_then_ip(self):
-        cases = [("orbymon-huawei-live.json", "Top 20 ASNs"), ("orbymon-ip-analytics.json", "Top ASNs de origem"),
-                 ("orbymon-overview.json", "Top ASNs de origem"), ("orbymon-ip-analytics.json", "Ranking de IPs de origem"),
-                 ("orbymon-ip-analytics.json", "Ranking de IPs de destino")]
+        cases = [("orbyflow-huawei-live.json", "Top 20 ASNs"), ("orbyflow-ip-analytics.json", "Top ASNs de origem"),
+                 ("orbyflow-overview.json", "Top ASNs de origem"), ("orbyflow-ip-analytics.json", "Ranking de IPs de origem"),
+                 ("orbyflow-ip-analytics.json", "Ranking de IPs de destino")]
         for name, title in cases:
             p = [p for p in dash(name)["panels"] if p["title"].startswith(title)][0]
             cols = columns(p["targets"][0]["rawSql"])
@@ -28,14 +28,14 @@ class NamesAndMapsTests(unittest.TestCase):
             self.assertIn("País", cols)
 
     def test_country_shown_by_name(self):
-        for name in ("orbymon-huawei-live.json", "orbymon-ip-analytics.json", "orbymon-overview.json"):
+        for name in ("orbyflow-huawei-live.json", "orbyflow-ip-analytics.json", "orbyflow-overview.json"):
             for p in dash(name)["panels"]:
                 sql = " ".join(t.get("rawSql", "") for t in p.get("targets", []))
                 if "'País'" in sql:
                     self.assertIn("orby_country_names", sql, (name, p["title"]))
 
     def test_packet_rates_use_pps_unit(self):
-        for name in ("orbymon-huawei-live.json", "orbymon-ip-analytics.json", "orbymon-overview.json"):
+        for name in ("orbyflow-huawei-live.json", "orbyflow-ip-analytics.json", "orbyflow-overview.json"):
             for p in dash(name)["panels"]:
                 sql = " ".join(t.get("rawSql", "") for t in p.get("targets", []))
                 for col in ("Pacotes/s médio", "Pacotes/s"):
@@ -45,7 +45,7 @@ class NamesAndMapsTests(unittest.TestCase):
                         self.assertEqual(units.get(col), ["pps"], (name, p["title"]))
 
     def test_maps_are_interactive(self):
-        for name in ("orbymon-huawei-live.json", "orbymon-ip-analytics.json", "orbymon-overview.json"):
+        for name in ("orbyflow-huawei-live.json", "orbyflow-ip-analytics.json", "orbyflow-overview.json"):
             for p in dash(name)["panels"]:
                 if p["type"] != "geomap":
                     continue

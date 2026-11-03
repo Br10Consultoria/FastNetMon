@@ -11,7 +11,7 @@ def dash(name):
 
 class DashboardImprovementsTests(unittest.TestCase):
     def test_geo_panels_use_enriched_huawei_rollup(self):
-        d=dash("orbymon-overview.json")
+        d=dash("orbyflow-overview.json")
         sql_by_id={p["id"]:p["targets"][0]["rawSql"] for p in d["panels"]}
         for panel_id in (3,8,9):
             self.assertIn("orby_ip_pairs_minute",sql_by_id[panel_id])
@@ -20,8 +20,8 @@ class DashboardImprovementsTests(unittest.TestCase):
         self.assertIn("src_asn_name",sql_by_id[8])
         self.assertIn("src_country",sql_by_id[9])
     def test_tables_show_units_with_numeric_values(self):
-        for name in ("orbymon-overview.json","orbymon-ip-analytics.json",
-                     "orbymon-cgnat.json"):
+        for name in ("orbyflow-overview.json","orbyflow-ip-analytics.json",
+                     "orbyflow-cgnat.json"):
             d=dash(name)
             found=False
             for p in d["panels"]:
@@ -33,13 +33,13 @@ class DashboardImprovementsTests(unittest.TestCase):
             self.assertTrue(found,name)
     def test_units_scale_automatically(self):
         """Taxas em bits/s e volumes em bytes: o Grafana mostra Gb/s e GB/TB sozinho."""
-        for name in ("orbymon-overview.json","orbymon-ip-analytics.json",
-                     "orbymon-cgnat.json","orbymon-huawei-live.json"):
+        for name in ("orbyflow-overview.json","orbyflow-ip-analytics.json",
+                     "orbyflow-cgnat.json","orbyflow-huawei-live.json"):
             text=json.dumps(dash(name))
             for fixed in ('"Mbps"','"suffix: MB"',"60000000","300000000","'MB estimados'"):
                 self.assertNotIn(fixed,text,name)
     def test_recency_does_not_depend_on_selected_time_range(self):
-        for name in ("orbymon-ip-analytics.json","orbymon-cgnat.json"):   # overview: removido no padrão atual
+        for name in ("orbyflow-ip-analytics.json","orbyflow-cgnat.json"):   # overview: removido no padrão atual
             d=dash(name)
             recency=[p for p in d["panels"] if "Atraso da última coleta Huawei" in p["title"]]
             self.assertEqual(len(recency),1,name)
@@ -47,7 +47,7 @@ class DashboardImprovementsTests(unittest.TestCase):
             self.assertIn("UTC_TIMESTAMP()",q)
             self.assertNotIn("$__timeFilter",q)
     def test_verified_ifname_is_not_guessed(self):
-        for name in ("orbymon-ip-analytics.json","orbymon-cgnat.json"):
+        for name in ("orbyflow-ip-analytics.json","orbyflow-cgnat.json"):
             d=dash(name)
             qs=" ".join(p["targets"][0]["rawSql"] for p in d["panels"])
             self.assertIn("orby_interface_names",qs)
@@ -57,8 +57,8 @@ class DashboardImprovementsTests(unittest.TestCase):
             self.assertNotIn("Direcao raw",qs)
     def test_no_duplicate_uids(self):
         self.assertEqual(len({dash(n)["uid"] for n in
-           ("orbymon-overview.json","orbymon-ip-analytics.json",
-            "orbymon-cgnat.json")}),3)
+           ("orbyflow-overview.json","orbyflow-ip-analytics.json",
+            "orbyflow-cgnat.json")}),3)
 
 if __name__=="__main__":
     unittest.main()

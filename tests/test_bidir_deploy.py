@@ -107,7 +107,7 @@ class DeployTests(unittest.TestCase):
         self.assertIn("ON orbymon.$table", setup)
         self.assertIn("u:orbymon-admin:r", setup)          # painel so le o log NAT
         deploy = (ROOT / "scripts/deploy-live-dashboards.sh").read_text()
-        self.assertIn("orbymon-reputacao.json", deploy)
+        self.assertIn("orbyflow-reputacao.json", deploy)
 
 
 if __name__ == "__main__":

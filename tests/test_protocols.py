@@ -19,7 +19,7 @@ class ProtocolTests(unittest.TestCase):
     def test_dashboard_lists_all_protocols(self):
         import json
         from pathlib import Path
-        d = json.loads((Path(__file__).resolve().parent.parent / "grafana/dashboards/orbymon-f4-ataques.json").read_text())
+        d = json.loads((Path(__file__).resolve().parent.parent / "grafana/dashboards/orbyflow-f4-ataques.json").read_text())
         var = [v for v in d["templating"]["list"] if v["name"] == "proto"][0]
         values = {o["value"] for o in var["options"]}
         self.assertTrue(NAMES <= values)

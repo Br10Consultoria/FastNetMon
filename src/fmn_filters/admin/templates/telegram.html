@@ -12,7 +12,7 @@
     <label>Encerrar após (min sem eventos) <input name="close" type="number" min="5" max="1440" value="{{ t.get('ORBYMON_NOTIFY_CLOSE_AFTER_MIN', 20) }}"></label>
   </div>
   <div class="grid">
-    <label>URL do Grafana (links nos alertas) <input name="grafana_url" value="{{ t.get('ORBYMON_GRAFANA_URL', '') }}" placeholder="https://orbymon.exemplo:3000"></label>
+    <label>URL do Grafana (links nos alertas) <input name="grafana_url" value="{{ t.get('ORBYMON_GRAFANA_URL', '') }}" placeholder="https://orbyflow.exemplo:3000"></label>
     <label>Nome do site nos alertas <input name="site" value="{{ t.get('ORBYMON_SITE_NAME', '') }}" maxlength="60"></label>
   </div>
   <button>Salvar</button>

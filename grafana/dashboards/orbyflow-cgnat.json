@@ -1,10 +1,10 @@
 {
   "id": null,
-  "uid": "orbymon-cgnat-observability",
+  "uid": "orbyflow-cgnat-observability",
   "title": "CGNAT - Redes Publicas e Baseline",
   "description": "CGNAT A10: pools publicos NAT-POOL-08/09/10/11 e rede interna 100.64.64.0/19. Lado src/dst e ifIndex sao brutos do NetFlow; sem inferencia de NAT, assinante ou ataque.",
   "tags": [
-    "orbymon",
+    "orbyflow",
     "cgnat",
     "baseline",
     "huawei"
@@ -130,7 +130,7 @@
           "refId": "A",
           "datasource": {
             "type": "mysql",
-            "uid": "orbymon-mysql"
+            "uid": "orbyflow-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -139,7 +139,7 @@
       ],
       "datasource": {
         "type": "mysql",
-        "uid": "orbymon-mysql"
+        "uid": "orbyflow-mysql"
       }
     },
     {
@@ -215,7 +215,7 @@
           "refId": "A",
           "datasource": {
             "type": "mysql",
-            "uid": "orbymon-mysql"
+            "uid": "orbyflow-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -224,7 +224,7 @@
       ],
       "datasource": {
         "type": "mysql",
-        "uid": "orbymon-mysql"
+        "uid": "orbyflow-mysql"
       }
     },
     {
@@ -319,7 +319,7 @@
           "refId": "A",
           "datasource": {
             "type": "mysql",
-            "uid": "orbymon-mysql"
+            "uid": "orbyflow-mysql"
           },
           "editorMode": "code",
           "format": "time_series",
@@ -328,7 +328,7 @@
       ],
       "datasource": {
         "type": "mysql",
-        "uid": "orbymon-mysql"
+        "uid": "orbyflow-mysql"
       }
     },
     {
@@ -423,7 +423,7 @@
           "refId": "A",
           "datasource": {
             "type": "mysql",
-            "uid": "orbymon-mysql"
+            "uid": "orbyflow-mysql"
           },
           "editorMode": "code",
           "format": "time_series",
@@ -432,7 +432,7 @@
       ],
       "datasource": {
         "type": "mysql",
-        "uid": "orbymon-mysql"
+        "uid": "orbyflow-mysql"
       }
     },
     {
@@ -507,7 +507,7 @@
           "refId": "A",
           "datasource": {
             "type": "mysql",
-            "uid": "orbymon-mysql"
+            "uid": "orbyflow-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -516,7 +516,7 @@
       ],
       "datasource": {
         "type": "mysql",
-        "uid": "orbymon-mysql"
+        "uid": "orbyflow-mysql"
       }
     },
     {
@@ -591,7 +591,7 @@
           "refId": "A",
           "datasource": {
             "type": "mysql",
-            "uid": "orbymon-mysql"
+            "uid": "orbyflow-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -600,7 +600,7 @@
       ],
       "datasource": {
         "type": "mysql",
-        "uid": "orbymon-mysql"
+        "uid": "orbyflow-mysql"
       }
     },
     {
@@ -677,7 +677,7 @@
           "refId": "A",
           "datasource": {
             "type": "mysql",
-            "uid": "orbymon-mysql"
+            "uid": "orbyflow-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -686,7 +686,7 @@
       ],
       "datasource": {
         "type": "mysql",
-        "uid": "orbymon-mysql"
+        "uid": "orbyflow-mysql"
       }
     },
     {
@@ -763,7 +763,7 @@
           "refId": "A",
           "datasource": {
             "type": "mysql",
-            "uid": "orbymon-mysql"
+            "uid": "orbyflow-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -772,7 +772,7 @@
       ],
       "datasource": {
         "type": "mysql",
-        "uid": "orbymon-mysql"
+        "uid": "orbyflow-mysql"
       }
     },
     {
@@ -867,7 +867,7 @@
           "refId": "A",
           "datasource": {
             "type": "mysql",
-            "uid": "orbymon-mysql"
+            "uid": "orbyflow-mysql"
           },
           "editorMode": "code",
           "format": "time_series",
@@ -876,7 +876,7 @@
       ],
       "datasource": {
         "type": "mysql",
-        "uid": "orbymon-mysql"
+        "uid": "orbyflow-mysql"
       }
     },
     {
@@ -952,7 +952,7 @@
           "refId": "A",
           "datasource": {
             "type": "mysql",
-            "uid": "orbymon-mysql"
+            "uid": "orbyflow-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -961,7 +961,7 @@
       ],
       "datasource": {
         "type": "mysql",
-        "uid": "orbymon-mysql"
+        "uid": "orbyflow-mysql"
       }
     },
     {
@@ -1037,7 +1037,7 @@
           "refId": "A",
           "datasource": {
             "type": "mysql",
-            "uid": "orbymon-mysql"
+            "uid": "orbyflow-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -1046,7 +1046,7 @@
       ],
       "datasource": {
         "type": "mysql",
-        "uid": "orbymon-mysql"
+        "uid": "orbyflow-mysql"
       }
     },
     {
@@ -1100,7 +1100,7 @@
           "refId": "A",
           "datasource": {
             "type": "mysql",
-            "uid": "orbymon-mysql"
+            "uid": "orbyflow-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -1109,7 +1109,7 @@
       ],
       "datasource": {
         "type": "mysql",
-        "uid": "orbymon-mysql"
+        "uid": "orbyflow-mysql"
       }
     },
     {
@@ -1165,7 +1165,7 @@
           "refId": "A",
           "datasource": {
             "type": "mysql",
-            "uid": "orbymon-mysql"
+            "uid": "orbyflow-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -1174,7 +1174,7 @@
       ],
       "datasource": {
         "type": "mysql",
-        "uid": "orbymon-mysql"
+        "uid": "orbyflow-mysql"
       }
     },
     {
@@ -1248,7 +1248,7 @@
           "refId": "A",
           "datasource": {
             "type": "mysql",
-            "uid": "orbymon-mysql"
+            "uid": "orbyflow-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -1257,7 +1257,7 @@
       ],
       "datasource": {
         "type": "mysql",
-        "uid": "orbymon-mysql"
+        "uid": "orbyflow-mysql"
       }
     },
     {
@@ -1327,7 +1327,7 @@
           "refId": "A",
           "datasource": {
             "type": "mysql",
-            "uid": "orbymon-mysql"
+            "uid": "orbyflow-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -1336,7 +1336,7 @@
       ],
       "datasource": {
         "type": "mysql",
-        "uid": "orbymon-mysql"
+        "uid": "orbyflow-mysql"
       }
     }
   ]

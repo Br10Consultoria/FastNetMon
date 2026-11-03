@@ -4,7 +4,7 @@ import re
 import unittest
 
 ROOT = Path(__file__).resolve().parent.parent
-DASH = json.loads((ROOT / "grafana/dashboards/orbymon-f4-ataques.json").read_text())
+DASH = json.loads((ROOT / "grafana/dashboards/orbyflow-f4-ataques.json").read_text())
 
 
 class F4DashboardTests(unittest.TestCase):
@@ -24,7 +24,7 @@ class F4DashboardTests(unittest.TestCase):
     def test_every_query_is_time_bounded_and_uses_mysql_datasource(self):
         for p in DASH["panels"]:
             for t in p.get("targets", []):
-                self.assertEqual(t["datasource"]["uid"], "orbymon-mysql")
+                self.assertEqual(t["datasource"]["uid"], "orbyflow-mysql")
                 self.assertIn("$__timeFilter(", t["rawSql"], p["title"])
 
     def test_rates_and_volumes_have_scaling_units(self):
@@ -34,7 +34,7 @@ class F4DashboardTests(unittest.TestCase):
         self.assertNotIn('"Mbps"', text)
 
     def test_deploy_script_ships_the_dashboard(self):
-        self.assertIn("orbymon-f4-ataques.json", (ROOT / "scripts/deploy-live-dashboards.sh").read_text())
+        self.assertIn("orbyflow-f4-ataques.json", (ROOT / "scripts/deploy-live-dashboards.sh").read_text())
 
 
 if __name__ == "__main__":

@@ -161,7 +161,7 @@ class Formatter:
             return ""
         center = int(when.replace(tzinfo=timezone.utc).timestamp() * 1000)
         query = urllib.parse.urlencode({"var-ip": ip, "from": center - 30 * 60000, "to": center + 30 * 60000})
-        return '\n<a href="%s/d/orbymon-f4-ataques?%s">Abrir no painel</a>' % (html.escape(self.s.grafana_url), query)
+        return '\n<a href="%s/d/orbyflow-f4-ataques?%s">Abrir no painel</a>' % (html.escape(self.s.grafana_url), query)
 
     def header(self, icon, title):
         site = "[%s] " % html.escape(self.s.site) if self.s.site else ""

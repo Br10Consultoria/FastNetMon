@@ -30,7 +30,7 @@ CURSOR = {"Off": 0, "Crosshair": 1, "Tooltip": 2}
 
 
 def ds(q):
-    return {"type": q.get("group", "mysql"), "uid": (q.get("datasource") or {}).get("name", "orbymon-mysql")}
+    return {"type": q.get("group", "mysql"), "uid": (q.get("datasource") or {}).get("name", "orbyflow-mysql")}
 
 
 def proto_options():
@@ -165,16 +165,94 @@ def make_generic(dash):
 HARDCODED = re.compile(r"'(?:45\.238|187\.87|100\.64\.64)\.")
 
 
+# ------------------------------------------------------------------ reputacao separada dos ataques originados
+REP_KEEP = {2, 3, 6, 12, 11}            # listas de bloqueio, fontes e historico
+ORIG_KEEP = {4, 5, 7, 8, 9, 10}         # ataques originados por clientes
+DS_MYSQL = {"type": "mysql", "uid": "orbyflow-mysql"}
+
+
+def _repack(panels):
+    """Mantem a ordem e as larguras; refaz as alturas das linhas sem os paineis removidos."""
+    rows = {}
+    for p in panels:
+        rows.setdefault(p["gridPos"]["y"], []).append(p)
+    y = 0
+    for _, row in sorted(rows.items()):
+        for p in row:
+            p["gridPos"]["y"] = y
+        y += max(p["gridPos"]["h"] for p in row)
+    return y
+
+
+def _panel(pid, kind, title, sql, grid, desc="", fmt="table", unit=None):
+    p = {"id": pid, "type": kind, "title": title, "description": desc, "gridPos": grid, "links": [],
+         "datasource": dict(DS_MYSQL), "transparent": False,
+         "targets": [{"refId": "A", "datasource": dict(DS_MYSQL), "editorMode": "code", "format": fmt,
+                      "rawQuery": True, "rawSql": sql}],
+         "options": {}, "fieldConfig": {"defaults": {}, "overrides": []}}
+    if kind == "timeseries":
+        p["options"] = {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": True},
+                        "tooltip": {"mode": "multi", "sort": "desc"}}
+        p["fieldConfig"]["defaults"] = {"custom": {"drawStyle": "bars", "fillOpacity": 60, "lineWidth": 1}}
+    if kind == "table":
+        p["options"] = {"showHeader": True, "cellHeight": "sm"}
+        p["fieldConfig"]["defaults"] = {"custom": {"filterable": True}}
+    if unit:
+        p["fieldConfig"]["defaults"]["unit"] = unit
+    return p
+
+
+def split_reputation(dash):
+    """Dashboard de reputacao/blacklists e outro de ataques originados (antes misturados)."""
+    import copy
+    rep, orig = copy.deepcopy(dash), copy.deepcopy(dash)
+    rep["panels"] = [p for p in rep["panels"] if p["id"] in REP_KEEP]
+    orig["panels"] = [p for p in orig["panels"] if p["id"] in ORIG_KEEP]
+    bottom = _repack(rep["panels"])
+    rep["panels"] += [
+        _panel(13, "table", "Listagens ativas por lista",
+               "SELECT source_label AS 'Lista',COUNT(DISTINCT entry) AS 'IPs/blocos listados',"
+               "SUM(scope='cgnat_pool') AS 'De pool CGNAT',MIN(first_seen) AS 'Listado desde (mais antigo)',"
+               "MAX(last_seen) AS 'Última confirmação' FROM orby_reputation_listings WHERE removed_at IS NULL "
+               "GROUP BY source_label ORDER BY 2 DESC",
+               {"x": 0, "y": bottom, "w": 12, "h": 8},
+               "Em quais listas os IPs do provedor estão agora. Listas de spam (Spamhaus, SpamCop, Barracuda) "
+               "afetam e-mail; listas de ataque/botnet (FireHOL, IPsum, AbuseIPDB) podem bloquear navegação."),
+        _panel(14, "timeseries", "Entradas e saídas das listas por dia",
+               "SELECT $__timeGroupAlias(first_seen,'1d'),'entrou' AS metric,COUNT(*) AS value FROM "
+               "orby_reputation_listings WHERE $__timeFilter(first_seen) GROUP BY 1 UNION ALL SELECT "
+               "$__timeGroupAlias(removed_at,'1d'),'saiu',COUNT(*) FROM orby_reputation_listings WHERE removed_at "
+               "IS NOT NULL AND $__timeFilter(removed_at) GROUP BY 1 ORDER BY 1",
+               {"x": 12, "y": bottom, "w": 12, "h": 8},
+               "Listagens novas e removidas por dia. Muitas entradas seguidas indicam um cliente infectado ativo: "
+               "veja o dashboard de ataques originados.", fmt="time_series"),
+    ]
+    rep.update(uid="orbyflow-reputacao", title="Reputação e blacklists",
+               description="IPs e blocos do provedor em listas de bloqueio (blacklists, DNSBL, AbuseIPDB), assinante "
+                           "provável no CGNAT, situação de cada fonte e histórico. Quem origina ataques: dashboard "
+                           "Ataques originados (clientes).",
+               tags=["orbyflow", "reputacao", "blacklist"])
+    _repack(orig["panels"])
+    orig.update(uid="orbyflow-ataques-originados", title="Ataques originados (clientes)",
+                description="Ataques e varreduras saindo de clientes do provedor (causa comum de entrar em blacklist): "
+                            "quem origina, por tipo, por hora e saída suspeita para muitos destinos na mesma porta.",
+                tags=["orbyflow", "abuso", "originados"])
+    return {"orbyflow-reputacao.json": rep, "orbyflow-ataques-originados.json": orig}
+
+
 def main():
     out = []
     for path in sorted((ROOT / "grafana" / "exports").glob("*.v2.json")):
         dash = make_generic(convert(json.loads(path.read_text(encoding="utf-8"))))
-        text = json.dumps(dash, ensure_ascii=False, indent=2) + "\n"
-        if HARDCODED.search(text):
-            raise SystemExit("%s: ainda ha blocos do provedor fixos no SQL" % path.name)
-        target = ROOT / "grafana" / "dashboards" / path.name.replace(".v2.json", ".json")
-        target.write_text(text, encoding="utf-8")
-        out.append("%s (%d paineis)" % (target.name, len(dash["panels"])))
+        name = path.name.replace(".v2.json", ".json")
+        outputs = split_reputation(dash) if name == "orbyflow-reputacao.json" else {name: dash}
+        for fname, d in outputs.items():
+            text = json.dumps(d, ensure_ascii=False, indent=2) + "\n"
+            if HARDCODED.search(text):
+                raise SystemExit("%s: ainda ha blocos do provedor fixos no SQL" % path.name)
+            target = ROOT / "grafana" / "dashboards" / fname
+            target.write_text(text, encoding="utf-8")
+            out.append("%s (%d paineis)" % (target.name, len(d["panels"])))
     print("\n".join(out))
 
 

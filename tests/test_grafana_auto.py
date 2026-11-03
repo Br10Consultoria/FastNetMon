@@ -13,12 +13,12 @@ class GrafanaSetupTests(unittest.TestCase):
             data = json.loads(path.read_text(encoding="utf-8"))
             self.assertNotIn(data["uid"], uids)
             uids.add(data["uid"])
-        live = json.loads((ROOT / "grafana/dashboards/orbymon-huawei-live.json").read_text(encoding="utf-8"))
+        live = json.loads((ROOT / "grafana/dashboards/orbyflow-huawei-live.json").read_text(encoding="utf-8"))
         self.assertGreaterEqual(len(live["panels"]), 8)
         for panel in live["panels"]:
-            self.assertEqual(panel["datasource"]["uid"], "orbymon-mysql")
+            self.assertEqual(panel["datasource"]["uid"], "orbyflow-mysql")
             for target in panel["targets"]:
-                self.assertEqual(target["datasource"]["uid"], "orbymon-mysql")
+                self.assertEqual(target["datasource"]["uid"], "orbyflow-mysql")
                 self.assertNotIn("*2048", target["rawSql"])
 
     def test_secure_setup(self):

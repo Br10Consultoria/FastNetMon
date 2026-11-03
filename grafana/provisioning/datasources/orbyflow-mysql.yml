@@ -1,7 +1,10 @@
 apiVersion: 1
-datasources:
+deleteDatasources:
   - name: OrbyMon MariaDB
-    uid: orbymon-mysql
+    orgId: 1
+datasources:
+  - name: OrbyFlow MariaDB
+    uid: orbyflow-mysql
     type: mysql
     access: proxy
     url: ${ORBYMON_DB_HOST}:3306

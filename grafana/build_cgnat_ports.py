@@ -1,4 +1,4 @@
-"""Gera o dashboard "CGNAT - Portas por IP publico" (grafana/dashboards/orbymon-cgnat-portas.json).
+"""Gera o dashboard "CGNAT - Portas por IP publico" (grafana/dashboards/orbyflow-cgnat-portas.json).
 
 Fonte: orby_nat_public_minute (receptor A10, foto da tabela NAT a cada minuto) e orby_nat_user_minute
 (portas por assinante). Dados do log NAT do A10: contagem real, sem amostragem.
@@ -10,8 +10,8 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-OUT = ROOT / "grafana" / "dashboards" / "orbymon-cgnat-portas.json"
-DS = {"type": "mysql", "uid": "orbymon-mysql"}
+OUT = ROOT / "grafana" / "dashboards" / "orbyflow-cgnat-portas.json"
+DS = {"type": "mysql", "uid": "orbyflow-mysql"}
 PCT = "100*GREATEST(tcp_ports,udp_ports)/capacity"
 LAST = "bucket_utc=(SELECT MAX(bucket_utc) FROM orby_nat_public_minute WHERE $__timeFilter(bucket_utc))"
 STEPS = [{"value": None, "color": "green"}, {"value": 60, "color": "yellow"}, {"value": 80, "color": "orange"},
@@ -109,10 +109,10 @@ def build():
                "SELECT $__timeGroupAlias(bucket_utc,'1m'),pool AS metric,SUM(allocs) AS value FROM orby_nat_public_minute "
                "WHERE $__timeFilter(bucket_utc) GROUP BY 1,pool ORDER BY 1", 61),
     ]
-    return {"id": None, "uid": "orbymon-cgnat-portas", "title": "CGNAT - Portas por IP público",
+    return {"id": None, "uid": "orbyflow-cgnat-portas", "title": "CGNAT - Portas por IP público",
             "description": "Capacidade: uso de portas NAT por IP público do pool (log do A10, sem amostragem). Um IP público com "
                            "portas esgotadas faz as novas conexões dos assinantes que o compartilham falharem.",
-            "tags": ["orbymon", "cgnat", "a10", "portas"], "editable": True, "schemaVersion": 41, "version": 1,
+            "tags": ["orbyflow", "cgnat", "a10", "portas"], "editable": True, "schemaVersion": 41, "version": 1,
             "graphTooltip": 1, "links": [], "liveNow": False, "timezone": "browser",
             "time": {"from": "now-6h", "to": "now"}, "refresh": "1m", "fiscalYearStartMonth": 0,
             "timepicker": {"refresh_intervals": ["1m", "5m", "15m"]},

@@ -1,4 +1,4 @@
-"""Gera o dashboard "CGNAT - Assinantes (portas e abuso)" (grafana/dashboards/orbymon-cgnat-assinantes.json).
+"""Gera o dashboard "CGNAT - Assinantes (portas e abuso)" (grafana/dashboards/orbyflow-cgnat-assinantes.json).
 
 Separado do dashboard de capacidade dos IPs publicos: aqui o foco e o ASSINANTE (IP privado).
   - quem ocupa muitas portas e quanto do IP publico dele isso representa (sem cota no A10, esgota os vizinhos);
@@ -17,7 +17,7 @@ from pathlib import Path
 from build_cgnat_ports import DS, STEPS, series, stat, table
 
 ROOT = Path(__file__).resolve().parent.parent
-OUT = ROOT / "grafana" / "dashboards" / "orbymon-cgnat-assinantes.json"
+OUT = ROOT / "grafana" / "dashboards" / "orbyflow-cgnat-assinantes.json"
 SUB = "${assinante:sqlstring}"
 LAST_H = "bucket_utc=(SELECT MAX(bucket_utc) FROM orby_nat_heavy_minute WHERE $__timeFilter(bucket_utc))"
 SHARE_STEPS = [{"value": None, "color": "green"}, {"value": 15, "color": "yellow"}, {"value": 30, "color": "orange"},
@@ -107,11 +107,11 @@ def build():
     var = {"type": "textbox", "name": "assinante", "label": "Assinante (IP privado)", "query": "",
            "current": {"text": "", "value": ""}, "hide": 0, "skipUrlSync": False,
            "description": "IP privado do assinante (100.64.x.x) para os painéis de baixo"}
-    return {"id": None, "uid": "orbymon-cgnat-assinantes", "title": "CGNAT - Assinantes (portas e abuso)",
+    return {"id": None, "uid": "orbyflow-cgnat-assinantes", "title": "CGNAT - Assinantes (portas e abuso)",
             "description": "Uso de portas NAT por assinante (log do A10, sem amostragem): quem ocupa o IP público dos "
                            "vizinhos, quem abre conexões em massa e os alertas de NAT. Capacidade dos IPs públicos: "
                            "dashboard CGNAT - Portas por IP público.",
-            "tags": ["orbymon", "cgnat", "a10", "assinantes"], "editable": True, "schemaVersion": 41, "version": 1,
+            "tags": ["orbyflow", "cgnat", "a10", "assinantes"], "editable": True, "schemaVersion": 41, "version": 1,
             "graphTooltip": 1, "links": [], "liveNow": False, "timezone": "browser",
             "time": {"from": "now-6h", "to": "now"}, "refresh": "1m", "fiscalYearStartMonth": 0,
             "timepicker": {"refresh_intervals": ["1m", "5m", "15m"]},

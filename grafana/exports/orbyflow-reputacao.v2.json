@@ -2,7 +2,7 @@
   "apiVersion": "dashboard.grafana.app/v2",
   "kind": "Dashboard",
   "metadata": {
-    "name": "orbymon-reputacao"
+    "name": "orbyflow-reputacao"
   },
   "spec": {
     "annotations": [
@@ -49,7 +49,7 @@
                       "group": "mysql",
                       "version": "v0",
                       "datasource": {
-                        "name": "orbymon-mysql"
+                        "name": "orbyflow-mysql"
                       },
                       "spec": {
                         "editorMode": "code",
@@ -131,7 +131,7 @@
                       "group": "mysql",
                       "version": "v0",
                       "datasource": {
-                        "name": "orbymon-mysql"
+                        "name": "orbyflow-mysql"
                       },
                       "spec": {
                         "editorMode": "code",
@@ -214,7 +214,7 @@
                       "group": "mysql",
                       "version": "v0",
                       "datasource": {
-                        "name": "orbymon-mysql"
+                        "name": "orbyflow-mysql"
                       },
                       "spec": {
                         "editorMode": "code",
@@ -324,7 +324,7 @@
                       "group": "mysql",
                       "version": "v0",
                       "datasource": {
-                        "name": "orbymon-mysql"
+                        "name": "orbyflow-mysql"
                       },
                       "spec": {
                         "editorMode": "code",
@@ -416,7 +416,7 @@
                       "group": "mysql",
                       "version": "v0",
                       "datasource": {
-                        "name": "orbymon-mysql"
+                        "name": "orbyflow-mysql"
                       },
                       "spec": {
                         "editorMode": "code",
@@ -512,7 +512,7 @@
                       "group": "mysql",
                       "version": "v0",
                       "datasource": {
-                        "name": "orbymon-mysql"
+                        "name": "orbyflow-mysql"
                       },
                       "spec": {
                         "editorMode": "code",
@@ -608,7 +608,7 @@
                       "group": "mysql",
                       "version": "v0",
                       "datasource": {
-                        "name": "orbymon-mysql"
+                        "name": "orbyflow-mysql"
                       },
                       "spec": {
                         "editorMode": "code",
@@ -704,7 +704,7 @@
                       "group": "mysql",
                       "version": "v0",
                       "datasource": {
-                        "name": "orbymon-mysql"
+                        "name": "orbyflow-mysql"
                       },
                       "spec": {
                         "editorMode": "code",
@@ -824,7 +824,7 @@
                       "group": "mysql",
                       "version": "v0",
                       "datasource": {
-                        "name": "orbymon-mysql"
+                        "name": "orbyflow-mysql"
                       },
                       "spec": {
                         "editorMode": "code",
@@ -952,7 +952,7 @@
                       "group": "mysql",
                       "version": "v0",
                       "datasource": {
-                        "name": "orbymon-mysql"
+                        "name": "orbyflow-mysql"
                       },
                       "spec": {
                         "editorMode": "code",
@@ -1071,7 +1071,7 @@
                       "group": "mysql",
                       "version": "v0",
                       "datasource": {
-                        "name": "orbymon-mysql"
+                        "name": "orbyflow-mysql"
                       },
                       "spec": {
                         "editorMode": "code",
@@ -1293,7 +1293,7 @@
     "liveNow": false,
     "preload": false,
     "tags": [
-      "orbymon",
+      "orbyflow",
       "reputacao",
       "abuso"
     ],

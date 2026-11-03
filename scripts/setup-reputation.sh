@@ -81,8 +81,8 @@ id orbymon-admin >/dev/null 2>&1 && systemctl restart orbymon-admin.service || t
 
 if [[ -d /var/lib/grafana/dashboards/orbymon ]]; then
   echo "=== Dashboard ==="
-  python3 -m json.tool "$BASE/grafana/dashboards/orbymon-reputacao.json" >/dev/null
-  install -o grafana -g grafana -m 0644 "$BASE/grafana/dashboards/orbymon-reputacao.json" /var/lib/grafana/dashboards/orbymon/
+  python3 -m json.tool "$BASE/grafana/dashboards/orbyflow-reputacao.json" >/dev/null
+  install -o grafana -g grafana -m 0644 "$BASE/grafana/dashboards/orbyflow-reputacao.json" /var/lib/grafana/dashboards/orbymon/
   echo "OrbyFlow | Reputacao e ataques originados (aparece no Grafana em ~30 s)"
 fi
 cat <<MSG
