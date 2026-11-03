@@ -342,8 +342,8 @@
         "kind": "Panel",
         "spec": {
           "id": 12,
-          "title": "Últimos incidentes",
-          "description": "",
+          "title": "Últimos ataques detectados (recebidos e originados)",
+          "description": "Detecção bidirecional (F4): origem/destino do lado da rede, IP público usado no CGNAT, protocolo e porta, principais IPs remotos. Detalhe completo, ASN e país dos remotos: painel web > Ataques.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -362,7 +362,7 @@
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
-                        "rawSql": "SELECT a.event_time AS 'Data UTC',a.rule_name AS 'Regra',a.severity AS 'Severidade',a.src_asn AS 'ASN',a.src_asn_name AS 'Nome',a.src_ip AS 'IP origem',a.dst_ip AS 'IP destino',COALESCE(cn.name,NULLIF(a.src_country,''),'Não informado') AS 'País',a.pps AS 'Pacotes/s',a.mbps*1000000 AS 'Taxa',a.unique_sources AS 'Fontes' FROM orby_alerts AS a LEFT JOIN orby_country_names AS cn ON cn.code=a.src_country WHERE $__timeFilter(a.event_time) ORDER BY a.event_time DESC LIMIT 500"
+                        "rawSql": "SELECT event_time AS 'Hora',CASE direction WHEN 'in' THEN 'recebido' ELSE 'originado' END AS 'Sentido',rule_name AS 'Regra',severity AS 'Severidade',CASE scope WHEN 'dedicated' THEN 'IP dedicado' WHEN 'cgnat_pool' THEN 'Pool CGNAT' ELSE 'Assinante CGNAT' END AS 'Tipo de IP',IF(subscriber_ip<>'' AND scope<>'cgnat_pool',subscriber_ip,local_ip) AS 'IP da rede',COALESCE(NULLIF(JSON_VALUE(details,'$.public_ips[0]'),''),IF(scope='cgnat_pool',local_ip,'')) AS 'IP público (CGNAT)',CASE WHEN detection='nat' THEN COALESCE(CONCAT(JSON_VALUE(details,'$.top_portas[0].protocolo'),'/',JSON_VALUE(details,'$.top_portas[0].porta'),' → ',JSON_VALUE(details,'$.top_portas[0].destinos'),' destinos'),'sem fluxo amostrado') ELSE CONCAT(protocol,IF(remote_port>0,CONCAT(IF(direction='in',' origem ',' destino '),remote_port),''),IF(local_port>0,CONCAT(' local ',local_port),'')) END AS 'Protocolo / porta',CONCAT_WS(', ',JSON_VALUE(details,'$.top_remote_ips[0]'),JSON_VALUE(details,'$.top_remote_ips[1]'),JSON_VALUE(details,'$.top_remote_ips[2]')) AS 'IPs remotos (principais)',remote_ips AS 'Qtd. remotos',pps AS 'Pacotes/s',mbps*1000000 AS 'Taxa',CAST(JSON_VALUE(details,'$.allocs_per_min') AS UNSIGNED) AS 'Alocações NAT/min',CAST(JSON_VALUE(details,'$.active_ports') AS UNSIGNED) AS 'Portas NAT ativas' FROM orby_attack_events WHERE $__timeFilter(event_time) ORDER BY event_time DESC LIMIT 500"
                       }
                     },
                     "refId": "A",
@@ -443,6 +443,18 @@
                       {
                         "id": "decimals",
                         "value": 2
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Hora"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "dateTimeAsLocal"
                       }
                     ]
                   }
