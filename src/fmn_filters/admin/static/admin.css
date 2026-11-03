@@ -83,3 +83,11 @@ svg.hours .base{stroke:var(--bad);stroke-width:2}
 .legend .sw.static{border:1px dashed var(--muted)}.legend .sw.dyn{background:var(--accent)}.legend .sw.base{border-top:2px solid var(--bad);height:0}
 svg.hours .lbl{font-size:10px}
 pre.detail{background:var(--bg);border-radius:6px;padding:10px;font-size:12px;max-height:480px;overflow:auto;white-space:pre-wrap;word-break:break-word}
+.dd{position:relative}
+.ddbtn{background:none;color:var(--fg);font-weight:400;padding:6px 10px;border-radius:6px}
+.dd.on>.ddbtn,.dd:hover>.ddbtn,.dd:focus-within>.ddbtn{background:var(--bg);color:var(--accent)}
+.menu{display:none;position:absolute;z-index:20;top:100%;left:0;min-width:180px;padding:6px;background:var(--card);
+border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.18)}
+.dd:hover>.menu,.dd:focus-within>.menu{display:block}
+.menu a{display:block;white-space:nowrap}
+@media print{.top,.actions,form.card{display:none}main{max-width:none}}

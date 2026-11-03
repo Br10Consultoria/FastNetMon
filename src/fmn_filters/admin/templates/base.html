@@ -12,28 +12,22 @@
   {% if g.user %}
   <nav>
     {% set here = request.endpoint %}
-    <a href="{{ url_for('index') }}" class="{{ 'on' if here=='index' }}">Status</a>
-    <a href="{{ url_for('attacks_page') }}" class="{{ 'on' if here in ('attacks_page','attack_detail') }}">Ataques</a>
-    <a href="{{ url_for('network') }}" class="{{ 'on' if here=='network' }}">Rede</a>
-    <a href="{{ url_for('borders') }}" class="{{ 'on' if here=='borders' }}">Bordas</a>
-    <a href="{{ url_for('rules') }}" class="{{ 'on' if here=='rules' }}">Regras</a>
-    <a href="{{ url_for('alarms') }}" class="{{ 'on' if here in ('alarms','alarm_edit') }}">Alarmes</a>
-    <a href="{{ url_for('mitigation_page') }}" class="{{ 'on' if here == 'mitigation_page' }}">Mitigação</a>
-    <a href="{{ url_for('health_page') }}" class="{{ 'on' if here == 'health_page' }}">Saúde</a>
-    <a href="{{ url_for('customers_page') }}" class="{{ 'on' if here == 'customers_page' }}">Clientes</a>
-    <a href="{{ url_for('exceptions_page') }}" class="{{ 'on' if here == 'exceptions_page' }}">Exceções</a>
-    <a href="{{ url_for('baseline_page') }}" class="{{ 'on' if here == 'baseline_page' }}">Base</a>
-    <a href="{{ url_for('analysis') }}" class="{{ 'on' if here=='analysis' }}">Análise</a>
-    <a href="{{ url_for('investigate') }}" class="{{ 'on' if here=='investigate' }}">Investigar</a>
-    <a href="{{ url_for('report_page') }}" class="{{ 'on' if here == 'report_page' }}">Relatório</a>
-    <a href="{{ url_for('tools_page') }}" class="{{ 'on' if here == 'tools_page' }}">Ferramentas</a>
-    <a href="{{ url_for('reputation') }}" class="{{ 'on' if here=='reputation' }}">Reputação</a>
-    <a href="{{ url_for('telegram') }}" class="{{ 'on' if here=='telegram' }}">Telegram</a>
-    <a href="{{ url_for('backup_page') }}" class="{{ 'on' if here == 'backup_page' }}">Backup</a>
-    <a href="{{ url_for('channels_page') }}" class="{{ 'on' if here == 'channels_page' }}">E-mail/Webhook</a>
-    <a href="{{ url_for('retention') }}" class="{{ 'on' if here=='retention' }}">Retenção</a>
-    <a href="{{ url_for('users') }}" class="{{ 'on' if here=='users' }}">Usuários</a>
-    <a href="{{ url_for('audit_page') }}" class="{{ 'on' if here=='audit_page' }}">Auditoria</a>
+    {% set groups = [
+      ('Monitoramento', [('index','Status',('index',)),('attacks_page','Ataques',('attacks_page','attack_detail')),('network','Rede',('network',)),('borders','Bordas',('borders',)),('health_page','Saúde',('health_page',))]),
+      ('Detecção', [('rules','Regras',('rules',)),('alarms','Alarmes',('alarms','alarm_edit')),('exceptions_page','Exceções',('exceptions_page',)),('baseline_page','Base',('baseline_page',)),('mitigation_page','Mitigação',('mitigation_page',))]),
+      ('Investigação', [('investigate','Investigar',('investigate',)),('analysis','Análise',('analysis',)),('reputation','Reputação',('reputation',)),('customers_page','Clientes',('customers_page',)),('report_page','Relatório',('report_page',))]),
+      ('Notificações', [('telegram','Telegram',('telegram',)),('channels_page','E-mail/Webhook',('channels_page',))]),
+      ('Sistema', [('tools_page','Ferramentas',('tools_page',)),('backup_page','Backup',('backup_page',)),('retention','Retenção',('retention',)),('users','Usuários',('users',)),('audit_page','Auditoria',('audit_page',))]),
+    ] %}
+    {% for title, items in groups %}
+    {% set active = namespace(v=false) %}{% for ep, label, eps in items %}{% if here in eps %}{% set active.v = true %}{% endif %}{% endfor %}
+    <div class="dd {{ 'on' if active.v }}">
+      <button type="button" class="ddbtn" aria-haspopup="true">{{ title }} ▾</button>
+      <div class="menu" role="menu">
+        {% for ep, label, eps in items %}<a role="menuitem" href="{{ url_for(ep) }}" class="{{ 'on' if here in eps }}">{{ label }}</a>{% endfor %}
+      </div>
+    </div>
+    {% endfor %}
   </nav>
   <form method="post" action="{{ url_for('logout') }}" class="who">
     <a href="{{ url_for('password') }}">{{ g.user.username }}</a>

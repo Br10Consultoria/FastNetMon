@@ -30,7 +30,9 @@ origem, destino, portas, IP privado do assinante e os IPs remotos.</p>
 {% if note %}<p class="muted">{{ note }}</p>{% endif %}
 {% if not error %}
 <section class="card">
-  <h2>{{ total }} ataque(s){% if total > attacks|length %} — mostrando os {{ attacks|length }} mais recentes{% endif %}</h2>
+  <div class="titlebar"><h2>{{ total }} ataque(s){% if total > attacks|length %} — mostrando os {{ attacks|length }} mais recentes{% endif %}</h2>
+  {% if attacks %}<span class="actions"><a class="button" href="{{ url_for('attacks_page', export='csv', **request.args.to_dict()) }}">Exportar CSV</a>
+  <button type="button" class="secondary" onclick="window.print()">Imprimir / PDF</button></span>{% endif %}</div>
   {% if attacks %}
   <div class="scroll"><table>
     <tr><th>Quando</th><th>Sentido</th><th>Origem</th><th>Destino</th><th>Proto · portas</th><th>Tipo de IP</th><th class="num">Pico</th><th>Regra</th><th></th></tr>

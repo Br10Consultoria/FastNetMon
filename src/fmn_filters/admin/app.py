@@ -12,7 +12,7 @@ import shutil
 import subprocess
 import time
 
-from flask import Flask, abort, flash, g, redirect, render_template, request, session, url_for
+from flask import Flask, Response, abort, flash, g, redirect, render_template, request, session, url_for
 
 from . import security
 from .config_store import ConfigStore, Paths, parse_cidrs, parse_ints, parse_ips
@@ -1035,6 +1035,33 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
             return None
         return ClickFlows(client, source) if client else None
 
+    def attacks_csv(attacks, tz, tzname, fmt_ts, at):
+        """Exporta a lista filtrada de ataques (CSV com BOM e ';' para abrir direto no Excel)."""
+        import csv
+        import io
+
+        def safe(v):
+            v = "" if v is None else str(v)
+            return "'" + v if v[:1] in ("=", "+", "-", "@") else v
+        out = io.StringIO()
+        w = csv.writer(out, delimiter=";", lineterminator="\r\n")
+        w.writerow(["inicio (%s)" % tzname, "fim (%s)" % tzname, "duracao_min", "eventos", "sentido", "origem", "destino",
+                    "protocolo", "portas_top", "tipo_ip", "pool", "assinantes_top", "ips_remotos_top", "pico_pps",
+                    "pico_mbps", "alocacoes_por_min", "portas_ativas", "regra", "severidade", "deteccao"])
+        for x in attacks:
+            ports = ", ".join("%s/%s (%s)" % (p.get("protocolo"), p.get("porta"), p.get("destinos"))
+                              for p in (x.get("ports_top") or [])[:5])
+            w.writerow([safe(v) for v in (
+                fmt_ts(x["start"], tz), fmt_ts(x["end"], tz), x["minutes"], x["events"],
+                "recebido" if x["direction"] == "in" else "originado", x["origem"], x["destino"],
+                x.get("protocol") or "", ports, at.SCOPE_PT.get(x["scope"], x["scope"]), x.get("pool") or "",
+                " ".join(x.get("subs_top") or []), " ".join(x.get("remotes_top") or []),
+                round(x["pps"]), round(x["mbps"], 2), x["allocs"], x["active_ports"], x["rule"], x["severity"],
+                x["detection"])])
+        name = "ataques-%s.csv" % dt_now_utc().strftime("%Y%m%d-%H%M%S")
+        return Response("\ufeff" + out.getvalue(), mimetype="text/csv; charset=utf-8",
+                        headers={"Content-Disposition": "attachment; filename=" + name})
+
     @app.route("/ataques")
     def attacks_page():
         from datetime import timezone as dt_timezone
@@ -1081,6 +1108,8 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
             error = str(exc)
         for x in attacks:
             x["link"] = url_for("attack_detail", tz=tzname, **at.key_params(x))
+        if a.get("export") == "csv" and not error:
+            return attacks_csv(attacks, tz, tzname, fmt_ts, at)
         return render_template("attacks.html", form=form, attacks=attacks, total=total, error=error, note=note,
                                customers=customers, rules=rules, tz=tz, tz_choices=TZ_CHOICES, ts=fmt_ts,
                                human=at.human, mbps=at.mbps, scope_pt=at.SCOPE_PT, backend=backend)
