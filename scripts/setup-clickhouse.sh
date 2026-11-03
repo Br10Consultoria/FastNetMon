@@ -163,7 +163,7 @@ cat > "$TMPX" <<XML
       <max_memory_usage>3000000000</max_memory_usage>
       <max_threads>4</max_threads>
       <constraints>
-        <max_execution_time><max>60</max></max_execution_time>
+        <max_execution_time><max>120</max></max_execution_time>
         <max_memory_usage><max>3000000000</max></max_memory_usage>
         <max_threads><max>4</max></max_threads>
         <join_use_nulls><readonly/></join_use_nulls>
@@ -299,6 +299,8 @@ datasources:
       secure: false
       username: orbyflow_grafana
       defaultDatabase: orbyflow
+      dialTimeout: "10"
+      queryTimeout: "60"
     secureJsonData:
       password: $ORBYFLOW_CH_GRAFANA_PASSWORD
 YAML
