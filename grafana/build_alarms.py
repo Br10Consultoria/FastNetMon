@@ -93,8 +93,8 @@ def build():
     p[-1]["fieldConfig"]["defaults"]["custom"].update({"drawStyle": "bars", "fillOpacity": 80})
     p[-1]["fieldConfig"]["defaults"].update({"min": 0, "max": 1})
     var = {"type": "query", "name": "alarme", "label": "Alarme", "datasource": dict(DS),
-           "query": "SELECT name AS __text, id AS __value FROM orby_filter_rules WHERE enabled=1 ORDER BY name",
-           "definition": "SELECT name AS __text, id AS __value FROM orby_filter_rules WHERE enabled=1 ORDER BY name",
+           "query": "SELECT CONCAT(name, IF(enabled,'',' (desligado)')) AS __text, id AS __value FROM orby_filter_rules ORDER BY enabled DESC, name",
+           "definition": "SELECT CONCAT(name, IF(enabled,'',' (desligado)')) AS __text, id AS __value FROM orby_filter_rules ORDER BY enabled DESC, name",
            "refresh": 1, "multi": True, "includeAll": True, "allValue": "SELECT id FROM orby_filter_rules",
            "current": {"text": "All", "value": "$__all"}, "hide": 0, "skipUrlSync": False, "sort": 1}
     return {"id": None, "uid": "orbyflow-alarmes", "title": "Alarmes por filtro",

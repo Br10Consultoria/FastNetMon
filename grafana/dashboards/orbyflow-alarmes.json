@@ -54,8 +54,8 @@
           "type": "mysql",
           "uid": "orbyflow-mysql"
         },
-        "query": "SELECT name AS __text, id AS __value FROM orby_filter_rules WHERE enabled=1 ORDER BY name",
-        "definition": "SELECT name AS __text, id AS __value FROM orby_filter_rules WHERE enabled=1 ORDER BY name",
+        "query": "SELECT CONCAT(name, IF(enabled,'',' (desligado)')) AS __text, id AS __value FROM orby_filter_rules ORDER BY enabled DESC, name",
+        "definition": "SELECT CONCAT(name, IF(enabled,'',' (desligado)')) AS __text, id AS __value FROM orby_filter_rules ORDER BY enabled DESC, name",
         "refresh": 1,
         "multi": true,
         "includeAll": true,
