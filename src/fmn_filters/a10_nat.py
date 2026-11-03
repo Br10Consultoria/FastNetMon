@@ -174,8 +174,15 @@ class NatTable:
         self.closed: dict[tuple, list] = {}
         self._order: deque = deque()
         self.users: dict[str, int] = defaultdict(int)   # inside_ip -> portas ativas (gauge)
+        self.by_user: dict[str, set] = {}                # inside_ip -> chaves ativas
         self.orphan_frees = 0
         self.missed_frees = 0
+        self.moved_frees = 0
+        # A10 LSN: todas as portas de um assinante saem pelo MESMO IP publico (Users/Rsvd por IP no
+        # "show cgnv6 nat pool statistics"). Se ele aparece alocando em outro IP, os mapeamentos no IP antigo
+        # morreram sem log de liberacao (reinicio do A10, NAT refeito): sem isso ficavam "ativos" para sempre e
+        # dobravam assinantes e portas nos dashboards.
+        self.paired = os.environ.get("ORBYMON_NAT_PAIRED", "1") != "0"
 
     def apply(self, ev: NatEvent):
         key = (ev.public_ip, ev.public_port, ev.protocol)
@@ -184,22 +191,33 @@ class NatTable:
             if old is not None:
                 self.missed_frees += 1       # liberacao perdida: fecha o anterior agora
                 self._close(key, old, ev.ts)
+            mine = self.by_user.get(ev.inside_ip)
+            if self.paired and mine:
+                stale = [k for k in mine if k[0] != ev.public_ip]
+                for k in stale:
+                    self.moved_frees += 1
+                    self._close(k, self.active.pop(k), ev.ts)
             self.active[key] = (ev.inside_ip, ev.inside_port, ev.ts)
             self.users[ev.inside_ip] += 1
+            self.by_user.setdefault(ev.inside_ip, set()).add(key)
         else:
             old = self.active.pop(key, None)
             if old is None:
                 self.orphan_frees += 1       # liberacao sem alocacao conhecida (ex. antes do inicio)
                 return
-            self.users[old[0]] -= 1
-            if self.users[old[0]] <= 0:
-                self.users.pop(old[0], None)
-            self._store(key, old, ev.ts)
+            self._close(key, old, ev.ts)
 
     def _close(self, key, old, end):
+        """Tira o mapeamento das contagens do assinante e guarda no historico (a chave ja saiu de active
+        ou vai ser sobrescrita pelo chamador)."""
         self.users[old[0]] -= 1
         if self.users[old[0]] <= 0:
             self.users.pop(old[0], None)
+        mine = self.by_user.get(old[0])
+        if mine is not None:
+            mine.discard(key)
+            if not mine:
+                self.by_user.pop(old[0], None)
         self._store(key, old, end)
 
     def _store(self, key, old, end):
@@ -669,6 +687,7 @@ def replay_rsyslog_spool(path, scopes: ScopeMap, *, max_bytes=2_000_000_000, pro
         "liberacoes_sem_alocacao": service.table.orphan_frees,
         "alocacoes_ainda_ativas_no_fim": service.table.sizes()["ativos"],
         "realocacao_sem_liberacao": service.table.missed_frees,
+        "assinante_mudou_de_ip_publico": service.table.moved_frees,
         "bytes_descartados_inicio": sum(s.discarded_prefix for s in splitters.values()),
         "observacao": ("liberacoes_sem_alocacao altas sao esperadas em janelas curtas: a alocacao "
                        "ocorreu antes do inicio do arquivo. Compare com periodo_a10_segundos."),

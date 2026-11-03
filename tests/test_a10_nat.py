@@ -120,6 +120,21 @@ class TableTests(unittest.TestCase):
         self.assertEqual(t.missed_frees, 1)
         self.assertEqual(dict(t.users), {"100.64.64.9": 1})
 
+    def test_subscriber_moved_to_other_public_ip_drops_stale(self):
+        t = NatTable()
+        t.apply(self.ev("allocated", 1000, pp=20000))
+        t.apply(self.ev("allocated", 1001, pp=20001))
+        t.apply(self.ev("allocated", 1002, inside="100.64.64.9", pp=20002))
+        # A10 reiniciou sem liberar: o mesmo assinante volta por outro IP publico
+        t.apply(self.ev("allocated", 2000, pub="45.238.171.80", pp=30000))
+        self.assertEqual(t.moved_frees, 2)
+        self.assertEqual(dict(t.users), {"100.64.64.5": 1, "100.64.64.9": 1})
+        self.assertEqual(len(t.active), 2)
+        self.assertEqual(t.lookup("45.238.170.70", 20000, "tcp", 1500)[0], "100.64.64.5")   # historico mantido
+        t.apply(self.ev("freed", 2100, pub="45.238.171.80", pp=30000))
+        self.assertNotIn("100.64.64.5", t.by_user)
+        self.assertEqual(t.sizes()["ativos"], 1)
+
     def test_prune(self):
         t = NatTable(retention_seconds=100)
         t.apply(self.ev("allocated", 1000))
@@ -311,7 +326,7 @@ class PublicPortsTests(unittest.TestCase):
         svc = NatService(SCOPES, allowed_sources=["127.0.0.1"])
         sp = StreamSplitter()
         text = (msg(pub_port=1) + msg(pub_port=2, inside="100.64.64.9") + msg(proto="UDP", pub_port=3) +
-                msg(public="45.238.171.80", pub_port=5) + msg(kind="Freed", pub_port=1))
+                msg(public="45.238.171.80", pub_port=5, inside="100.64.64.20") + msg(kind="Freed", pub_port=1))
         svc.ingest_text(text, sp, now=600.0)
         rows = {r[1]: r for r in svc.public_rows(now=670.0, capacity=100)}
         r = rows["45.238.170.70"]
