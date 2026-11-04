@@ -336,7 +336,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT r.name AS 'Alarme',IF(r.enabled,'ligado','desligado') AS 'Ligado',CASE WHEN NOT r.enabled THEN '—' WHEN s.status='open' THEN 'INCIDENTE' WHEN s.status='cooling' THEN 'resfriando' WHEN s.last_bucket IS NULL THEN 'aguardando' ELSE 'normal' END AS 'Situação',CASE r.direction WHEN 'in' THEN 'recebido' WHEN 'out' THEN 'originado' ELSE 'ambos' END AS 'Sentido',r.severity AS 'Severidade',CONCAT(CASE JSON_VALUE(r.definition,'$.conditions[0].metric') WHEN 'mbps' THEN 'Mbps' WHEN 'pps' THEN 'pacotes/s' WHEN 'flows' THEN 'fluxos/min' ELSE JSON_VALUE(r.definition,'$.conditions[0].metric') END,' ',CASE JSON_VALUE(r.definition,'$.conditions[0].op') WHEN 'gt' THEN '>' WHEN 'lt' THEN '<' ELSE JSON_VALUE(r.definition,'$.conditions[0].op') END,' ',JSON_VALUE(r.definition,'$.conditions[0].value'),IF(JSON_LENGTH(r.definition,'$.conditions')>1,' (+ outras)',''),' · ',JSON_VALUE(r.definition,'$.consecutive'),' min') AS 'Dispara quando',(SELECT MAX(i.started_at) FROM orby_filter_incidents i WHERE i.rule_id=r.id) AS 'Último incidente (UTC)',s.last_bucket AS 'Último minuto (UTC)',s.last_bps AS 'Taxa',s.last_pps AS 'Pacotes/s',s.last_flows AS 'Fluxos/min',NULLIF(s.last_error,'') AS 'Erro',r.expr AS 'Filtro' FROM orby_filter_rules r LEFT JOIN orby_filter_rule_state s ON s.rule_id=r.id ORDER BY r.enabled DESC,(s.status='open') DESC,r.name"
+          "rawSql": "SELECT r.name AS 'Alarme',IF(r.enabled,'ligado','desligado') AS 'Ligado',CASE WHEN NOT r.enabled THEN '—' WHEN s.status='open' THEN 'INCIDENTE' WHEN s.status='cooling' THEN 'resfriando' WHEN s.last_bucket IS NULL THEN 'aguardando' ELSE 'normal' END AS 'Situação',CASE r.direction WHEN 'in' THEN 'recebido' WHEN 'out' THEN 'originado' ELSE 'ambos' END AS 'Sentido',r.severity AS 'Severidade',CONCAT(CONCAT(CASE JSON_VALUE(r.definition,'$.conditions[0].metric') WHEN 'mbps' THEN 'Mbps' WHEN 'pps' THEN 'pacotes/s' WHEN 'flows' THEN 'fluxos/min' WHEN 'bpp' THEN 'bytes/pacote' ELSE JSON_VALUE(r.definition,'$.conditions[0].metric') END,' ',CASE JSON_VALUE(r.definition,'$.conditions[0].op') WHEN 'gt' THEN '>' WHEN 'ge' THEN '≥' WHEN 'lt' THEN '<' WHEN 'le' THEN '≤' ELSE '' END,IF(JSON_VALUE(r.definition,'$.conditions[0].op') IN ('gt','ge','lt','le'),' ',''),JSON_VALUE(r.definition,'$.conditions[0].value'),CASE JSON_VALUE(r.definition,'$.conditions[0].op') WHEN 'above_avg' THEN '% acima da média' WHEN 'below_avg' THEN '% abaixo da média' WHEN 'above_usual' THEN '% acima do habitual' WHEN 'below_usual' THEN '% abaixo do habitual' ELSE '' END,IF(JSON_LENGTH(r.definition,'$.conditions')>1,' (+ outras)','')),' · ',JSON_VALUE(r.definition,'$.consecutive'),' min') AS 'Dispara quando',(SELECT MAX(i.started_at) FROM orby_filter_incidents i WHERE i.rule_id=r.id) AS 'Último incidente (UTC)',s.last_bucket AS 'Último minuto (UTC)',s.last_bps AS 'Taxa',s.last_pps AS 'Pacotes/s',s.last_flows AS 'Fluxos/min',NULLIF(s.last_error,'') AS 'Erro',r.expr AS 'Filtro' FROM orby_filter_rules r LEFT JOIN orby_filter_rule_state s ON s.rule_id=r.id ORDER BY r.enabled DESC,(s.status='open') DESC,r.name"
         }
       ],
       "options": {
@@ -451,8 +451,8 @@
     {
       "id": 7,
       "type": "timeseries",
-      "title": "Taxa medida por alarme (Mbps)",
-      "description": "O que cada alarme mediu minuto a minuto (soma do tráfego que casa com o filtro, normal ou não). Só vira incidente quando passa do limite do alarme; compare com a coluna 'Dispara quando' acima.",
+      "title": "${alarme:text}",
+      "description": "Um gráfico por alarme: o que ele mediu minuto a minuto (tráfego que casa com o filtro, normal ou não) e a linha do limite. Só vira incidente quando o medido passa do limite pelos minutos seguidos. Escolha os alarmes no filtro do topo.",
       "datasource": {
         "type": "mysql",
         "uid": "orbyflow-mysql"
@@ -460,8 +460,8 @@
       "gridPos": {
         "x": 0,
         "y": 24,
-        "w": 24,
-        "h": 8
+        "w": 8,
+        "h": 7
       },
       "targets": [
         {
@@ -473,17 +473,14 @@
           "editorMode": "code",
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "SELECT $__timeGroupAlias(x.bucket_utc,'1m'),r.name AS metric,x.bps/1000000 AS value FROM orby_filter_rule_samples x JOIN orby_filter_rules r ON r.id=x.rule_id WHERE r.id IN (${alarme:csv}) AND $__timeFilter(x.bucket_utc) ORDER BY 1"
+          "rawSql": "SELECT * FROM (SELECT $__timeGroupAlias(x.bucket_utc,'1m'),CONCAT('medido (',CASE JSON_VALUE(r.definition,'$.conditions[0].metric') WHEN 'mbps' THEN 'Mbps' WHEN 'pps' THEN 'pacotes/s' WHEN 'flows' THEN 'fluxos/min' WHEN 'bpp' THEN 'bytes/pacote' ELSE JSON_VALUE(r.definition,'$.conditions[0].metric') END,')') AS metric,CASE JSON_VALUE(r.definition,'$.conditions[0].metric') WHEN 'pps' THEN x.pps WHEN 'flows' THEN x.flows WHEN 'bpp' THEN x.bpp ELSE x.bps/1000000 END AS value FROM orby_filter_rule_samples x JOIN orby_filter_rules r ON r.id=x.rule_id WHERE x.rule_id=${alarme} AND $__timeFilter(x.bucket_utc) UNION ALL SELECT $__timeGroupAlias(x.bucket_utc,'1m'),'limite',CAST(JSON_VALUE(r.definition,'$.conditions[0].value') AS DOUBLE) FROM orby_filter_rule_samples x JOIN orby_filter_rules r ON r.id=x.rule_id WHERE x.rule_id=${alarme} AND JSON_VALUE(r.definition,'$.conditions[0].op') IN ('gt','ge') AND $__timeFilter(x.bucket_utc)) u ORDER BY 1"
         }
       ],
       "options": {
         "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": [
-            "max",
-            "lastNotNull"
-          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": [],
           "showLegend": true
         },
         "tooltip": {
@@ -493,8 +490,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "Mbps",
-          "decimals": 0,
+          "unit": "short",
           "custom": {
             "lineWidth": 2,
             "fillOpacity": 8,
@@ -502,68 +498,44 @@
             "spanNulls": true
           }
         },
-        "overrides": []
-      }
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "limite"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              }
+            ]
+          }
+        ]
+      },
+      "repeat": "alarme",
+      "repeatDirection": "h",
+      "maxPerRow": 3
     },
     {
       "id": 8,
-      "type": "timeseries",
-      "title": "Pacotes/s medidos por alarme",
-      "description": "",
-      "datasource": {
-        "type": "mysql",
-        "uid": "orbyflow-mysql"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 32,
-        "w": 24,
-        "h": 8
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "mysql",
-            "uid": "orbyflow-mysql"
-          },
-          "editorMode": "code",
-          "format": "time_series",
-          "rawQuery": true,
-          "rawSql": "SELECT $__timeGroupAlias(x.bucket_utc,'1m'),r.name AS metric,x.pps AS value FROM orby_filter_rule_samples x JOIN orby_filter_rules r ON r.id=x.rule_id WHERE r.id IN (${alarme:csv}) AND $__timeFilter(x.bucket_utc) ORDER BY 1"
-        }
-      ],
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": [
-            "max",
-            "lastNotNull"
-          ],
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "pps",
-          "decimals": 0,
-          "custom": {
-            "lineWidth": 2,
-            "fillOpacity": 8,
-            "showPoints": "never",
-            "spanNulls": true
-          }
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 9,
       "type": "timeseries",
       "title": "Minutos em que a condição casou",
       "description": "1 = a condição do alarme foi atendida naquele minuto. O incidente abre depois dos 'minutos seguidos' configurados no alarme.",
@@ -573,7 +545,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 40,
+        "y": 31,
         "w": 24,
         "h": 8
       },

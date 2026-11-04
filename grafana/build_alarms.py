@@ -16,6 +16,18 @@ from build_cgnat_ports import DS, series, stat, table
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "grafana" / "dashboards" / "orbyflow-alarmes.json"
 RULES = "r.id IN (${alarme:csv})"
+C0 = "JSON_VALUE(r.definition,'$.conditions[0].%s')"
+METRIC = ("CASE %s WHEN 'mbps' THEN 'Mbps' WHEN 'pps' THEN 'pacotes/s' WHEN 'flows' THEN 'fluxos/min' WHEN 'bpp' THEN "
+          "'bytes/pacote' ELSE %s END" % (C0 % "metric", C0 % "metric"))
+# "Mbps > 300" ou "Mbps 300% acima do habitual"; mais de uma condicao: "(+ outras)"
+COND = ("CONCAT(" + METRIC + ",' ',CASE " + C0 % "op" + " WHEN 'gt' THEN '>' WHEN 'ge' THEN '≥' WHEN 'lt' THEN '<' WHEN "
+        "'le' THEN '≤' ELSE '' END,IF(" + C0 % "op" + " IN ('gt','ge','lt','le'),' ',''),"
+        + C0 % "value" + ",CASE " + C0 % "op" + " WHEN 'above_avg' THEN '% acima da média' WHEN 'below_avg' THEN "
+        "'% abaixo da média' WHEN 'above_usual' THEN '% acima do habitual' WHEN 'below_usual' THEN "
+        "'% abaixo do habitual' ELSE '' END,IF(JSON_LENGTH(r.definition,'$.conditions')>1,' (+ outras)',''))")
+# medida na unidade do proprio alarme (a da 1a condicao)
+MEASURE = ("CASE " + C0 % "metric" + " WHEN 'pps' THEN x.pps WHEN 'flows' THEN x.flows WHEN 'bpp' THEN x.bpp "
+           "ELSE x.bps/1000000 END")
 
 
 def at(panel, y, x=0, w=24, h=None):
@@ -38,13 +50,7 @@ def build():
                   "CASE WHEN NOT r.enabled THEN '—' WHEN s.status='open' THEN 'INCIDENTE' WHEN s.status='cooling' "
                   "THEN 'resfriando' WHEN s.last_bucket IS NULL THEN 'aguardando' ELSE 'normal' END AS 'Situação',"
                   "CASE r.direction WHEN 'in' THEN 'recebido' WHEN 'out' THEN 'originado' ELSE 'ambos' END AS 'Sentido',"
-                  "r.severity AS 'Severidade',CONCAT(CASE JSON_VALUE(r.definition,'$.conditions[0].metric') WHEN 'mbps' THEN "
-                  "'Mbps' WHEN 'pps' THEN 'pacotes/s' WHEN 'flows' THEN 'fluxos/min' ELSE "
-                  "JSON_VALUE(r.definition,'$.conditions[0].metric') END,' ',CASE JSON_VALUE(r.definition,"
-                  "'$.conditions[0].op') WHEN 'gt' THEN '>' WHEN 'lt' THEN '<' ELSE JSON_VALUE(r.definition,"
-                  "'$.conditions[0].op') END,' ',JSON_VALUE(r.definition,'$.conditions[0].value'),IF(JSON_LENGTH("
-                  "r.definition,'$.conditions')>1,' (+ outras)',''),' · ',JSON_VALUE(r.definition,'$.consecutive'),"
-                  "' min') AS 'Dispara quando',(SELECT MAX(i.started_at) FROM orby_filter_incidents i WHERE "
+                  "r.severity AS 'Severidade',CONCAT(" + COND + ",' · ',JSON_VALUE(r.definition,'$.consecutive'),' min') AS 'Dispara quando',(SELECT MAX(i.started_at) FROM orby_filter_incidents i WHERE "
                   "i.rule_id=r.id) AS 'Último incidente (UTC)',s.last_bucket AS 'Último minuto (UTC)',"
                   "s.last_bps AS 'Taxa',"
                   "s.last_pps AS 'Pacotes/s',s.last_flows AS 'Fluxos/min',NULLIF(s.last_error,'') AS 'Erro',"
@@ -72,6 +78,24 @@ def build():
     incidents["fieldConfig"]["defaults"]["noValue"] = "Nenhum incidente no período: nenhum alarme passou do limite."
     unit_override(incidents, "Pico taxa", "bps")
     unit_override(incidents, "Pico pacotes/s", "pps")
+    per_alarm = series(7, "${alarme:text}",
+                       "SELECT * FROM (SELECT $__timeGroupAlias(x.bucket_utc,'1m'),CONCAT('medido ('," + METRIC + ",')') "
+                       "AS metric," + MEASURE + " AS value FROM orby_filter_rule_samples x JOIN orby_filter_rules r ON "
+                       "r.id=x.rule_id WHERE x.rule_id=${alarme} AND $__timeFilter(x.bucket_utc) UNION ALL SELECT "
+                       "$__timeGroupAlias(x.bucket_utc,'1m'),'limite',CAST(" + C0 % "value" + " AS DOUBLE) FROM "
+                       "orby_filter_rule_samples x JOIN orby_filter_rules r ON r.id=x.rule_id WHERE x.rule_id=${alarme} "
+                       "AND " + C0 % "op" + " IN ('gt','ge') AND $__timeFilter(x.bucket_utc)) u ORDER BY 1", 24, "short",
+                       "Um gráfico por alarme: o que ele mediu minuto a minuto (tráfego que casa com o filtro, normal ou "
+                       "não) e a linha do limite. Só vira incidente quando o medido passa do limite pelos minutos "
+                       "seguidos. Escolha os alarmes no filtro do topo.")
+    per_alarm.update({"repeat": "alarme", "repeatDirection": "h", "maxPerRow": 3})
+    per_alarm["gridPos"].update({"w": 8, "h": 7})
+    per_alarm["options"]["legend"].update({"displayMode": "list", "placement": "bottom", "calcs": []})
+    per_alarm["fieldConfig"]["defaults"].pop("decimals", None)
+    per_alarm["fieldConfig"]["overrides"].append({"matcher": {"id": "byName", "options": "limite"}, "properties": [
+        {"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}},
+        {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}},
+        {"id": "custom.fillOpacity", "value": 0}]})
     p = [
         at(stat(1, "Alarmes ligados", "SELECT COUNT(*) AS value FROM orby_filter_rules WHERE enabled=1", 0, 6), 0, 0, 6),
         at(stat(2, "Incidentes abertos agora",
@@ -86,20 +110,11 @@ def build():
                 "Filtro inválido ou atalho (@rede, @pools...) vazio: veja a coluna Erro abaixo."), 0, 18, 6),
         state,
         incidents,
-        series(7, "Taxa medida por alarme (Mbps)",
-               "SELECT $__timeGroupAlias(x.bucket_utc,'1m'),r.name AS metric,x.bps/1000000 AS value FROM "
-               "orby_filter_rule_samples x JOIN orby_filter_rules r ON r.id=x.rule_id WHERE " + RULES +
-               " AND $__timeFilter(x.bucket_utc) ORDER BY 1", 24, "Mbps",
-               "O que cada alarme mediu minuto a minuto (soma do tráfego que casa com o filtro, normal ou não). Só vira "
-               "incidente quando passa do limite do alarme; compare com a coluna 'Dispara quando' acima."),
-        series(8, "Pacotes/s medidos por alarme",
-               "SELECT $__timeGroupAlias(x.bucket_utc,'1m'),r.name AS metric,x.pps AS value FROM "
-               "orby_filter_rule_samples x JOIN orby_filter_rules r ON r.id=x.rule_id WHERE " + RULES +
-               " AND $__timeFilter(x.bucket_utc) ORDER BY 1", 32, "pps"),
-        series(9, "Minutos em que a condição casou",
+        per_alarm,
+        series(8, "Minutos em que a condição casou",
                "SELECT $__timeGroupAlias(x.bucket_utc,'1m'),r.name AS metric,x.matched AS value FROM "
                "orby_filter_rule_samples x JOIN orby_filter_rules r ON r.id=x.rule_id WHERE " + RULES +
-               " AND $__timeFilter(x.bucket_utc) ORDER BY 1", 40, "none",
+               " AND $__timeFilter(x.bucket_utc) ORDER BY 1", 31, "none",
                "1 = a condição do alarme foi atendida naquele minuto. O incidente abre depois dos 'minutos seguidos' "
                "configurados no alarme."),
     ]
