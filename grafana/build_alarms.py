@@ -25,6 +25,10 @@ COND = ("CONCAT(" + METRIC + ",' ',CASE " + C0 % "op" + " WHEN 'gt' THEN '>' WHE
         + C0 % "value" + ",CASE " + C0 % "op" + " WHEN 'above_avg' THEN '% acima da média' WHEN 'below_avg' THEN "
         "'% abaixo da média' WHEN 'above_usual' THEN '% acima do habitual' WHEN 'below_usual' THEN "
         "'% abaixo do habitual' ELSE '' END,IF(JSON_LENGTH(r.definition,'$.conditions')>1,' (+ outras)',''))")
+# limite fixo (> ou >=) na mesma metrica do grafico: 1a ou 2a condicao ("acima do habitual E acima de 500 Mbps")
+C1 = "JSON_VALUE(r.definition,'$.conditions[1].%s')"
+LIMIT = ("COALESCE(IF(%s IN ('gt','ge'),%s,NULL),IF(%s IN ('gt','ge') AND %s=%s,%s,NULL))"
+         % (C0 % "op", C0 % "value", C1 % "op", C1 % "metric", C0 % "metric", C1 % "value"))
 # medida na unidade do proprio alarme (a da 1a condicao)
 MEASURE = ("CASE " + C0 % "metric" + " WHEN 'pps' THEN x.pps WHEN 'flows' THEN x.flows WHEN 'bpp' THEN x.bpp "
            "ELSE x.bps/1000000 END")
@@ -82,9 +86,9 @@ def build():
                        "SELECT * FROM (SELECT $__timeGroupAlias(x.bucket_utc,'1m'),CONCAT('medido ('," + METRIC + ",')') "
                        "AS metric," + MEASURE + " AS value FROM orby_filter_rule_samples x JOIN orby_filter_rules r ON "
                        "r.id=x.rule_id WHERE x.rule_id=${alarme} AND $__timeFilter(x.bucket_utc) UNION ALL SELECT "
-                       "$__timeGroupAlias(x.bucket_utc,'1m'),'limite',CAST(" + C0 % "value" + " AS DOUBLE) FROM "
+                       "$__timeGroupAlias(x.bucket_utc,'1m'),'limite',CAST(" + LIMIT + " AS DOUBLE) FROM "
                        "orby_filter_rule_samples x JOIN orby_filter_rules r ON r.id=x.rule_id WHERE x.rule_id=${alarme} "
-                       "AND " + C0 % "op" + " IN ('gt','ge') AND $__timeFilter(x.bucket_utc)) u ORDER BY 1", 24, "short",
+                       "AND " + LIMIT + " IS NOT NULL AND $__timeFilter(x.bucket_utc)) u ORDER BY 1", 24, "short",
                        "Um gráfico por alarme: o que ele mediu minuto a minuto (tráfego que casa com o filtro, normal ou "
                        "não) e a linha do limite. Só vira incidente quando o medido passa do limite pelos minutos "
                        "seguidos. Escolha os alarmes no filtro do topo.")
