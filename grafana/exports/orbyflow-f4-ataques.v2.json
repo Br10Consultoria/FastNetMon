@@ -282,8 +282,8 @@
         "kind": "Panel",
         "spec": {
           "id": 11,
-          "title": "IPs remotos (quem ataca ou é atacado)",
-          "description": "",
+          "title": "IPs remotos com mais tráfego (não indica ataque)",
+          "description": "Os IPs de fora da rede que mais trocaram tráfego com a gente no período, maior volume primeiro. É tráfego normal na maioria: CDNs, Meta (WhatsApp/Instagram), Google, streaming. Não é lista de ataques (ataques: tabela 'Ataques detectados' e painel web > Ataques). Recebido = veio dele para nós; originado = foi nosso para ele. IPs nossos envolvidos = quantos IPs nossos falaram com ele. Clique no IP para filtrar o dashboard por ele: o painel 'Protocolos e portas de serviço' mostra as portas.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -410,6 +410,23 @@
                       {
                         "id": "custom.width",
                         "value": 174
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "IP remoto"
+                    },
+                    "properties": [
+                      {
+                        "id": "links",
+                        "value": [
+                          {
+                            "title": "Filtrar o dashboard por este IP",
+                            "url": "/d/orbyflow-f4-ataques/?${__url_time_range}&var-remoto=${__value.raw}"
+                          }
+                        ]
                       }
                     ]
                   }

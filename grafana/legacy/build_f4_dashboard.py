@@ -108,7 +108,7 @@ panel("IPs da rede com maior pico (público, pool ou assinante)", "table",
       "GROUP BY direction,scope,pool,local_ip,subscriber_ip ORDER BY MAX(bps) DESC LIMIT 50",
       0, 26, 24, 10, overrides=[ov("Pico", "bps"), ov("Pico pacotes/s", "pps", 0), ov("Volume", "decbytes", 1)])
 
-panel("IPs remotos (quem ataca ou é atacado)", "table",
+panel("IPs remotos com mais tráfego (não indica ataque)", "table",
       f"SELECT remote_ip AS 'IP remoto',{DIRNAME} AS 'Sentido',protocol AS 'Proto',"
       "COUNT(DISTINCT local_ip) AS 'IPs nossos envolvidos',SUM(bytes) AS 'Volume',SUM(packets)/GREATEST(1,$__unixEpochTo()-$__unixEpochFrom()) AS 'Pacotes/s médio' "
       f"FROM orby_flow_minute WHERE {F} GROUP BY remote_ip,direction,protocol ORDER BY SUM(bytes) DESC LIMIT 50",

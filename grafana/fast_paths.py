@@ -51,7 +51,7 @@ FAST = {
         "MAX(remotes) AS 'IPs remotos (pico)' FROM orby_flow_ip_minute WHERE source='huawei' AND "
         "$__timeFilter(bucket_utc) AND %s AND %s GROUP BY direction,scope,local_ip,subscriber_ip "
         "ORDER BY MAX(bytes) DESC LIMIT 50" % (SENT, IPF, DIR)),
-    "IPs remotos (quem ataca ou é atacado)": (
+    "IPs remotos com mais tráfego (não indica ataque)": (
         [NO_IP, NO_PORT],
         "SELECT remote_ip AS 'IP remoto',%s AS 'Sentido',protocol AS 'Proto',MAX(locals) AS 'IPs nossos envolvidos',"
         "SUM(bytes) AS 'Volume',SUM(packets)/GREATEST(1,$__unixEpochTo()-$__unixEpochFrom()) AS 'Pacotes/s médio' "
