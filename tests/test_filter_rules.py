@@ -251,3 +251,26 @@ class TestAllTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PruneOrphanTests(unittest.TestCase):
+    def test_disabled_or_deleted_rule_closes_open_incidents(self):
+        from fmn_filters import filter_rules as fr
+        sqls = []
+
+        class Cur:
+            def execute(self, sql, params=None):
+                sqls.append(" ".join(sql.split()))
+
+        class Db:
+            def cursor(self):
+                return Cur()
+
+            def commit(self):
+                pass
+
+        fr.prune(Db(), [])
+        close = [q for q in sqls if q.startswith("UPDATE orby_filter_incidents")]
+        self.assertEqual(len(close), 1)
+        self.assertIn("LEFT JOIN orby_filter_rules", close[0])
+        self.assertIn("r.id IS NULL OR r.enabled=0", close[0])

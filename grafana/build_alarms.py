@@ -38,11 +38,22 @@ def build():
                   "CASE WHEN NOT r.enabled THEN '—' WHEN s.status='open' THEN 'INCIDENTE' WHEN s.status='cooling' "
                   "THEN 'resfriando' WHEN s.last_bucket IS NULL THEN 'aguardando' ELSE 'normal' END AS 'Situação',"
                   "CASE r.direction WHEN 'in' THEN 'recebido' WHEN 'out' THEN 'originado' ELSE 'ambos' END AS 'Sentido',"
-                  "r.severity AS 'Severidade',s.last_bucket AS 'Último minuto (UTC)',s.last_bps AS 'Taxa',"
+                  "r.severity AS 'Severidade',CONCAT(CASE JSON_VALUE(r.definition,'$.conditions[0].metric') WHEN 'mbps' THEN "
+                  "'Mbps' WHEN 'pps' THEN 'pacotes/s' WHEN 'flows' THEN 'fluxos/min' ELSE "
+                  "JSON_VALUE(r.definition,'$.conditions[0].metric') END,' ',CASE JSON_VALUE(r.definition,"
+                  "'$.conditions[0].op') WHEN 'gt' THEN '>' WHEN 'lt' THEN '<' ELSE JSON_VALUE(r.definition,"
+                  "'$.conditions[0].op') END,' ',JSON_VALUE(r.definition,'$.conditions[0].value'),IF(JSON_LENGTH("
+                  "r.definition,'$.conditions')>1,' (+ outras)',''),' · ',JSON_VALUE(r.definition,'$.consecutive'),"
+                  "' min') AS 'Dispara quando',(SELECT MAX(i.started_at) FROM orby_filter_incidents i WHERE "
+                  "i.rule_id=r.id) AS 'Último incidente (UTC)',s.last_bucket AS 'Último minuto (UTC)',"
+                  "s.last_bps AS 'Taxa',"
                   "s.last_pps AS 'Pacotes/s',s.last_flows AS 'Fluxos/min',NULLIF(s.last_error,'') AS 'Erro',"
                   "r.expr AS 'Filtro' FROM orby_filter_rules r LEFT JOIN orby_filter_rule_state s ON s.rule_id=r.id "
                   "ORDER BY r.enabled DESC,(s.status='open') DESC,r.name", 5, 9,
-                  "Liga/desliga e limites: painel web > Alarmes. Cada alarme ligado é avaliado a cada minuto (24x7).")
+                  "Situação 'normal' = a medida está abaixo do limite ('Dispara quando'); nenhum ataque. Taxa = quanto do tráfego "
+                  "casa com o filtro agora (tráfego legítimo também casa: respostas DNS, NTP...). 'INCIDENTE' = passou do "
+                  "limite pelos minutos seguidos; aí o quadro 'Incidentes no período' mostra hora, IPs atacados e de "
+                  "onde veio. Liga/desliga e limites: painel web > Alarmes.")
     unit_override(state, "Taxa", "bps")
     unit_override(state, "Pacotes/s", "pps")
     incidents = table(6, "Incidentes no período",
@@ -54,10 +65,11 @@ def build():
                       "JSON_VALUE(i.top,'$[1].key'),JSON_VALUE(i.top,'$[2].key')) AS 'Top (IPs/portas)',"
                       "COALESCE(JSON_VALUE(i.top,'$[0].assinantes[0]'),JSON_VALUE(i.top,'$[1].assinantes[0]'),"
                       "JSON_VALUE(i.top,'$[2].assinantes[0]')) AS 'Assinante (CGNAT)' FROM orby_filter_incidents i "
-                      "JOIN orby_filter_rules r ON r.id=i.rule_id WHERE " + RULES + " AND i.started_at<$__timeTo() AND "
+                      "WHERE i.rule_id IN (${alarme:csv}) AND i.started_at<$__timeTo() AND "
                       "(i.resolved_at IS NULL OR i.resolved_at>=$__timeFrom()) ORDER BY i.started_at DESC LIMIT 300",
                       14, 10, "Top = quem mais pesou no alarme (destino, origem, porta... conforme o relatório do "
                       "alarme). Detalhe por IP: painel web > Ataques (tipo 'Filtro: ...').")
+    incidents["fieldConfig"]["defaults"]["noValue"] = "Nenhum incidente no período: nenhum alarme passou do limite."
     unit_override(incidents, "Pico taxa", "bps")
     unit_override(incidents, "Pico pacotes/s", "pps")
     p = [
@@ -78,7 +90,8 @@ def build():
                "SELECT $__timeGroupAlias(x.bucket_utc,'1m'),r.name AS metric,x.bps/1000000 AS value FROM "
                "orby_filter_rule_samples x JOIN orby_filter_rules r ON r.id=x.rule_id WHERE " + RULES +
                " AND $__timeFilter(x.bucket_utc) ORDER BY 1", 24, "Mbps",
-               "O que cada alarme mediu minuto a minuto (soma do tráfego que casa com o filtro)."),
+               "O que cada alarme mediu minuto a minuto (soma do tráfego que casa com o filtro, normal ou não). Só vira "
+               "incidente quando passa do limite do alarme; compare com a coluna 'Dispara quando' acima."),
         series(8, "Pacotes/s medidos por alarme",
                "SELECT $__timeGroupAlias(x.bucket_utc,'1m'),r.name AS metric,x.pps AS value FROM "
                "orby_filter_rule_samples x JOIN orby_filter_rules r ON r.id=x.rule_id WHERE " + RULES +
@@ -95,7 +108,7 @@ def build():
     var = {"type": "query", "name": "alarme", "label": "Alarme", "datasource": dict(DS),
            "query": "SELECT CONCAT(name, IF(enabled,'',' (desligado)')) AS __text, id AS __value FROM orby_filter_rules ORDER BY enabled DESC, name",
            "definition": "SELECT CONCAT(name, IF(enabled,'',' (desligado)')) AS __text, id AS __value FROM orby_filter_rules ORDER BY enabled DESC, name",
-           "refresh": 1, "multi": True, "includeAll": True, "allValue": "SELECT id FROM orby_filter_rules",
+           "refresh": 1, "multi": True, "includeAll": True, "allValue": "SELECT rule_id FROM orby_filter_incidents UNION SELECT id FROM orby_filter_rules",
            "current": {"text": "All", "value": "$__all"}, "hide": 0, "skipUrlSync": False, "sort": 1}
     return {"id": None, "uid": "orbyflow-alarmes", "title": "Alarmes por filtro",
             "description": "Alarmes ligados no painel web (página Alarmes): situação agora, incidentes e a medida "

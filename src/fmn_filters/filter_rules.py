@@ -394,6 +394,13 @@ def prune(db, rules):
         cur.execute("DELETE FROM orby_filter_rule_samples WHERE rule_id=%s AND bucket_utc<UTC_TIMESTAMP()-INTERVAL %s DAY",
                     (r["id"], int(r["definition"].get("retention_days", 7))))
     cur.execute("DELETE FROM orby_filter_rule_samples WHERE rule_id NOT IN (SELECT id FROM orby_filter_rules)")
+    # alarme desligado ou excluido nao e mais avaliado: o incidente que estava aberto ficava "aberto" para sempre
+    # (contado em "Incidentes abertos agora" e lembrete no Telegram a cada 30 min). Encerra no ultimo minuto que casou.
+    cur.execute("""UPDATE orby_filter_incidents i LEFT JOIN orby_filter_rules r ON r.id=i.rule_id
+ SET i.status='resolved',i.resolved_at=COALESCE(i.last_match_at,UTC_TIMESTAMP())
+ WHERE i.status<>'resolved' AND (r.id IS NULL OR r.enabled=0)""")
+    cur.execute("""UPDATE orby_filter_rule_state s JOIN orby_filter_rules r ON r.id=s.rule_id SET s.status='normal',
+ s.streak=0 WHERE r.enabled=0 AND s.status<>'normal'""")
     cur.execute("DELETE FROM orby_filter_incidents WHERE status='resolved' AND resolved_at<UTC_TIMESTAMP()-INTERVAL 90 DAY")
     db.commit()
 
