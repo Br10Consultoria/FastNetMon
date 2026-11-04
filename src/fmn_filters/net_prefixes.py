@@ -27,7 +27,8 @@ def rows(cfg, profile):
 def sync(db, cfg, profile):
     data = rows(cfg, profile)
     cur = db.cursor()
-    cur.execute("DELETE FROM orby_net_prefixes")
+    # so os tipos vindos da configuracao: kind='group' (grupos de ASN/CDN) e mantido por asn_groups
+    cur.execute("DELETE FROM orby_net_prefixes WHERE kind IN ('protected','pool','private','infra')")
     if data:
         cur.executemany("INSERT INTO orby_net_prefixes (kind,cidr,name,v_start,v_end) VALUES (%s,%s,%s,%s,%s)", data)
     db.commit()

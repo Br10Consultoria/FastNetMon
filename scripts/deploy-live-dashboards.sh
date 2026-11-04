@@ -5,7 +5,7 @@ set -euo pipefail
 [[ $EUID -eq 0 ]] || { echo "Execute como root/sudo" >&2; exit 1; }
 BASE="$(cd "$(dirname "$0")/.." && pwd)"
 D=/var/lib/grafana/dashboards/orbymon
-DASHBOARDS="orbyflow-huawei-live.json orbyflow-overview.json orbyflow-ip-analytics.json orbyflow-cgnat.json orbyflow-f4-ataques.json orbyflow-reputacao.json orbyflow-cgnat-portas.json orbyflow-cgnat-assinantes.json orbyflow-ataques-originados.json orbyflow-alarmes.json"
+DASHBOARDS="orbyflow-huawei-live.json orbyflow-overview.json orbyflow-ip-analytics.json orbyflow-cgnat.json orbyflow-f4-ataques.json orbyflow-reputacao.json orbyflow-cgnat-portas.json orbyflow-cgnat-assinantes.json orbyflow-ataques-originados.json orbyflow-alarmes.json orbyflow-c2-botnets.json orbyflow-grupos-asn.json"
 [[ -d "$D" ]] || { echo "Diretorio Grafana ausente: $D" >&2; exit 1; }
 id grafana >/dev/null || { echo "Usuario grafana ausente" >&2; exit 1; }
 if command -v mariadb >/dev/null; then
@@ -21,6 +21,37 @@ if command -v mariadb >/dev/null; then
     id orbymon-admin >/dev/null 2>&1 && mariadb -e "GRANT SELECT, INSERT, DELETE ON orbymon.orby_net_prefixes TO 'orbymon_admin'@'127.0.0.1'" 2>/dev/null || true
     sudo -u orbymon env $(grep -v '^#' /etc/orbymon/pipeline.env | xargs) PYTHONPATH="$BASE/src" \
       "$BASE/.venv/bin/python" -m fmn_filters.net_prefixes --config /etc/orbymon/bidir.json
+    # grupos de ASN/CDN (dashboard Trafego por grupo): editaveis no painel, pagina Grupos de ASN
+    mariadb orbymon < "$BASE/sql/asn_groups.sql"
+    for host in $(mariadb -NBe "SELECT Host FROM mysql.user WHERE User='$DB_USER'"); do
+      mariadb -e "GRANT SELECT, INSERT, DELETE ON orbymon.orby_asn_group_members TO '$DB_USER'@'$host'"
+      mariadb -e "GRANT SELECT ON orbymon.orby_asn_groups TO '$DB_USER'@'$host'"
+    done
+    if id orbymon-admin >/dev/null 2>&1; then
+      mariadb -e "GRANT SELECT, INSERT, UPDATE, DELETE ON orbymon.orby_asn_groups TO 'orbymon_admin'@'127.0.0.1'" 2>/dev/null || true
+      mariadb -e "GRANT SELECT, INSERT, DELETE ON orbymon.orby_asn_group_members TO 'orbymon_admin'@'127.0.0.1'" 2>/dev/null || true
+    fi
+    sudo -u orbymon env $(grep -v '^#' /etc/orbymon/pipeline.env | xargs) PYTHONPATH="$BASE/src" \
+      "$BASE/.venv/bin/python" -m fmn_filters.asn_groups
+    # ClickHouse ja instalado: cria a copia da tabela de grupos e libera o TRUNCATE dela para o pipeline
+    UX=/etc/clickhouse-server/users.d/orbyflow.xml
+    if [[ -s /etc/orbymon/clickhouse-admin.env && -f "$UX" ]]; then
+      if ! grep -q orby_asn_group_members "$UX"; then
+        sed -i 's#^\(\s*\)<query>GRANT TRUNCATE ON orbyflow.orby_net_prefixes</query>#&\n\1<query>GRANT TRUNCATE ON orbyflow.orby_asn_group_members</query>#' "$UX"
+      fi
+      PYTHONPATH="$BASE/src" "$BASE/.venv/bin/python" - <<'PY' || echo "[AVISO] ClickHouse: tabela de grupos nao criada (rode scripts/setup-clickhouse.sh)"
+from pathlib import Path
+from fmn_filters import clickhouse as ch
+from fmn_filters.admin.config_store import read_env
+c = ch.Client.from_env(read_env(Path("/etc/orbymon/clickhouse-admin.env")))
+for sql in ch.schema(30, c.database):
+    if "CREATE TABLE IF NOT EXISTS" in sql and "orby_asn_group_members" in sql:
+        c.execute(sql)
+print("[OK] ClickHouse: tabela de grupos de ASN")
+PY
+    fi
+    # tabelas do dashboard C2 e botnets (vazias ate rodar scripts/setup-threat-intel.sh)
+    mariadb orbymon < "$BASE/sql/threat_intel.sql"
   fi
 fi
 # com o ClickHouse configurado (setup-clickhouse.sh), os dashboards de trafego leem dele

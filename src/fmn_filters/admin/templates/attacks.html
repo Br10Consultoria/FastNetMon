@@ -21,7 +21,9 @@ origem, destino, portas, IP privado do assinante e os IPs remotos.</p>
     <label>Severidade mínima <select name="sev"><option value="">todas</option>{% for s, n in (('warning','aviso'),('high','alta'),('critical','crítica')) %}<option value="{{ s }}" {{ 'selected' if form.sev==s }}>{{ n }}</option>{% endfor %}</select></label>
     <label>Tipo de detecção <select name="tipo"><option value="">todos</option>
       <option value="flow" {{ 'selected' if form.tipo=='flow' }}>tráfego (NetStream)</option>
-      <option value="nat" {{ 'selected' if form.tipo=='nat' }}>portas NAT (log do A10)</option></select></label>
+      <option value="nat" {{ 'selected' if form.tipo=='nat' }}>portas NAT (log do A10)</option>
+      <option value="filter" {{ 'selected' if form.tipo=='filter' }}>alarmes por filtro</option>
+      <option value="c2" {{ 'selected' if form.tipo=='c2' }}>C2/botnet (listas de ameaças)</option></select></label>
     <label>Fuso <select name="tz">{% for z in tz_choices %}<option {{ 'selected' if form.tz==z }}>{{ z }}</option>{% endfor %}</select></label>
   </div>
   <button>Filtrar</button> <a href="{{ url_for('attacks_page') }}">limpar</a>

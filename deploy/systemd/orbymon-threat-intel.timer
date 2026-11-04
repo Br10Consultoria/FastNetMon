@@ -1,0 +1,11 @@
+[Unit]
+Description=OrbyFlow - C2 e botnets a cada 10 minutos
+
+[Timer]
+OnBootSec=5min
+OnCalendar=*-*-* *:04/10:00
+Persistent=true
+Unit=orbymon-threat-intel.service
+
+[Install]
+WantedBy=timers.target

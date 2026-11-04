@@ -196,6 +196,7 @@ cat > "$TMPX" <<XML
         <query>GRANT TRUNCATE ON orbyflow.orby_interface_names</query>
         <query>GRANT TRUNCATE ON orbyflow.orby_country_names</query>
         <query>GRANT TRUNCATE ON orbyflow.orby_net_prefixes</query>
+        <query>GRANT TRUNCATE ON orbyflow.orby_asn_group_members</query>
       </grants>
     </orbyflow_writer>
     <orbyflow_grafana>

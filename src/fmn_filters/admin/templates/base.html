@@ -13,9 +13,9 @@
   <nav>
     {% set here = request.endpoint %}
     {% set groups = [
-      ('Monitoramento', [('index','Status',('index',)),('attacks_page','Ataques',('attacks_page','attack_detail')),('network','Rede',('network',)),('borders','Bordas',('borders',)),('health_page','Saúde',('health_page',))]),
+      ('Monitoramento', [('index','Status',('index',)),('attacks_page','Ataques',('attacks_page','attack_detail')),('network','Rede',('network',)),('asn_groups','Grupos de ASN',('asn_groups',)),('borders','Bordas',('borders',)),('health_page','Saúde',('health_page',))]),
       ('Detecção', [('rules','Regras',('rules',)),('alarms','Alarmes',('alarms','alarm_edit')),('exceptions_page','Exceções',('exceptions_page',)),('baseline_page','Base',('baseline_page',)),('mitigation_page','Mitigação',('mitigation_page',))]),
-      ('Investigação', [('investigate','Investigar',('investigate',)),('analysis','Análise',('analysis',)),('reputation','Reputação',('reputation',)),('customers_page','Clientes',('customers_page',)),('report_page','Relatório',('report_page',))]),
+      ('Investigação', [('investigate','Investigar',('investigate',)),('analysis','Análise',('analysis',)),('reputation','Reputação',('reputation',)),('threats','C2 e botnets',('threats',)),('customers_page','Clientes',('customers_page',)),('report_page','Relatório',('report_page',))]),
       ('Notificações', [('telegram','Telegram',('telegram',)),('channels_page','E-mail/Webhook',('channels_page',))]),
       ('Sistema', [('tools_page','Ferramentas',('tools_page',)),('backup_page','Backup',('backup_page',)),('retention','Retenção',('retention',)),('users','Usuários',('users',)),('audit_page','Auditoria',('audit_page',))]),
     ] %}

@@ -108,6 +108,38 @@ class FakeStore:
     def reputation_sources(self):
         return [("blocklist_de_ssh", None, datetime(2026, 11, 1), 4911, 1, "ok", "")]
 
+    def threat_hits(self, category="", ip="", days=7, limit=500):
+        self.threat_args = (category, ip, days)
+        return [{"cpe_ip": "100.64.70.39", "remote_ip": "45.9.9.9", "protocol": "udp", "remote_port": 0,
+                 "public_ip": "45.238.170.70", "scope": "cgnat_pool", "pool": "NAT-POOL-08", "category": "bot",
+                 "sources": "ThreatFox (abuse.ch)", "listed_port": 3524, "malware": "Mirai",
+                 "first_seen": datetime(2026, 11, 4, 8), "last_seen": datetime(2026, 11, 4, 9), "flows": 6,
+                 "packets": 8192.0, "bytes": 597.0}]
+
+    groups = None
+
+    def asn_groups(self):
+        return self.groups if self.groups is not None else [
+            {"id": 1, "name": "Google / YouTube", "members": "15169 36040", "sort": 10, "builtin": 1,
+             "updated_by": "", "updated_at": None}]
+
+    def save_asn_group(self, gid, name, members, sort, user):
+        self.saved_group = (gid, name, members, sort, user)
+        return 1
+
+    def delete_asn_group(self, gid):
+        self.deleted_group = gid
+        return 1
+
+    def sync_asn_groups(self):
+        return 2, 1, []
+
+    def threat_summary(self, days=7):
+        return [("bot", 1, 1, 1)]
+
+    def threat_sources(self):
+        return [("feodo", "Feodo Tracker (abuse.ch)", "bot", None, datetime(2026, 11, 4), 5, "ok", "")]
+
     saved = None
 
     def saved_filters(self):
@@ -307,7 +339,7 @@ def make_tree(tmp: Path):
     return {"ORBYMON_ADMIN_TESTING": "1", "ORBYMON_CONFIG": str(etc / "bidir.json"),
             "ORBYMON_TELEGRAM_ENV": str(etc / "telegram.env"), "ORBYMON_RETENTION_ENV": str(etc / "retention.env"),
             "ORBYMON_CALIBRATION_DIR": str(calib), "ORBYMON_ADMIN_BACKUP_DIR": str(tmp / "backups"),
-            "ORBYMON_REPUTATION_ENV": str(etc / "reputation.env"), "ORBYMON_RADIUS_ENV": str(etc / "radius.env"), "ORBYMON_BACKUP_DIR": str(tmp / "backups"), "ORBYMON_NOTIFY_ENV": str(etc / "notify.env"), "ORBYMON_MITIGATION_CONFIG": str(etc / "mitigation.json"), "ORBYMON_NAT_DIR": str(tmp / "nat"),
+            "ORBYMON_REPUTATION_ENV": str(etc / "reputation.env"), "ORBYMON_THREAT_ENV": str(etc / "threat.env"), "ORBYMON_RADIUS_ENV": str(etc / "radius.env"), "ORBYMON_BACKUP_DIR": str(tmp / "backups"), "ORBYMON_NOTIFY_ENV": str(etc / "notify.env"), "ORBYMON_MITIGATION_CONFIG": str(etc / "mitigation.json"), "ORBYMON_NAT_DIR": str(tmp / "nat"),
             "ORBYMON_FLOW_ROOT": str(tmp / "flows"), "ORBYMON_QUERY_LOCK": str(tmp / "query.lock")}
 
 
@@ -661,6 +693,47 @@ class PanelTests(unittest.TestCase):
         self.assertEqual(read_env(Path(self.env["ORBYMON_REPUTATION_ENV"]))["ABUSEIPDB_API_KEY"], key)
         self.post("/reputacao", src=["ipsum"], heavy_every_h="6", abuseipdb_key="x'; rm -rf /")
         self.assertEqual(read_env(Path(self.env["ORBYMON_REPUTATION_ENV"]))["ABUSEIPDB_API_KEY"], key)
+
+    def test_threats_page_filters_and_secret_key(self):
+        self.login()
+        page = self.c.get("/ameacas?cat=bot&dias=30&ip=100.64.70.39")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn(b"Mirai", page.data)
+        self.assertIn(b"NAT-POOL-08", page.data)
+        self.assertEqual(self.db.threat_args, ("bot", "100.64.70.39", 30))
+        self.c.get("/ameacas?cat=x&dias=999&ip=1.2.3.4'--")
+        self.assertEqual(self.db.threat_args, ("", "", 7))
+        key = "Ab1" * 16
+        self.post("/ameacas", src=["feodo", "threatfox"], refresh_h="12", threatfox_key=key, events_rep="1")
+        values = read_env(Path(self.env["ORBYMON_THREAT_ENV"]))
+        self.assertEqual(values["THREATFOX_AUTH_KEY"], key)
+        self.assertEqual(values["ORBYMON_THREAT_REFRESH_H"], "12")
+        self.assertEqual(values["ORBYMON_THREAT_EVENTS_REPUTATION"], "1")
+        self.assertIn("ipsum", values["ORBYMON_THREAT_DISABLED"])
+        self.assertNotIn("feodo", values["ORBYMON_THREAT_DISABLED"])
+        self.assertNotIn(key, json.dumps(self.db.audits))
+        self.assertNotIn(key.encode(), self.c.get("/ameacas").data)
+        self.post("/ameacas", src=["feodo"], refresh_h="6", threatfox_key="")             # mantem a chave
+        self.assertEqual(read_env(Path(self.env["ORBYMON_THREAT_ENV"]))["THREATFOX_AUTH_KEY"], key)
+        self.post("/ameacas", src=["feodo"], refresh_h="6", threatfox_key="x'; rm -rf /")
+        self.assertEqual(read_env(Path(self.env["ORBYMON_THREAT_ENV"]))["THREATFOX_AUTH_KEY"], key)
+        self.post("/ameacas", src=["feodo"], refresh_h="6", clear_key="1")
+        self.assertEqual(read_env(Path(self.env["ORBYMON_THREAT_ENV"]))["THREATFOX_AUTH_KEY"], "")
+
+    def test_asn_groups_page(self):
+        self.login()
+        page = self.c.get("/grupos-asn")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("Google / YouTube".encode(), page.data)
+        self.post("/grupos-asn", gid="1", name="  Google   YouTube ", members="AS15169, 36040\n177.10.0.0/22", sort="10")
+        self.assertEqual(self.db.saved_group, (1, "Google YouTube", "15169 36040 177.10.0.0/22", 10, "admin"))
+        self.db.saved_group = None
+        self.post("/grupos-asn", gid="0", name="Outros", members="15169", sort="5")
+        self.post("/grupos-asn", gid="0", name="X1", members="google.com", sort="5")
+        self.post("/grupos-asn", gid="0", name="X2", members="", sort="5")
+        self.assertIsNone(self.db.saved_group)
+        self.post("/grupos-asn", gid="1", action="excluir")
+        self.assertEqual(self.db.deleted_group, 1)
 
     def test_investigate_with_port_and_email(self):
         from datetime import timezone as tzm

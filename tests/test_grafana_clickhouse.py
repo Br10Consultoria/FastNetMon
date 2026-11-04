@@ -86,7 +86,9 @@ class RunTests(unittest.TestCase):
                                       ("protected", "45.238.170.0/23", "", 770615808, 770616319),
                                       ("pool", "45.238.170.64/26", "NAT-POOL-08", 770615872, 770615935),
                                       ("pool", "45.238.171.64/26", "NAT-POOL-09", 770616128, 770616191),
-                                      ("private", "100.64.64.0/19", "", 1681932288, 1681940479)]}
+                                      ("private", "100.64.64.0/19", "", 1681932288, 1681940479),
+                                      ("group", "203.0.113.0/24", "Cache CDN", 3405803776, 3405804031)],
+                "orby_asn_group_members": [(15169, "Google / YouTube"), (4134, "China Telecom")]}
         for t, r in dims.items():
             cls.s.query("INSERT INTO %s (%s) FORMAT TabSeparated\n%s"
                         % (t, ",".join(ch.DIMENSIONS[t][1]), ch.encode_rows(r).decode()))
@@ -116,6 +118,22 @@ class RunTests(unittest.TestCase):
                         self.assertEqual(res["meta"][0]["name"], "time", p["title"])
         self.assertEqual(total, 50)
         self.assertLessEqual(len(empty), 2, empty)
+
+    def test_asn_groups_dashboard_runs(self):
+        dash = json.loads((ROOT / "grafana" / "dashboards-clickhouse" / "orbyflow-grupos-asn.json").read_text())
+        out = {}
+        for p in dash["panels"]:
+            sql = expand(p["targets"][0]["rawSql"].replace("${lado}", "src").replace("$__interval_s", "300"))
+            out[p["title"]] = json.loads(str(self.s.query(sql + " SETTINGS join_use_nulls=1 FORMAT JSON")))["data"]
+        groups = {r["Grupo"]: r for r in out["Grupos no período"]}
+        self.assertIn("Google / YouTube", groups)                  # por ASN
+        self.assertIn("Cache CDN", groups)                         # bloco ganha do ASN (203.0.113.9 e AS4134)
+        self.assertNotIn("China Telecom", groups)
+        self.assertNotIn("Google / YouTube", {r["metric"] for r in out["Banda por grupo"]} - set(groups))
+        self.assertTrue(all(r["metric"] != "Outros" for r in out["Banda por grupo"]))
+        others = {int(r["ASN"]) for r in out["Maiores ASNs fora dos grupos ('Outros')"]}
+        self.assertNotIn(262687, others)                            # o nosso lado nunca e "remoto"
+        self.assertNotIn(15169, others)
 
     def test_pool_and_interface_names_resolved(self):
         dash = json.loads((ROOT / "grafana" / "dashboards-clickhouse" / "orbyflow-cgnat.json").read_text())

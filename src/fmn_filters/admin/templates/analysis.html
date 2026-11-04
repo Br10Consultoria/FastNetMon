@@ -59,8 +59,8 @@
         {% else %}<td class="nowrap">{{ v }}{% if r._tags.get(c) %} <span class="tag">{{ r._tags[c] }}</span>{% endif %}</td>{% endif %}
       {% endfor %}
       <td class="nowrap">{% set ipcol = r.get('Origem') or r.get(result.columns[0]) %}
-        {% if result.mode == 'flows' and 'pool' in (r._tags.get('Origem') or '') %}<a href="{{ url_for('investigate', ip=r['Origem'], port=r['Porta orig.'], time=r['Início'], tz='UTC', window=2) }}">quem é?</a>
-        {% elif result.mode == 'flows' and 'pool' in (r._tags.get('Destino') or '') %}<a href="{{ url_for('investigate', ip=r['Destino'], port=r['Porta dest.'], time=r['Início'], tz='UTC', window=2) }}">quem é?</a>
+        {% if result.mode in ('flows','record') and 'pool' in (r._tags.get('Origem') or '') %}<a href="{{ url_for('investigate', ip=r['Origem'], port=r['Porta orig.'], time=r['Início'], tz='UTC', window=2) }}">quem é?</a>
+        {% elif result.mode in ('flows','record') and 'pool' in (r._tags.get('Destino') or '') %}<a href="{{ url_for('investigate', ip=r['Destino'], port=r['Porta dest.'], time=r['Início'], tz='UTC', window=2) }}">quem é?</a>
         {% elif r._tags.get(result.columns[0]) and result.columns[0].startswith('IP') %}<a href="{{ url_for('investigate', ip=r[result.columns[0]]) }}">histórico</a>{% endif %}</td>
     </tr>{% endfor %}
   </table></div>

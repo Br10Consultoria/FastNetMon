@@ -51,7 +51,8 @@ tar -C / -cf "$WORK/b/etc.tar" etc/orbymon
 
 echo "=== Banco (configuracao) ==="
 CONFIG_TABLES="orby_admin_users orby_interface_names orby_saved_filters orby_filter_rules orby_exceptions
-orby_exception_prefixes orby_baseline orby_customers orby_customer_prefixes orby_net_prefixes"
+orby_exception_prefixes orby_baseline orby_customers orby_customer_prefixes orby_net_prefixes
+orby_asn_groups orby_asn_group_members"
 HISTORY_TABLES="orby_attack_events orby_filter_incidents orby_notify_incidents orby_reputation_listings
 orby_reputation_sources orby_admin_audit"
 existing() {     # so as tabelas que existem (etapas ainda nao instaladas sao puladas)

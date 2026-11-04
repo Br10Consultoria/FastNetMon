@@ -1,0 +1,41 @@
+{% extends "base.html" %}{% block title %}Grupos de ASN{% endblock %}
+{% block body %}
+<h1>Grupos de ASN/CDN</h1>
+<p class="muted">Junta ASNs e blocos IP sob um nome para o dashboard <b>Tráfego por grupo de ASN/CDN</b> no Grafana
+(Google, Meta, Netflix, caches...). Membros separados por espaço, vírgula ou linha: ASN (<code>15169</code> ou
+<code>AS15169</code>) ou bloco IPv4 (<code>177.10.0.0/22</code>). Bloco ganha de ASN: um cache do Google dentro da
+rede do trânsito entra pelo bloco. Um ASN em dois grupos fica no de menor ordem. O que não está em nenhum grupo aparece
+como "Outros" (o dashboard lista os maiores ASNs de fora, para virar grupo).</p>
+
+{% if asn_list is none %}
+<section class="card"><p class="bad">Tabela de grupos ainda não criada: rode <code>sudo bash scripts/deploy-live-dashboards.sh</code>.</p></section>
+{% else %}
+{% for gr in asn_list %}
+<form method="post" class="card" autocomplete="off">
+  {% include "_csrf.html" %}
+  <input type="hidden" name="gid" value="{{ gr.id }}">
+  <div class="inline">
+    <label>Nome <input name="name" value="{{ gr.name }}" maxlength="64" required></label>
+    <label>Ordem <input name="sort" type="number" min="0" max="9999" value="{{ gr.sort }}" style="width:90px"></label>
+    {% if gr.builtin %}<span class="pill idle">modelo</span>{% endif %}
+  </div>
+  <label>Membros <textarea name="members" rows="2">{{ gr.members }}</textarea></label>
+  <small class="muted">{% if gr.updated_by %}alterado por {{ gr.updated_by }} em {{ gr.updated_at }}{% endif %}</small>
+  <div class="inline">
+    <button name="action" value="salvar">Salvar</button>
+    <button name="action" value="excluir" class="secondary">Excluir</button>
+  </div>
+</form>
+{% endfor %}
+<form method="post" class="card" autocomplete="off">
+  {% include "_csrf.html" %}
+  <h2>Novo grupo</h2>
+  <div class="inline">
+    <label>Nome <input name="name" maxlength="64" placeholder="Cache Google (transito)" required></label>
+    <label>Ordem <input name="sort" type="number" min="0" max="9999" value="5" style="width:90px"></label>
+  </div>
+  <label>Membros <textarea name="members" rows="2" placeholder="177.10.0.0/22 177.10.4.0/24 ou AS28146"></textarea></label>
+  <button name="action" value="salvar">Criar</button>
+</form>
+{% endif %}
+{% endblock %}

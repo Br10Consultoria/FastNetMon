@@ -235,6 +235,39 @@ FROM orby_attack_events ORDER BY event_time DESC LIMIT %s""", (limit,))
         except Exception:
             return []
 
+    # ---------- C2 e botnets
+    THREAT_COLS = ("cpe_ip", "remote_ip", "protocol", "remote_port", "public_ip", "scope", "pool", "category",
+                   "sources", "listed_port", "malware", "first_seen", "last_seen", "flows", "packets", "bytes")
+
+    def threat_hits(self, category="", ip="", days=7, limit=500):
+        where, params = ["last_seen>=UTC_TIMESTAMP()-INTERVAL %s DAY"], [int(days)]
+        if category in ("bot", "reputacao"):
+            where.append("category=%s")
+            params.append(category)
+        if ip:
+            where.append("(cpe_ip=%s OR remote_ip=%s OR public_ip=%s)")
+            params += [ip, ip, ip]
+        try:
+            rows = self._q("SELECT " + ",".join(self.THREAT_COLS) + " FROM orby_threat_hits WHERE " + " AND ".join(where) +
+                           " ORDER BY category='bot' DESC,last_seen DESC,bytes DESC LIMIT %s", tuple(params) + (int(limit),))
+        except Exception:
+            return []
+        return [dict(zip(self.THREAT_COLS, r)) for r in rows]
+
+    def threat_summary(self, days=7):
+        try:
+            return self._q("SELECT category,COUNT(DISTINCT cpe_ip),COUNT(*),COUNT(DISTINCT remote_ip) FROM orby_threat_hits "
+                           "WHERE last_seen>=UTC_TIMESTAMP()-INTERVAL %s DAY GROUP BY category", (int(days),))
+        except Exception:
+            return []
+
+    def threat_sources(self):
+        try:
+            return self._q("SELECT name,label,category,last_run,last_ok,entries,status,error FROM orby_threat_sources "
+                           "ORDER BY category,label")
+        except Exception:
+            return []
+
     def with_connection(self, fn):
         """Executa fn(conexao) e fecha (para as consultas da investigacao)."""
         db = self.conn_factory()
@@ -260,6 +293,32 @@ description=IF(builtin=0,VALUES(description),description)""", (name, expr, descr
 
     def delete_filter(self, fid):
         return self._q("DELETE FROM orby_saved_filters WHERE id=%s AND builtin=0", (fid,), fetch=False)
+
+    # ---------- grupos de ASN/CDN (dashboard de trafego por grupo)
+    def asn_groups(self):
+        try:
+            rows = self._q("SELECT id,name,members,sort,builtin,updated_by,updated_at FROM orby_asn_groups ORDER BY sort,name")
+        except Exception:
+            return None
+        return [dict(zip(("id", "name", "members", "sort", "builtin", "updated_by", "updated_at"), r)) for r in rows]
+
+    def save_asn_group(self, gid, name, members, sort, user):
+        if gid:
+            return self._q("UPDATE orby_asn_groups SET name=%s,members=%s,sort=%s,updated_by=%s WHERE id=%s",
+                           (name, members, sort, user, gid), fetch=False)
+        return self._q("INSERT INTO orby_asn_groups (name,members,sort,builtin,updated_by) VALUES (%s,%s,%s,0,%s)",
+                       (name, members, sort, user), fetch=False)
+
+    def delete_asn_group(self, gid):
+        return self._q("DELETE FROM orby_asn_groups WHERE id=%s", (gid,), fetch=False)
+
+    def sync_asn_groups(self):
+        from ..asn_groups import sync
+        db = self.conn_factory()
+        try:
+            return sync(db)
+        finally:
+            db.close()
 
     # ---------- blocos do provedor para os dashboards
     def sync_prefixes(self, cfg, profile):

@@ -33,6 +33,7 @@ RUNTIME = {
     "orbymon-traffic-huawei.service": (60, 45, 90),
     "orbymon-ddos-huawei.service": (60, 45, 90),
     "orbymon-telegram.service": (30, 30, 90),
+    "orbymon-threat-intel.service": (600, 300, 600),
     "orbymon-backup.service": (86400, 900, 1800),
 }
 
@@ -292,6 +293,22 @@ def check_db(cur, cfg, now, telegram_on=False, a10_on=True):
         detail = "; ".join(x for x in (("com erro: " + ", ".join(bad[:5])) if bad else "",
                                        ("sem avaliar há 10+ min: " + ", ".join(late[:5])) if late else "") if x)
         out.append(item("filter_rules", "Alarmes por filtro", st, "%d ligado(s)" % len(rules), detail))
+    try:
+        cur.execute("SELECT label,status,last_ok,error FROM orby_threat_sources")
+        lists = cur.fetchall()
+    except Exception:
+        lists = None
+    if lists:
+        # ThreatFox sem Auth-Key e opcional: nao conta como falha
+        bad = [r[0] for r in lists if r[1] != "ok" and "Auth-Key" not in (r[3] or "")]
+        stale = [r[0] for r in lists if r[1] == "ok" and (_age(now, r[2]) or 0) > 2 * 86400]
+        ok_n = sum(1 for r in lists if r[1] == "ok")
+        st = WARN if bad or stale or not ok_n else OK
+        detail = "; ".join(x for x in (("sem baixar: " + ", ".join(bad[:5])) if bad else "",
+                                       ("desatualizada(s) há 2+ dias: " + ", ".join(stale[:5])) if stale else "") if x)
+        out.append(item("threat_lists", "Listas de C2/botnet", st, "%d de %d atualizada(s)" % (ok_n, len(lists)),
+                        detail + ("; servidor sem acesso à internet? veja journalctl -u orbymon-threat-intel" if
+                                  st != OK else "")))
     if telegram_on:
         stuck = _one(cur, "SELECT COUNT(*) FROM orby_attack_events WHERE notified_at IS NULL AND "
                           "event_time < %s - INTERVAL 10 MINUTE AND event_time >= %s - INTERVAL 1 DAY", (now, now))

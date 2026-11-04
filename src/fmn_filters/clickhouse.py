@@ -45,6 +45,8 @@ DIMENSIONS = {
                           ("kind", "cidr", "name", "v_start", "v_end"),
                           "kind LowCardinality(String), cidr String, name String, v_start UInt64, v_end UInt64",
                           "(kind, v_start)"),
+    "orby_asn_group_members": ("SELECT asn,name FROM orby_asn_group_members", ("asn", "name"),
+                               "asn UInt64, name String", "asn"),
 }
 SPOOL_DIR = "/var/lib/orbymon/clickhouse-spool"
 SPOOL_MAX_BYTES = 2 * 1024 ** 3

@@ -83,6 +83,39 @@ class RunTests(unittest.TestCase):
         r = self.q("any", mode="inif")
         self.assertIn("334", [x["Interface de entrada"] for x in r.rows])
 
+    def test_flows_are_the_largest_not_the_first(self):
+        r = self.q("any", mode="flows", limit=3)
+        self.assertEqual([x["Bytes"] for x in r.rows], [700000.0] * 3)         # -c pegava os 3 primeiros (o 3o com 180 B)
+        self.assertIn("ToS", r.columns)
+        self.assertEqual(r.rows[0]["bytes/pacote"], 1400)
+
+    def test_pairs_and_geo_and_nat_tags(self):
+        r = self.q("any", mode="pair", limit=4)
+        self.assertEqual(r.columns[:2], ["Origem", "Destino"])
+        self.assertEqual(r.rows[0]["Bytes"], 1400000.0)
+
+        class Geo:
+            def lookup(self, ip):
+                return {"asn": 64500, "asn_name": "EXEMPLO", "country": "US"} if ip.startswith("203.") else {}
+
+        asked = []
+
+        def nat(keys):
+            asked.extend(keys)
+            return [["100.64.65.10", 40001] for _ in keys]
+
+        fq.annotate(r, build_scopes(CFG, PROFILE), geo=Geo(), nat=nat)
+        self.assertEqual(r.rows[0]["_tags"]["Origem"], "AS64500 EXEMPLO · US")
+        self.assertEqual(r.rows[0]["_tags"]["Destino"], "pool NAT-POOL-08")       # pares: sem porta, sem NAT
+        self.assertEqual(asked, [])
+        f = self.q("dst net 45.238.170.64/26", mode="flows", limit=2)
+        fq.annotate(f, build_scopes(CFG, PROFILE), geo=Geo(), nat=nat)
+        self.assertIn("→ assinante 100.64.65.10", f.rows[0]["_tags"]["Destino"])
+        self.assertEqual(asked[0][:3], [f.rows[0]["Destino"], int(f.rows[0]["Porta dest."]), "udp"])
+        g = self.q("dst net 45.238.170.64/26", mode="flows", limit=2)
+        fq.annotate(g, build_scopes(CFG, PROFILE), nat=lambda keys: 1 / 0)
+        self.assertTrue(g.notes)
+
     def test_errors(self):
         with self.assertRaises(fq.QueryError) as ctx:
             self.q("dst ip 1.2.3")

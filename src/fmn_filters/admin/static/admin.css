@@ -91,3 +91,5 @@ border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,
 .dd:hover>.menu,.dd:focus-within>.menu{display:block}
 .menu a{display:block;white-space:nowrap}
 @media print{.top,.actions,form.card{display:none}main{max-width:none}}
+.pill.warn{color:var(--warn)}
+.stats div.bad b{color:var(--bad)}.stats div.warn b{color:var(--warn)}

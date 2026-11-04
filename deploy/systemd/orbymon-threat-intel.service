@@ -1,0 +1,25 @@
+[Unit]
+Description=OrbyFlow - clientes falando com C2/botnet e IPs de ma reputacao (listas de ameacas)
+After=network-online.target mariadb.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=orbymon
+Group=orbymon
+WorkingDirectory=/opt/orbymon
+EnvironmentFile=/etc/orbymon/pipeline.env
+# fluxos no ClickHouse quando instalado (senao MariaDB)
+EnvironmentFile=-/etc/orbymon/clickhouse.env
+Environment=PYTHONPATH=/opt/orbymon/src
+# threat.env e editado pelo painel: lido como dado, nunca como ambiente
+ExecStart=/opt/orbymon/.venv/bin/python -m fmn_filters.threat_intel --config /etc/orbymon/bidir.json \
+  --env-file /etc/orbymon/threat.env --state-dir /var/lib/orbymon/threat
+Nice=10
+TimeoutStartSec=900
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/orbymon/threat
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX

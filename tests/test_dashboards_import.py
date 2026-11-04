@@ -21,7 +21,9 @@ class DashboardImportTests(unittest.TestCase):
                                       "orbyflow-cgnat-portas.json",       # gerado por grafana/build_cgnat_ports.py
                                       "orbyflow-cgnat-assinantes.json",  # gerado por grafana/build_cgnat_subscribers.py
                                       "orbyflow-ataques-originados.json",  # separado da reputacao pelo import_v2
-                                      "orbyflow-alarmes.json"})  # gerado por grafana/build_alarms.py
+                                      "orbyflow-alarmes.json",   # gerado por grafana/build_alarms.py
+                                      "orbyflow-c2-botnets.json",  # gerado por grafana/build_c2.py
+                                      "orbyflow-grupos-asn.json"})  # gerado por grafana/build_asn_groups.py
 
     def test_no_provider_specific_blocks(self):
         for path in DASH.glob("*.json"):
@@ -42,7 +44,7 @@ class DashboardImportTests(unittest.TestCase):
             for p in d["panels"]:
                 for t in p.get("targets", []):
                     self.assertEqual(t["datasource"], {"type": "mysql", "uid": "orbyflow-mysql"})
-        self.assertEqual(len(uids), 10)
+        self.assertEqual(len(uids), 12)
 
     def test_cgnat_ports_dashboard_is_generated(self):
         sys.path.insert(0, str(ROOT / "grafana"))
@@ -52,6 +54,17 @@ class DashboardImportTests(unittest.TestCase):
         import build_alarms as a
         self.assertEqual(json.loads((DASH / "orbyflow-alarmes.json").read_text()), a.build(),
                          "rode python3 grafana/build_alarms.py")
+        import build_c2 as c2
+        self.assertEqual(json.loads((DASH / "orbyflow-c2-botnets.json").read_text()), c2.build(),
+                         "rode python3 grafana/build_c2.py")
+        import build_asn_groups as ag
+        self.assertEqual(json.loads((DASH / "orbyflow-grupos-asn.json").read_text()), ag.build(False),
+                         "rode python3 grafana/build_asn_groups.py")
+        self.assertEqual(json.loads((ROOT / "grafana" / "dashboards-clickhouse" / "orbyflow-grupos-asn.json")
+                                    .read_text()), ag.build(True), "rode python3 grafana/build_asn_groups.py")
+        deploy = (ROOT / "scripts" / "deploy-live-dashboards.sh").read_text()
+        for name in [p.name for p in DASH.glob("*.json")]:
+            self.assertIn(name, deploy)
         import build_cgnat_subscribers as s
         self.assertEqual(json.loads((DASH / "orbyflow-cgnat-assinantes.json").read_text()), s.build(),
                          "rode python3 grafana/build_cgnat_subscribers.py")

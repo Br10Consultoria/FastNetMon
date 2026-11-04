@@ -25,6 +25,7 @@ class Paths:
         self.calibration = Path(env.get("ORBYMON_CALIBRATION_DIR", "/var/lib/orbymon/calibration"))
         self.backups = Path(env.get("ORBYMON_ADMIN_BACKUP_DIR", "/var/lib/orbymon/admin/backups"))
         self.reputation = Path(env.get("ORBYMON_REPUTATION_ENV", "/etc/orbymon/reputation.env"))
+        self.threat = Path(env.get("ORBYMON_THREAT_ENV", "/etc/orbymon/threat.env"))
         self.radius = Path(env.get("ORBYMON_RADIUS_ENV", "/etc/orbymon/radius.env"))
         self.notify = Path(env.get("ORBYMON_NOTIFY_ENV", "/etc/orbymon/notify.env"))
         self.mitigation = Path(env.get("ORBYMON_MITIGATION_CONFIG", "/etc/orbymon/mitigation.json"))
@@ -84,6 +85,9 @@ class ConfigStore:
 
     def reputation(self) -> dict:
         return read_env(self.p.reputation)
+
+    def threat(self) -> dict:
+        return read_env(self.p.threat) if self.p.threat.exists() else {}
 
     # ---------- gravacao
     def _backup(self, path: Path):
@@ -180,6 +184,9 @@ class ConfigStore:
 
     def save_reputation(self, values: dict):
         self._write(self.p.reputation, render_env(values, "Reputacao dos IPs do provedor (contem chave de API: nao compartilhe)"))
+
+    def save_threat(self, values: dict):
+        self._write(self.p.threat, render_env(values, "C2 e botnets: listas de ameacas (contem chave de API: nao compartilhe)"))
 
     # ---------- calibracao
     def calibration_proposal(self):

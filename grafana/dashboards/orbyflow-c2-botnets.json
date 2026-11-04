@@ -1,0 +1,508 @@
+{
+  "id": null,
+  "uid": "orbyflow-c2-botnets",
+  "title": "C2 e botnets",
+  "description": "Clientes que enviaram tráfego para IPs de listas públicas de ameaças: C2/botnet e má reputação, com o assinante do CGNAT. O NetStream é amostrado: contato curto com C2 só aparece quando algum pacote cai na amostra.",
+  "tags": [
+    "orbyflow",
+    "seguranca",
+    "botnet",
+    "c2"
+  ],
+  "editable": true,
+  "schemaVersion": 41,
+  "version": 1,
+  "graphTooltip": 1,
+  "links": [],
+  "liveNow": false,
+  "timezone": "browser",
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "refresh": "5m",
+  "fiscalYearStartMonth": 0,
+  "timepicker": {
+    "refresh_intervals": [
+      "5m",
+      "15m",
+      "1h"
+    ]
+  },
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "templating": {
+    "list": [
+      {
+        "type": "textbox",
+        "name": "ip",
+        "label": "IP (cliente, público ou listado)",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        },
+        "hide": 0,
+        "skipUrlSync": false
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Clientes falando com C2/botnet",
+      "description": "Clientes (assinante do CGNAT ou IP dedicado) que enviaram tráfego para um IP de comando de botnet.",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbyflow-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbyflow-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(DISTINCT cpe_ip) AS value FROM orby_threat_hits WHERE category='bot' AND last_seen>=$__timeFrom() AND first_seen<=$__timeTo() AND (${ip:sqlstring}='' OR cpe_ip=${ip:sqlstring} OR remote_ip=${ip:sqlstring} OR public_ip=${ip:sqlstring})"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "green"
+              },
+              {
+                "value": 1,
+                "color": "red"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "IPs de C2 contactados",
+      "description": "",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbyflow-mysql"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbyflow-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(DISTINCT remote_ip) AS value FROM orby_threat_hits WHERE category='bot' AND last_seen>=$__timeFrom() AND first_seen<=$__timeTo() AND (${ip:sqlstring}='' OR cpe_ip=${ip:sqlstring} OR remote_ip=${ip:sqlstring} OR public_ip=${ip:sqlstring})"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "green"
+              },
+              {
+                "value": 1,
+                "color": "red"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Clientes falando com IP de má reputação",
+      "description": "",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbyflow-mysql"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbyflow-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(DISTINCT cpe_ip) AS value FROM orby_threat_hits WHERE category='reputacao' AND last_seen>=$__timeFrom() AND first_seen<=$__timeTo() AND (${ip:sqlstring}='' OR cpe_ip=${ip:sqlstring} OR remote_ip=${ip:sqlstring} OR public_ip=${ip:sqlstring})"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "green"
+              },
+              {
+                "value": 1,
+                "color": "orange"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Listas com falha",
+      "description": "Lista que não baixou na última tentativa (a cópia anterior continua valendo). ThreatFox sem Auth-Key aparece aqui.",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbyflow-mysql"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbyflow-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS value FROM orby_threat_sources WHERE status<>'ok'"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "green"
+              },
+              {
+                "value": 1,
+                "color": "orange"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "Clientes falando com C2/botnet",
+      "description": "Servidor de comando de malware: o equipamento do cliente (roteador, câmera, PC) provavelmente está infectado. Também vira alerta em Ataques e no Telegram (uma vez por dia por par).",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbyflow-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbyflow-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT cpe_ip AS 'Cliente',NULLIF(public_ip,cpe_ip) AS 'IP público',NULLIF(pool,'') AS 'Pool',remote_ip AS 'IP listado',CONCAT(UPPER(CONVERT(protocol USING utf8mb4)),'/',IF(remote_port>0,remote_port,IF(listed_port>0,listed_port,'—'))) AS 'Porta',sources AS 'Listas',NULLIF(malware,'') AS 'Malware',flows AS 'Fluxos',bytes AS 'Volume (estim.)',first_seen AS 'Primeiro contato (UTC)',last_seen AS 'Último contato (UTC)' FROM orby_threat_hits WHERE category='bot' AND last_seen>=$__timeFrom() AND first_seen<=$__timeTo() AND (${ip:sqlstring}='' OR cpe_ip=${ip:sqlstring} OR remote_ip=${ip:sqlstring} OR public_ip=${ip:sqlstring}) ORDER BY last_seen DESC LIMIT 500"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": []
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true,
+            "align": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Volume (estim.)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "decbytes"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "Clientes falando com IP de má reputação",
+      "description": "IP em listas de varredura, spam ou rede criminosa (IPsum, Spamhaus DROP...). Vale olhar, nem sempre é infecção.",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbyflow-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 15,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbyflow-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT cpe_ip AS 'Cliente',NULLIF(public_ip,cpe_ip) AS 'IP público',NULLIF(pool,'') AS 'Pool',remote_ip AS 'IP listado',CONCAT(UPPER(CONVERT(protocol USING utf8mb4)),'/',IF(remote_port>0,remote_port,IF(listed_port>0,listed_port,'—'))) AS 'Porta',sources AS 'Listas',NULLIF(malware,'') AS 'Malware',flows AS 'Fluxos',bytes AS 'Volume (estim.)',first_seen AS 'Primeiro contato (UTC)',last_seen AS 'Último contato (UTC)' FROM orby_threat_hits WHERE category='reputacao' AND last_seen>=$__timeFrom() AND first_seen<=$__timeTo() AND (${ip:sqlstring}='' OR cpe_ip=${ip:sqlstring} OR remote_ip=${ip:sqlstring} OR public_ip=${ip:sqlstring}) ORDER BY bytes DESC LIMIT 500"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": []
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true,
+            "align": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Volume (estim.)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "decbytes"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "title": "Malware mais visto",
+      "description": "",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbyflow-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 25,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbyflow-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COALESCE(NULLIF(malware,''),'(sem família informada)') AS 'Malware',COUNT(DISTINCT cpe_ip) AS 'Clientes',COUNT(DISTINCT remote_ip) AS 'IPs de C2',MAX(last_seen) AS 'Último contato (UTC)' FROM orby_threat_hits WHERE category='bot' AND last_seen>=$__timeFrom() AND first_seen<=$__timeTo() AND (${ip:sqlstring}='' OR cpe_ip=${ip:sqlstring} OR remote_ip=${ip:sqlstring} OR public_ip=${ip:sqlstring}) GROUP BY 1 ORDER BY 2 DESC LIMIT 30"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": []
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true,
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 8,
+      "type": "table",
+      "title": "Listas",
+      "description": "Configuração e Auth-Key do ThreatFox: painel web > Investigação > C2 e botnets.",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbyflow-mysql"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 25,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbyflow-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT label AS 'Lista',IF(category='bot','C2/botnet','reputação') AS 'Categoria',status AS 'Situação',last_ok AS 'Última atualização (UTC)',entries AS 'Entradas',NULLIF(error,'') AS 'Erro' FROM orby_threat_sources ORDER BY category,label"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": []
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true,
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      }
+    }
+  ]
+}

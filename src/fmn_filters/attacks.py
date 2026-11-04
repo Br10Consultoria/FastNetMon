@@ -44,7 +44,7 @@ def parse_filters(args, now, parse_time, tz, customers=()):
          ("inicio", "fim", "sentido", "ip", "cliente", "remoto", "porta", "proto", "regra", "sev", "tipo")}
     f["sentido"] = f["sentido"] if f["sentido"] in ("in", "out") else ""
     f["sev"] = f["sev"] if f["sev"] in SEV_RANK else ""
-    f["tipo"] = f["tipo"] if f["tipo"] in ("flow", "nat") else ""
+    f["tipo"] = f["tipo"] if f["tipo"] in ("flow", "nat", "c2", "filter") else ""
     end = parse_time(f["fim"], tz) if f["fim"] else now
     start = parse_time(f["inicio"], tz) if f["inicio"] else end - timedelta(days=1)
     if start is None or end is None:

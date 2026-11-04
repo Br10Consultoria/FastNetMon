@@ -43,6 +43,7 @@ MODES = {   # nome: (rotulo, argumento -s do nfdump ou None para fluxos brutos)
     "inif": ("Interface de entrada", "inif"),
     "outif": ("Interface de saída", "outif"),
     "record": ("Conversas (origem, destino, portas)", "record"),
+    "pair": ("Pares de IP (origem → destino)", "record"),
     "flows": ("Fluxos individuais (maiores)", None),
 }
 ORDERS = ("bytes", "packets", "flows", "bps", "pps", "bpp")
@@ -206,39 +207,39 @@ def run(expr, start, end, mode, order, limit, flow_dir, table, lock_path=None, b
     try:
         rng = ["-R", "%s/%s:%s" % (flow_dir, files[0], files[-1])]
         left = lambda: budget - (time.monotonic() - t0)
-        if mode == "flows":
-            out = _run(rng + ["-o", "csv", "-O", order if order in ("bytes", "packets", "flows") else "bytes",
-                              "-c", str(limit), expanded], left())
+        if mode in ("flows", "record", "pair"):
+            # top N por -s record (com -A no modo pares). Nao usar -c: no nfdump ele limita os fluxos LIDOS,
+            # nao os mostrados (o resultado seria "os primeiros N", nao "os maiores N").
+            agg = ["-A", "srcip,dstip"] if mode == "pair" else []
+            out = _run(rng + agg + ["-o", "csv", "-s", "record/%s" % order, "-n", str(limit), expanded], left())
             rows, res.summary = _csv_blocks(out)
-            res.columns = ["Início", "Origem", "Porta orig.", "Destino", "Porta dest.", "Proto", "Flags",
-                           "Pacotes", "Bytes", "Entrada", "Saída", "AS orig.", "AS dest."]
+            if mode == "pair":
+                res.columns = ["Origem", "Destino", "Pacotes", "Bytes", "bytes/pacote", "Início", "Fim"]
+            else:
+                res.columns = ["Início", "Duração (s)", "Origem", "Porta orig.", "Destino", "Porta dest.", "Proto",
+                               "Flags", "ToS", "Pacotes", "Bytes", "bytes/pacote", "Entrada", "Saída", "AS orig.",
+                               "AS dest."]
             for r in rows[:limit]:
-                res.rows.append({"Início": r.get("ts", ""), "Origem": r.get("sa", ""), "Porta orig.": r.get("sp", ""),
-                                 "Destino": r.get("da", ""), "Porta dest.": r.get("dp", ""), "Proto": r.get("pr", "").lower(),
-                                 "Flags": r.get("flg", "").replace(".", ""), "Pacotes": _num(r, "ipkt"),
-                                 "Bytes": _num(r, "ibyt"), "Entrada": r.get("in", ""), "Saída": r.get("out", ""),
-                                 "AS orig.": r.get("sas", ""), "AS dest.": r.get("das", "")})
+                pk, by = _num(r, "ipkt"), _num(r, "ibyt")
+                row = {"Início": r.get("ts", "").split(".")[0], "Fim": r.get("te", "").split(".")[0],
+                       "Duração (s)": _num(r, "td"), "Origem": r.get("sa", ""), "Porta orig.": r.get("sp", ""),
+                       "Destino": r.get("da", ""), "Porta dest.": r.get("dp", ""), "Proto": r.get("pr", "").lower(),
+                       "Flags": r.get("flg", "").replace(".", ""), "ToS": r.get("stos", ""), "Pacotes": pk,
+                       "Bytes": by, "bytes/pacote": round(by / pk) if pk else 0, "Entrada": r.get("in", ""),
+                       "Saída": r.get("out", ""), "AS orig.": r.get("sas", ""), "AS dest.": r.get("das", "")}
+                res.rows.append({k: row[k] for k in res.columns} | {"_ts": row["Início"]})
         else:
             stat = MODES[mode][1]
             out = _run(rng + ["-o", "csv", "-s", "%s/%s" % (stat, order), "-n", str(limit), expanded], left())
             rows, res.summary = _csv_blocks(out)
-            if mode == "record":
-                res.columns = ["Origem", "Porta orig.", "Destino", "Porta dest.", "Proto", "Flags",
-                               "Pacotes", "Bytes", "Entrada", "Saída"]
-                for r in rows[:limit]:
-                    res.rows.append({"Origem": r.get("sa", ""), "Porta orig.": r.get("sp", ""), "Destino": r.get("da", ""),
-                                     "Porta dest.": r.get("dp", ""), "Proto": r.get("pr", "").lower(),
-                                     "Flags": r.get("flg", "").replace(".", ""), "Pacotes": _num(r, "ipkt"),
-                                     "Bytes": _num(r, "ibyt"), "Entrada": r.get("in", ""), "Saída": r.get("out", "")})
-            else:
-                res.columns = [MODES[mode][0], "Fluxos", "% fluxos", "Pacotes", "% pacotes", "Bytes", "% bytes",
-                               "pps", "bps", "bytes/pacote"]
-                for r in rows[:limit]:
-                    res.rows.append({MODES[mode][0]: r.get("val", "").strip(), "Fluxos": _num(r, "fl"),
-                                     "% fluxos": _num(r, "flP"), "Pacotes": _num(r, "pkt", "ipkt"),
-                                     "% pacotes": _num(r, "pktP", "ipktP"), "Bytes": _num(r, "byt", "ibyt"),
-                                     "% bytes": _num(r, "bytP", "ibytP"), "pps": _num(r, "pps", "ipps"),
-                                     "bps": _num(r, "bps", "ibps"), "bytes/pacote": _num(r, "bpp", "ibpp")})
+            res.columns = [MODES[mode][0], "Fluxos", "% fluxos", "Pacotes", "% pacotes", "Bytes", "% bytes",
+                           "pps", "bps", "bytes/pacote"]
+            for r in rows[:limit]:
+                res.rows.append({MODES[mode][0]: r.get("val", "").strip(), "Fluxos": _num(r, "fl"),
+                                 "% fluxos": _num(r, "flP"), "Pacotes": _num(r, "pkt", "ipkt"),
+                                 "% pacotes": _num(r, "pktP", "ipktP"), "Bytes": _num(r, "byt", "ibyt"),
+                                 "% bytes": _num(r, "bytP", "ibytP"), "pps": _num(r, "pps", "ipps"),
+                                 "bps": _num(r, "bps", "ibps"), "bytes/pacote": _num(r, "bpp", "ibpp")})
         # serie temporal: total do filtro em ate SERIES_POINTS fatias
         for part in chunks(files, SERIES_POINTS):
             if left() < 3:
@@ -262,13 +263,17 @@ def run(expr, start, end, mode, order, limit, flow_dir, table, lock_path=None, b
 
 
 # ------------------------------------------------------------------ apresentacao
-def annotate(res, scopes=None, ifnames=None):
-    """Acrescenta rotulos (tipo do IP, nome da interface, servico da porta) as linhas."""
+def annotate(res, scopes=None, ifnames=None, geo=None, nat=None):
+    """Acrescenta rotulos as linhas: tipo do IP (nosso), nome da interface, servico da porta, ASN/pais do IP
+    remoto (geo: enrichment.Enricher) e o assinante por tras do IP:porta do pool CGNAT (nat: funcao
+    lookup_many([ip, porta, proto, epoch]) -> [[ip_privado, porta] | None])."""
     ifnames = ifnames or {}
+    ip_cols = ("Origem", "Destino", "IP de destino", "IP de origem", "IP (origem ou destino)")
+    pending = []
     for row in res.rows:
         tags = {}
         for col, val in row.items():
-            if not isinstance(val, str) or not val:
+            if not isinstance(val, str) or not val or col.startswith("_"):
                 continue
             if col in ("Entrada", "Saída", "Interface de entrada", "Interface de saída") and val.isdigit():
                 name = ifnames.get(int(val))
@@ -278,18 +283,46 @@ def annotate(res, scopes=None, ifnames=None):
                 svc = SERVICES.get(int(val))
                 if svc:
                     tags[col] = svc
-            elif scopes is not None and col in ("Origem", "Destino", "IP de destino", "IP de origem",
-                                                 "IP (origem ou destino)"):
+            elif col in ip_cols:
                 try:
                     ip_address(val)
                 except ValueError:
                     continue
-                scope, pool, _ = scopes.classify(val)
+                scope, pool = (scopes.classify(val)[:2]) if scopes is not None else ("", "")
                 label = {"cgnat_pool": "pool " + pool, "dedicated": "dedicado", "cgnat_private": "assinante",
                          "infra": "infra"}.get(scope)
                 if label:
                     tags[col] = label
+                    port_col = {"Origem": "Porta orig.", "Destino": "Porta dest."}.get(col)
+                    if scope == "cgnat_pool" and nat and port_col and str(row.get(port_col, "")).isdigit() \
+                            and row.get("_ts"):
+                        pending.append((row, col, val, int(row[port_col]), row.get("Proto", ""), row["_ts"]))
+                elif geo is not None:
+                    info = geo.lookup(val) or {}
+                    parts = []
+                    if info.get("asn"):
+                        parts.append(("AS%d %s" % (info["asn"], info.get("asn_name", ""))).strip()[:40])
+                    if info.get("country"):
+                        parts.append(info["country"])
+                    if parts:
+                        tags[col] = " · ".join(parts)
         row["_tags"] = tags
+    if pending:
+        keys = []
+        for _, _, ip, port, proto, ts in pending:
+            try:
+                epoch = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc).timestamp()
+            except ValueError:
+                epoch = 0
+            keys.append([ip, port, proto, epoch])
+        try:
+            found = nat(keys)
+        except Exception:
+            found = None
+            res.notes.append("Assinante do CGNAT indisponível (receptor NAT do A10 não respondeu).")
+        for (row, col, *_), hit in zip(pending, found or []):
+            if hit:
+                row["_tags"][col] = row["_tags"].get(col, "") + " → assinante " + str(hit[0])
     return res
 
 

@@ -207,6 +207,22 @@ class Formatter:
             who = self.ident(ev["subscriber_ip"] or ev["local_ip"], ev.get("event_time"))
             if who:
                 body.insert(-1, "Identificação: %s" % e(who))
+        elif ev["detection"] == "c2":
+            try:
+                details = json.loads(ev["details"] or "{}")
+            except (TypeError, ValueError):
+                details = {}
+            body = [self.header("🦠", "Cliente falando com C2/botnet") + " · " + sev,
+                    "<b>%s</b>" % e(ev["rule_name"])]
+            body += self.who(ev)
+            port = ev["remote_port"] or details.get("porta_listada") or 0
+            body.append("IP de comando: <code>%s</code>%s · %s" % (
+                e(str(details.get("remote_ip", "?"))), (" porta %s" % port) if port else "",
+                (ev["protocol"] or "-").upper()))
+            if details.get("listas"):
+                body.append("Listas: %s" % e(str(details["listas"])))
+            body.append("Equipamento do cliente provavelmente infectado (roteador, câmera, PC). "
+                        "Detalhes: painel → C2 e botnets.")
         else:
             inbound = ev["direction"] == "in"
             body = [self.header("🚨" if inbound else "📤", "Ataque recebido" if inbound else "Ataque originado")

@@ -4,6 +4,7 @@ from __future__ import annotations
 import copy
 from datetime import timedelta
 import functools
+import ipaddress
 import json
 import os
 from pathlib import Path
@@ -479,6 +480,94 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
                                every=current.get("ORBYMON_REP_HEAVY_EVERY_H", "6"),
                                key_masked=(key[:4] + "••••" + key[-4:]) if key else "")
 
+    @app.route("/ameacas", methods=["GET", "POST"])
+    def threats():
+        from ..customer_report import human_bytes
+        from ..threat_intel import CATEGORIES, FEEDS
+        current = config.threat()
+        names = [x.name for x in FEEDS]
+        if request.method == "POST":
+            f = request.form
+
+            def apply():
+                key = "" if f.get("clear_key") else (f.get("threatfox_key", "").strip() or
+                                                     current.get("THREATFOX_AUTH_KEY", ""))
+                if key and not re.fullmatch(r"[A-Za-z0-9]{20,128}", key):
+                    raise ValueError("Auth-Key do abuse.ch com formato inválido")
+                every = int(f.get("refresh_h", "6"))
+                if not 1 <= every <= 168:
+                    raise ValueError("atualização das listas entre 1 e 168 horas")
+                enabled = set(f.getlist("src"))
+                disabled = [n for n in names if n not in enabled]
+                config.save_threat({"ORBYMON_THREAT_DISABLED": ",".join(disabled), "ORBYMON_THREAT_REFRESH_H": every,
+                                    "ORBYMON_THREAT_EVENTS_REPUTATION": "1" if f.get("events_rep") else "0",
+                                    "THREATFOX_AUTH_KEY": key})
+                return {"desativadas": disabled, "atualizacao_h": every, "alerta_reputacao": bool(f.get("events_rep")),
+                        "threatfox": "configurada" if key else "sem chave"}
+            safe("ameacas_alteradas", apply, "Configuração salva. Vale na próxima execução (a cada 10 min).")
+            return redirect(url_for("threats"))
+        a = request.args
+        cat = a.get("cat") if a.get("cat") in CATEGORIES else ""
+        days = int(a.get("dias")) if a.get("dias") in ("1", "7", "30") else 7
+        ip = (a.get("ip") or "").strip()[:45]
+        if ip:
+            try:
+                ip = str(ipaddress.ip_address(ip))
+            except ValueError:
+                flash("IP inválido no filtro.")
+                ip = ""
+        disabled = {n.strip() for n in current.get("ORBYMON_THREAT_DISABLED", "").split(",") if n.strip()}
+        summary = {r[0]: {"cpes": r[1], "pares": r[2], "remotos": r[3]} for r in store.threat_summary(days)}
+        return render_template("threats.html", hits=store.threat_hits(cat, ip, days), summary=summary,
+                               sources=store.threat_sources(), feeds=FEEDS, disabled=disabled, categories=CATEGORIES,
+                               form={"cat": cat, "dias": str(days), "ip": ip},
+                               every=current.get("ORBYMON_THREAT_REFRESH_H", "6"),
+                               events_rep=current.get("ORBYMON_THREAT_EVENTS_REPUTATION", "0") == "1",
+                               key_set=bool(current.get("THREATFOX_AUTH_KEY")), human_bytes=human_bytes)
+
+    @app.route("/grupos-asn", methods=["GET", "POST"])
+    def asn_groups():
+        from ..asn_groups import parse_members
+        if request.method == "POST":
+            f = request.form
+            action = f.get("action", "salvar")
+            gid = int(f.get("gid") or 0)
+            if action == "excluir":
+                def apply_del():
+                    if not store.delete_asn_group(gid):
+                        raise ValueError("grupo não encontrado")
+                    store.sync_asn_groups()
+                    return "grupo %d" % gid
+                safe("grupo_asn_excluido", apply_del, "Grupo excluído.")
+            else:
+                def apply():
+                    name = " ".join(f.get("name", "").split())
+                    if not 2 <= len(name) <= 64 or name.lower() == "outros":
+                        raise ValueError("nome do grupo entre 2 e 64 caracteres (e diferente de 'Outros')")
+                    members = f.get("members", "")
+                    if len(members) > 40000:
+                        raise ValueError("lista de membros longa demais")
+                    asns, cidrs = parse_members(members)
+                    if not asns and not cidrs:
+                        raise ValueError("informe ao menos um ASN ou bloco IP")
+                    sort = int(f.get("sort") or 100)
+                    if not 0 <= sort <= 9999:
+                        raise ValueError("ordem entre 0 e 9999")
+                    clean = " ".join([str(a) for a in asns] + cidrs)
+                    try:
+                        store.save_asn_group(gid, name, clean, sort, g.user["username"])
+                    except Exception as exc:
+                        if "Duplicate" in str(exc):
+                            raise ValueError("já existe um grupo com esse nome") from None
+                        raise
+                    _, _, notes = store.sync_asn_groups()
+                    for n in notes:
+                        flash("Aviso: " + n)
+                    return {"grupo": name, "asns": len(asns), "blocos": len(cidrs)}
+                safe("grupo_asn_salvo", apply, "Grupo salvo. Os dashboards usam a nova lista em até 1 minuto.")
+            return redirect(url_for("asn_groups"))
+        return render_template("asn_groups.html", asn_list=store.asn_groups())
+
     @app.route("/investigar", methods=["GET", "POST"])
     def investigate():
         from datetime import timezone as dt_timezone
@@ -595,7 +684,12 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
                 result = fq.run(form["expr"], start, end, form["mode"], form["order"], int(form["limit"]),
                                 config.p.flow_root / cfg["source"], fq.macros(cfg, profile),
                                 lock_path=str(config.p.query_lock))
-                fq.annotate(result, build_scopes(cfg, profile), {int(i): n for i, n in store.interfaces()})
+                nat = None
+                if cfg.get("nat_socket"):
+                    from ..a10_nat import lookup_many
+                    nat = functools.partial(lookup_many, cfg["nat_socket"], timeout=5.0)
+                fq.annotate(result, build_scopes(cfg, profile), {int(i): n for i, n in store.interfaces()},
+                            geo=geo(), nat=nat)
                 chart = fq.svg_series(result.series)
                 audit("analise", "%s | %s | %s a %s" % (form["mode"], form["expr"][:500], start, end))
             except (fq.QueryError, ValueError) as exc:

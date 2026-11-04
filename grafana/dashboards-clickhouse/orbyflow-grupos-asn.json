@@ -1,0 +1,352 @@
+{
+  "id": null,
+  "uid": "orbyflow-grupos-asn",
+  "title": "Tráfego por grupo de ASN/CDN",
+  "description": "Banda por grupo de ASN/CDN (Google, Meta, Netflix, caches...). Grupos editáveis no painel web. Dados de tráfego no ClickHouse.",
+  "tags": [
+    "orbyflow",
+    "trafego",
+    "asn",
+    "cdn"
+  ],
+  "editable": true,
+  "schemaVersion": 41,
+  "version": 1,
+  "graphTooltip": 1,
+  "links": [],
+  "liveNow": false,
+  "timezone": "browser",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "refresh": "5m",
+  "fiscalYearStartMonth": 0,
+  "timepicker": {
+    "refresh_intervals": [
+      "1m",
+      "5m",
+      "15m"
+    ]
+  },
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "templating": {
+    "list": [
+      {
+        "type": "custom",
+        "name": "lado",
+        "label": "Sentido",
+        "query": "Recebido (origem remota) : src,Enviado (destino remoto) : dst",
+        "options": [
+          {
+            "text": "Recebido (origem remota)",
+            "value": "src",
+            "selected": true
+          },
+          {
+            "text": "Enviado (destino remoto)",
+            "value": "dst",
+            "selected": false
+          }
+        ],
+        "current": {
+          "text": "Recebido (origem remota)",
+          "value": "src"
+        },
+        "hide": 0,
+        "multi": false,
+        "includeAll": false,
+        "skipUrlSync": false
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Banda por grupo",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "orbyflow-clickhouse"
+      },
+      "description": "Taxa de cada grupo ao longo do tempo (só os grupos cadastrados; o resto fica em 'Outros' na tabela). Recebido = download dos clientes.",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "orbyflow-clickhouse"
+          },
+          "editorType": "sql",
+          "rawSql": "SELECT toStartOfInterval(p.bucket_utc, INTERVAL $__interval_s second) AS time,coalesce(nullIf(arrayFirst(r -> IPv4StringToNumOrDefault(p.${lado}_ip) BETWEEN r.1 AND r.2, (SELECT groupArray((v_start, v_end, name)) FROM orby_net_prefixes WHERE kind='group')).3, ''), nullIf(g.name, ''), 'Outros') AS metric,SUM(p.total_bytes)*8/$__interval_s AS value FROM orby_ip_pairs_minute p LEFT JOIN orby_asn_group_members g ON g.asn = p.${lado}_asn WHERE p.source='huawei' AND $__timeFilter(p.bucket_utc) AND NOT arrayExists(r -> IPv4StringToNumOrDefault(p.${lado}_ip) BETWEEN r.1 AND r.2, (SELECT groupArray((v_start, v_end)) FROM orby_net_prefixes WHERE kind IN ('protected','private','infra'))) GROUP BY 1,2 HAVING metric<>'Outros' ORDER BY 1",
+          "queryType": "timeseries",
+          "format": 0
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "showLegend": true,
+          "sortBy": "Mean",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 25,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "showPoints": "never"
+          },
+          "displayName": "${__field.labels.metric}"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "piechart",
+      "title": "Participação no volume",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "orbyflow-clickhouse"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 9,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "orbyflow-clickhouse"
+          },
+          "editorType": "sql",
+          "rawSql": "SELECT coalesce(nullIf(arrayFirst(r -> IPv4StringToNumOrDefault(p.${lado}_ip) BETWEEN r.1 AND r.2, (SELECT groupArray((v_start, v_end, name)) FROM orby_net_prefixes WHERE kind='group')).3, ''), nullIf(g.name, ''), 'Outros') AS grupo,SUM(p.total_bytes) AS volume FROM orby_ip_pairs_minute p LEFT JOIN orby_asn_group_members g ON g.asn = p.${lado}_asn WHERE p.source='huawei' AND $__timeFilter(p.bucket_utc) AND NOT arrayExists(r -> IPv4StringToNumOrDefault(p.${lado}_ip) BETWEEN r.1 AND r.2, (SELECT groupArray((v_start, v_end)) FROM orby_net_prefixes WHERE kind IN ('protected','private','infra'))) GROUP BY 1 ORDER BY 2 DESC",
+          "queryType": "table",
+          "format": 1
+        }
+      ],
+      "options": {
+        "pieType": "donut",
+        "reduceOptions": {
+          "values": true,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "values": [
+            "percent"
+          ],
+          "showLegend": true
+        },
+        "displayLabels": []
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "decbytes"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "table",
+      "title": "Grupos no período",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "orbyflow-clickhouse"
+      },
+      "gridPos": {
+        "x": 9,
+        "y": 9,
+        "w": 15,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "orbyflow-clickhouse"
+          },
+          "editorType": "sql",
+          "rawSql": "SELECT coalesce(nullIf(arrayFirst(r -> IPv4StringToNumOrDefault(p.${lado}_ip) BETWEEN r.1 AND r.2, (SELECT groupArray((v_start, v_end, name)) FROM orby_net_prefixes WHERE kind='group')).3, ''), nullIf(g.name, ''), 'Outros') AS \"Grupo\",SUM(p.total_bytes) AS \"Volume\",SUM(p.total_bytes)*8/greatest(1, dateDiff('second', $__fromTime, $__toTime)) AS \"Taxa média\",round(100 * sum(p.total_bytes) / greatest(1, sum(sum(p.total_bytes)) OVER ()), 1) AS \"% do total\",uniqExact(p.${lado}_ip) AS \"IPs remotos\" FROM orby_ip_pairs_minute p LEFT JOIN orby_asn_group_members g ON g.asn = p.${lado}_asn WHERE p.source='huawei' AND $__timeFilter(p.bucket_utc) AND NOT arrayExists(r -> IPv4StringToNumOrDefault(p.${lado}_ip) BETWEEN r.1 AND r.2, (SELECT groupArray((v_start, v_end)) FROM orby_net_prefixes WHERE kind IN ('protected','private','infra'))) GROUP BY 1 ORDER BY 2 DESC LIMIT 50",
+          "queryType": "table",
+          "format": 1
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Volume"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "decbytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Taxa média"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bps"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "% do total"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 4,
+      "type": "table",
+      "title": "Maiores ASNs fora dos grupos ('Outros')",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "orbyflow-clickhouse"
+      },
+      "description": "Candidatos a virar grupo: cadastre no painel web (Monitoramento > Grupos de ASN). Caches de CDN dentro do transito entram por bloco IP.",
+      "gridPos": {
+        "x": 0,
+        "y": 19,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "orbyflow-clickhouse"
+          },
+          "editorType": "sql",
+          "rawSql": "SELECT p.${lado}_asn AS \"ASN\",anyIf(p.${lado}_asn_name, p.${lado}_asn_name != '') AS \"Nome\",SUM(p.total_bytes) AS \"Volume\",SUM(p.total_bytes)*8/greatest(1, dateDiff('second', $__fromTime, $__toTime)) AS \"Taxa média\",uniqExact(p.${lado}_ip) AS \"IPs remotos\" FROM orby_ip_pairs_minute p LEFT JOIN orby_asn_group_members g ON g.asn = p.${lado}_asn WHERE p.source='huawei' AND $__timeFilter(p.bucket_utc) AND NOT arrayExists(r -> IPv4StringToNumOrDefault(p.${lado}_ip) BETWEEN r.1 AND r.2, (SELECT groupArray((v_start, v_end)) FROM orby_net_prefixes WHERE kind IN ('protected','private','infra'))) AND coalesce(nullIf(arrayFirst(r -> IPv4StringToNumOrDefault(p.${lado}_ip) BETWEEN r.1 AND r.2, (SELECT groupArray((v_start, v_end, name)) FROM orby_net_prefixes WHERE kind='group')).3, ''), nullIf(g.name, ''), 'Outros')='Outros' GROUP BY 1 ORDER BY 3 DESC LIMIT 30",
+          "queryType": "table",
+          "format": 1
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Volume"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "decbytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Taxa média"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bps"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "% do total"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

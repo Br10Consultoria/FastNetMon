@@ -1,0 +1,79 @@
+{% extends "base.html" %}{% block title %}C2 e botnets{% endblock %}
+{% block body %}
+<h1>C2 e botnets</h1>
+<p class="muted">Clientes que <b>enviaram</b> tráfego para IPs de listas públicas de ameaças. <b>C2/botnet</b> = servidor de
+comando de malware (equipamento do cliente provavelmente infectado: roteador, câmera, PC). <b>Reputação</b> = IP de
+má reputação (varredura, spam, rede criminosa): vale olhar, nem sempre é infecção. Verificado a cada 10 minutos; o
+assinante do CGNAT vem do log do A10. O NetStream é amostrado: conversa curta com C2 só aparece quando algum pacote
+cai na amostra, então os clientes infectados vão aparecendo ao longo dos dias.</p>
+
+<section class="card">
+  <div class="stats">
+    {% set b = summary.get('bot', {}) %}{% set r = summary.get('reputacao', {}) %}
+    <div class="stat {{ 'bad' if b.cpes }}"><b>{{ b.cpes or 0 }}</b><span>clientes falando com C2/botnet</span></div>
+    <div class="stat"><b>{{ b.remotos or 0 }}</b><span>IPs de C2 contactados</span></div>
+    <div class="stat {{ 'warn' if r.cpes }}"><b>{{ r.cpes or 0 }}</b><span>clientes falando com IP de má reputação</span></div>
+    <div class="stat"><b>{{ r.remotos or 0 }}</b><span>IPs de má reputação contactados</span></div>
+  </div>
+  <form method="get" class="inline">
+    <label>Categoria <select name="cat"><option value="">todas</option>
+      {% for k, v in categories.items() %}<option value="{{ k }}" {{ 'selected' if form.cat==k }}>{{ v }}</option>{% endfor %}</select></label>
+    <label>Período <select name="dias">{% for d, t in (('1','24 h'),('7','7 dias'),('30','30 dias')) %}<option value="{{ d }}" {{ 'selected' if form.dias==d }}>{{ t }}</option>{% endfor %}</select></label>
+    <label>IP (cliente, público ou listado) <input name="ip" value="{{ form.ip }}" placeholder="100.64.70.39"></label>
+    <button>Filtrar</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Clientes falando com IPs listados <span class="pill {{ 'bad' if hits else 'ok' }}">{{ hits|length }}</span></h2>
+  {% if hits %}
+  <div class="scroll"><table>
+    <tr><th>Cliente</th><th>IP listado</th><th>Porta</th><th>Categoria</th><th>Listas / malware</th><th class="num">Fluxos</th><th class="num">Volume (estim.)</th><th>Primeiro / último contato (UTC)</th><th></th></tr>
+    {% for h in hits %}
+    <tr>
+      <td class="nowrap"><code>{{ h.cpe_ip }}</code><br><small class="muted">
+        {% if h.public_ip and h.public_ip != h.cpe_ip %}via {{ h.public_ip }}{% if h.pool %} ({{ h.pool }}){% endif %}{% else %}{{ SCOPE_PT.get(h.scope, h.scope) }}{% endif %}</small></td>
+      <td class="nowrap"><code>{{ h.remote_ip }}</code></td>
+      <td class="nowrap">{{ h.protocol|upper }}/{{ h.remote_port or h.listed_port or '—' }}{% if h.listed_port and h.remote_port and h.listed_port != h.remote_port %}<br><small class="muted">listado na {{ h.listed_port }}</small>{% endif %}</td>
+      <td><span class="pill {{ 'bad' if h.category=='bot' else 'warn' }}">{{ categories.get(h.category, h.category) }}</span></td>
+      <td><small>{{ h.sources }}</small>{% if h.malware %}<br><b>{{ h.malware }}</b>{% endif %}</td>
+      <td class="num">{{ h.flows }}</td>
+      <td class="num">{{ human_bytes(h.bytes) }}</td>
+      <td class="nowrap"><small>{{ h.first_seen }}<br>{{ h.last_seen }}</small></td>
+      <td class="nowrap"><a href="{{ url_for('investigate', ip=h.public_ip or h.cpe_ip) }}">Investigar</a></td>
+    </tr>
+    {% endfor %}
+  </table></div>
+  {% if hits|length >= 500 %}<p class="muted">Mostrando os 500 mais recentes; use os filtros.</p>{% endif %}
+  {% else %}<p>Nenhum cliente falou com IPs das listas no período{% if form.cat or form.ip %} (com esses filtros){% endif %}.</p>{% endif %}
+</section>
+
+<section class="card">
+  <h2>Listas</h2>
+  {% if sources %}
+  <div class="scroll"><table>
+    <tr><th>Lista</th><th>Categoria</th><th>Situação</th><th>Última atualização (UTC)</th><th class="num">Entradas</th><th>Erro</th></tr>
+    {% for s in sources %}<tr><td>{{ s[1] }}</td><td>{{ categories.get(s[2], s[2]) }}</td>
+      <td><span class="pill {{ 'ok' if s[6]=='ok' else 'bad' }}">{{ s[6] }}</span></td><td>{{ s[4] or '—' }}</td>
+      <td class="num">{{ s[5] }}</td><td><small>{{ s[7] }}</small></td></tr>{% endfor %}
+  </table></div>
+  {% else %}<p class="muted">Ainda não houve verificação (instale com <code>scripts/setup-threat-intel.sh</code>).</p>{% endif %}
+</section>
+
+<form method="post" class="card" autocomplete="off">
+  {% include "_csrf.html" %}
+  <h2>Configuração</h2>
+  <div class="checks">
+    {% for s in feeds %}<label class="check"><input type="checkbox" name="src" value="{{ s.name }}" {{ 'checked' if s.name not in disabled }}> {{ s.label }} <small class="muted">— {{ categories.get(s.category) }}</small></label>{% endfor %}
+  </div>
+  <label>Atualizar as listas a cada (horas) <input name="refresh_h" type="number" min="1" max="168" value="{{ every }}"></label>
+  <label class="check"><input type="checkbox" name="events_rep" value="1" {{ 'checked' if events_rep }}> Avisar também (Ataques e Telegram) quando o IP for só de má reputação <small class="muted">— gera mais avisos; C2/botnet sempre avisa</small></label>
+  <h2>ThreatFox (abuse.ch)</h2>
+  <p class="muted">A maior lista de C2 ativa (Mirai, Cobalt Strike, AsyncRAT...). Precisa de uma Auth-Key gratuita: crie em
+  <a href="https://auth.abuse.ch/" rel="noopener noreferrer" target="_blank">auth.abuse.ch</a>. Sem a chave, essa lista fica de fora.</p>
+  <label>Auth-Key {% if key_set %}<span class="pill ok">configurada</span>{% endif %}
+    <input name="threatfox_key" type="password" autocomplete="new-password" placeholder="{{ 'deixe em branco para manter' if key_set else 'cole a chave' }}"></label>
+  {% if key_set %}<label class="check"><input type="checkbox" name="clear_key" value="1"> remover a chave</label>{% endif %}
+  <button>Salvar</button>
+</form>
+{% endblock %}

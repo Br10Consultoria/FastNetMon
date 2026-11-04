@@ -41,7 +41,7 @@ Requisitos: 4 GB de RAM (recomendado 16 GB), 20 GB livres, repositório em `/opt
 9. Painel web (porta 8443) e o primeiro usuário, com **senha gerada** em `/root/orbyflow-painel-acesso.txt`
    (troca obrigatória e cadastro do 2FA no primeiro acesso).
 10. Backup diário cifrado (`/etc/orbymon/backup.key`: guarde uma cópia fora do servidor).
-11. Reputação, alarmes por filtro (modelos desligados), clientes, linha de base, mitigação **em simulação** e saúde.
+11. Reputação, C2 e botnets (listas de ameaças a cada 10 min), alarmes por filtro (modelos desligados), clientes, linha de base, mitigação **em simulação** e saúde.
 12. Tabelas agregadas e uso de portas do CGNAT.
 13. ClickHouse (escolhe a versão certa para a CPU) e dashboards de tráfego nele.
 14. Verificação dos serviços e resumo.
@@ -61,6 +61,10 @@ rode de novo: as etapas prontas são preservadas (senhas, configuração e dados
    rede de gerência.
 7. Depois de 1 dia com tráfego: **Regras → aplicar a proposta de calibração**; com 3 dias, ligar o limite
    dinâmico em **Base**; ligar os alarmes por filtro com `sudo bash scripts/test-alarms.sh 60` como guia.
+8. **Painel → C2 e botnets:** colar a Auth-Key gratuita do abuse.ch (https://auth.abuse.ch/) para a lista ThreatFox,
+   a maior de C2 ativos. Sem ela, as outras listas funcionam.
+9. **Painel → Grupos de ASN:** ajustar os grupos (Google, Meta, Netflix...) e cadastrar os blocos dos caches de CDN
+   dentro do trânsito; o Grafana mostra em **Tráfego por grupo de ASN/CDN**.
 
 ## Atualizar
 

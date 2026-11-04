@@ -190,8 +190,9 @@ run setup-admin.sh --user "$ADMIN_USER" --random-password
 step "10/14 Backup diario cifrado"
 run setup-backup.sh --encrypt
 
-step "11/14 Reputacao, alarmes, clientes, linha de base, mitigacao (simulacao) e saude"
+step "11/14 Reputacao, C2/botnets, alarmes, clientes, linha de base, mitigacao (simulacao) e saude"
 run setup-reputation.sh
+run setup-threat-intel.sh
 run setup-filter-rules.sh
 run setup-customers.sh
 run setup-baseline.sh
