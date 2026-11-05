@@ -5,7 +5,7 @@ set -euo pipefail
 [[ $EUID -eq 0 ]] || { echo "Execute como root/sudo" >&2; exit 1; }
 BASE="$(cd "$(dirname "$0")/.." && pwd)"
 D=/var/lib/grafana/dashboards/orbymon
-DASHBOARDS="orbyflow-huawei-live.json orbyflow-overview.json orbyflow-ip-analytics.json orbyflow-cgnat.json orbyflow-f4-ataques.json orbyflow-reputacao.json orbyflow-cgnat-portas.json orbyflow-cgnat-assinantes.json orbyflow-ataques-originados.json orbyflow-alarmes.json orbyflow-c2-botnets.json orbyflow-grupos-asn.json"
+DASHBOARDS="orbyflow-huawei-live.json orbyflow-overview.json orbyflow-ip-analytics.json orbyflow-cgnat.json orbyflow-f4-ataques.json orbyflow-reputacao.json orbyflow-cgnat-portas.json orbyflow-cgnat-assinantes.json orbyflow-ataques-originados.json orbyflow-alarmes.json orbyflow-c2-botnets.json orbyflow-grupos-asn.json orbyflow-analise-ataques.json"
 [[ -d "$D" ]] || { echo "Diretorio Grafana ausente: $D" >&2; exit 1; }
 id grafana >/dev/null || { echo "Usuario grafana ausente" >&2; exit 1; }
 if command -v mariadb >/dev/null; then
@@ -52,6 +52,7 @@ PY
     fi
     # tabelas do dashboard C2 e botnets (vazias ate rodar scripts/setup-threat-intel.sh)
     mariadb orbymon < "$BASE/sql/threat_intel.sql"
+    mariadb orbymon < "$BASE/sql/attack_analysis.sql"     # dashboard Analise de ataques (setup-attack-analysis.sh)
   fi
 fi
 # com o ClickHouse configurado (setup-clickhouse.sh), os dashboards de trafego leem dele

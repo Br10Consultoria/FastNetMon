@@ -1,0 +1,636 @@
+{
+  "id": null,
+  "uid": "orbyflow-analise-ataques",
+  "title": "Análise de ataques",
+  "description": "Vetores identificados automaticamente em cada ataque, redes de origem, IPs mais atacados e clientes suspeitos.",
+  "tags": [
+    "orbyflow",
+    "ataques",
+    "analise"
+  ],
+  "editable": true,
+  "schemaVersion": 41,
+  "version": 1,
+  "graphTooltip": 1,
+  "links": [],
+  "liveNow": false,
+  "timezone": "browser",
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "refresh": "5m",
+  "fiscalYearStartMonth": 0,
+  "timepicker": {
+    "refresh_intervals": [
+      "1m",
+      "5m",
+      "15m"
+    ]
+  },
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "templating": {
+    "list": [
+      {
+        "type": "custom",
+        "name": "sentido",
+        "label": "Sentido",
+        "query": "Todos : all,Recebidos : in,Originados : out",
+        "options": [
+          {
+            "text": "Todos",
+            "value": "all",
+            "selected": true
+          },
+          {
+            "text": "Recebidos",
+            "value": "in",
+            "selected": false
+          },
+          {
+            "text": "Originados",
+            "value": "out",
+            "selected": false
+          }
+        ],
+        "current": {
+          "text": "Todos",
+          "value": "all"
+        },
+        "hide": 0,
+        "multi": false,
+        "includeAll": false,
+        "skipUrlSync": false
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Ataques recebidos (detecções)",
+      "description": "",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbyflow-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbyflow-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS value FROM orby_attack_events WHERE direction='in' AND detection IN ('flow','filter') AND $__timeFilter(event_time)"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "green"
+              },
+              {
+                "value": 1,
+                "color": "orange"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Ataques originados por clientes",
+      "description": "",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbyflow-mysql"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbyflow-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS value FROM orby_attack_events WHERE direction='out' AND detection IN ('flow','filter') AND $__timeFilter(event_time)"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "green"
+              },
+              {
+                "value": 1,
+                "color": "red"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "IPs nossos atacados",
+      "description": "",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbyflow-mysql"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbyflow-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(DISTINCT local_ip) AS value FROM orby_attack_events WHERE direction='in' AND $__timeFilter(event_time)"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "blue"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Maior ataque recebido",
+      "description": "",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbyflow-mysql"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbyflow-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT MAX(mbps)*1000000 AS value FROM orby_attack_events WHERE direction='in' AND $__timeFilter(event_time)"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "blue"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Detecções por vetor (por hora)",
+      "description": "Vetor identificado nos fluxos brutos de cada detecção (porta real, flags TCP, tamanho do pacote).",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbyflow-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbyflow-mysql"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT $__timeGroupAlias(a.event_time,'1h'),a.main_vector AS metric,COUNT(*) AS value FROM orby_attack_analysis a WHERE $__timeFilter(a.event_time) AND ('${sentido}'='all' OR a.direction='${sentido}') GROUP BY 1,2 ORDER BY 1"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 70,
+            "showPoints": "never",
+            "spanNulls": true,
+            "drawStyle": "bars",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "title": "Vetores no período",
+      "description": "IPs do /24 = quantos IPs do mesmo bloco receberam o mesmo vetor na mesma janela (carpet bombing quando são muitos).",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbyflow-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 13,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbyflow-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT a.main_vector AS 'Vetor',IF(a.direction='in','recebido','originado') AS 'Sentido',COUNT(*) AS 'Detecções',COUNT(DISTINCT a.local_ip) AS 'Alvos',MAX(e.mbps)*1000000 AS 'Pico',ROUND(AVG(a.bytes_per_packet)) AS 'Bytes/pacote (média)',MAX(a.block_ips_hit) AS 'IPs do /24 (máx)' FROM orby_attack_analysis a LEFT JOIN orby_attack_events e ON e.event_id=a.event_id WHERE $__timeFilter(a.event_time) AND ('${sentido}'='all' OR a.direction='${sentido}') GROUP BY 1,2 ORDER BY 3 DESC LIMIT 50"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": []
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true,
+            "align": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Pico"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bps"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 8,
+      "type": "table",
+      "title": "Redes que mais atacam (origem dos ataques recebidos)",
+      "description": "Rede (ASN) com mais volume em cada ataque recebido. Em amplificação são os refletores (servidores abertos), não o atacante real.",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbyflow-mysql"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 13,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbyflow-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT CONCAT('AS',a.top_asn) AS 'ASN',MAX(a.top_asn_name) AS 'Nome',MAX(a.top_country) AS 'País',COUNT(*) AS 'Detecções',COUNT(DISTINCT a.local_ip) AS 'Alvos',GROUP_CONCAT(DISTINCT a.main_vector ORDER BY a.main_vector SEPARATOR ', ') AS 'Vetores' FROM orby_attack_analysis a WHERE a.direction='in' AND a.top_asn>0 AND $__timeFilter(a.event_time) GROUP BY a.top_asn ORDER BY 4 DESC LIMIT 30"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": []
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true,
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 9,
+      "type": "table",
+      "title": "IPs nossos mais atacados",
+      "description": "",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbyflow-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbyflow-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT e.local_ip AS 'IP',MAX(e.pool) AS 'Pool',COUNT(*) AS 'Detecções',MAX(e.mbps)*1000000 AS 'Pico',GROUP_CONCAT(DISTINCT COALESCE(a.main_vector,e.rule_name) ORDER BY 1 SEPARATOR ', ') AS 'Vetores',MAX(e.event_time) AS 'Último (UTC)' FROM orby_attack_events e LEFT JOIN orby_attack_analysis a ON a.event_id=e.event_id WHERE e.direction='in' AND $__timeFilter(e.event_time) GROUP BY e.local_ip ORDER BY 3 DESC LIMIT 30"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": []
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true,
+            "align": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Pico"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bps"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 10,
+      "type": "table",
+      "title": "Clientes suspeitos (pontuação)",
+      "description": "Soma dos sinais de equipamento infectado ou abusivo por cliente (assinante do CGNAT ou IP dedicado): ataque originado vale 3, contato com C2 vale 5, alerta de NAT vale 2, IP de má reputação vale 1. Primeiros da lista = candidatos a contato do suporte.",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbyflow-mysql"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 22,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbyflow-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT ent AS 'Cliente',SUM(o) AS 'Ataques originados',SUM(c) AS 'Contatos C2',SUM(r) AS 'Má reputação',SUM(n) AS 'Alertas NAT',SUM(o)*3+SUM(c)*5+SUM(r)+SUM(n)*2 AS 'Pontuação',MAX(t) AS 'Último (UTC)' FROM (SELECT IF(subscriber_ip<>'',subscriber_ip,local_ip) AS ent,COUNT(*) AS o,0 AS c,0 AS r,0 AS n,MAX(event_time) AS t FROM orby_attack_events WHERE direction='out' AND detection IN ('flow','filter') AND $__timeFilter(event_time) GROUP BY 1 UNION ALL SELECT IF(subscriber_ip<>'',subscriber_ip,local_ip),0,0,0,COUNT(*),MAX(event_time) FROM orby_attack_events WHERE detection='nat' AND $__timeFilter(event_time) GROUP BY 1 UNION ALL SELECT cpe_ip,0,COUNT(*),0,0,MAX(last_seen) FROM orby_threat_hits WHERE category='bot' AND last_seen>=$__timeFrom() GROUP BY 1 UNION ALL SELECT cpe_ip,0,0,COUNT(*),0,MAX(last_seen) FROM orby_threat_hits WHERE category='reputacao' AND last_seen>=$__timeFrom() GROUP BY 1) x GROUP BY ent ORDER BY 6 DESC LIMIT 50"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": []
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true,
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 11,
+      "type": "table",
+      "title": "Ataques analisados",
+      "description": "Detalhe completo (origens, redes, flags TCP): painel web > Ataques > detalhe.",
+      "datasource": {
+        "type": "mysql",
+        "uid": "orbyflow-mysql"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 31,
+        "w": 24,
+        "h": 11
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "orbyflow-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT a.event_time AS 'Quando (UTC)',IF(a.direction='in','recebido','originado') AS 'Sentido',IF(a.subscriber_ip<>'',a.subscriber_ip,a.local_ip) AS 'IP nosso',a.vector AS 'Vetor',a.remote_ips AS 'Origens',IF(a.top_asn>0,CONCAT('AS',a.top_asn,' ',a.top_asn_name,IF(a.top_country<>'',CONCAT(' (',a.top_country,')'),'')),'') AS 'Rede principal',a.bytes_per_packet AS 'Bytes/pacote',ROUND(100*a.fragment_share) AS 'Fragmentos (%)',e.mbps*1000000 AS 'Taxa',e.rule_name AS 'Regra' FROM orby_attack_analysis a LEFT JOIN orby_attack_events e ON e.event_id=a.event_id WHERE $__timeFilter(a.event_time) AND ('${sentido}'='all' OR a.direction='${sentido}') ORDER BY a.event_time DESC LIMIT 300"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": []
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true,
+            "align": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Taxa"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bps"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

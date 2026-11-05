@@ -23,7 +23,8 @@ class DashboardImportTests(unittest.TestCase):
                                       "orbyflow-ataques-originados.json",  # separado da reputacao pelo import_v2
                                       "orbyflow-alarmes.json",   # gerado por grafana/build_alarms.py
                                       "orbyflow-c2-botnets.json",  # gerado por grafana/build_c2.py
-                                      "orbyflow-grupos-asn.json"})  # gerado por grafana/build_asn_groups.py
+                                      "orbyflow-grupos-asn.json",  # gerado por grafana/build_asn_groups.py
+                                      "orbyflow-analise-ataques.json"})  # grafana/build_attack_analysis.py
 
     def test_no_provider_specific_blocks(self):
         for path in DASH.glob("*.json"):
@@ -44,7 +45,7 @@ class DashboardImportTests(unittest.TestCase):
             for p in d["panels"]:
                 for t in p.get("targets", []):
                     self.assertEqual(t["datasource"], {"type": "mysql", "uid": "orbyflow-mysql"})
-        self.assertEqual(len(uids), 12)
+        self.assertEqual(len(uids), 13)
 
     def test_cgnat_ports_dashboard_is_generated(self):
         sys.path.insert(0, str(ROOT / "grafana"))
@@ -57,6 +58,9 @@ class DashboardImportTests(unittest.TestCase):
         import build_c2 as c2
         self.assertEqual(json.loads((DASH / "orbyflow-c2-botnets.json").read_text()), c2.build(),
                          "rode python3 grafana/build_c2.py")
+        import build_attack_analysis as aa
+        self.assertEqual(json.loads((DASH / "orbyflow-analise-ataques.json").read_text()), aa.build(),
+                         "rode python3 grafana/build_attack_analysis.py")
         import build_asn_groups as ag
         self.assertEqual(json.loads((DASH / "orbyflow-grupos-asn.json").read_text()), ag.build(False),
                          "rode python3 grafana/build_asn_groups.py")

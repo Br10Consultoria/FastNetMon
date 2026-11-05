@@ -37,7 +37,7 @@ origem, destino, portas, IP privado do assinante e os IPs remotos.</p>
   <button type="button" class="secondary" onclick="window.print()">Imprimir / PDF</button></span>{% endif %}</div>
   {% if attacks %}
   <div class="scroll"><table>
-    <tr><th>Quando</th><th>Sentido</th><th>Origem</th><th>Destino</th><th>Proto · portas</th><th>Tipo de IP</th><th class="num">Pico</th><th>Regra</th><th></th></tr>
+    <tr><th>Quando</th><th>Sentido</th><th>Origem</th><th>Destino</th><th>Proto · portas</th><th>Tipo de IP</th><th class="num">Pico</th><th>Regra · vetor</th><th></th></tr>
     {% for x in attacks %}
     <tr>
       <td>{{ ts(x.start, tz) }}<br><small class="muted">{{ x.minutes }} min{% if x.events > 1 %} · {{ x.events }} eventos{% endif %}</small></td>
@@ -55,7 +55,8 @@ origem, destino, portas, IP privado do assinante e os IPs remotos.</p>
           {% if x.entity_col=='local_ip' and x.subs_top %}<br><small>assinante: {% for s in x.subs_top[:2] %}<code>{{ s }}</code> {% endfor %}</small>{% endif %}</td>
       <td class="num">{% if x.detection == 'nat' %}{{ x.allocs }} aloc./min<br><small>{{ x.active_ports }} portas</small>
           {% else %}{{ human(x.pps) }} pps<br><small>{{ mbps(x.mbps) }} Mbps · {{ x.remote_ips }} IPs</small>{% endif %}</td>
-      <td><span class="pill sev-{{ x.severity }}">{{ x.severity }}</span><br><small>{{ x.rule }}</small></td>
+      <td><span class="pill sev-{{ x.severity }}">{{ x.severity }}</span><br><small>{{ x.rule }}</small>
+          {% if x.vector %}<br><b><small>{{ x.vector }}</small></b>{% endif %}</td>
       <td><a href="{{ x.link }}">detalhe</a></td>
     </tr>
     {% endfor %}

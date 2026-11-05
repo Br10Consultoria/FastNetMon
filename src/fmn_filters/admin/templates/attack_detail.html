@@ -18,6 +18,25 @@
   </div>
 </section>
 
+{% if d.analyses %}{% set an = d.analyses[0] %}
+<section class="card">
+  <h2>Análise automática</h2>
+  <p class="muted">Lida dos fluxos brutos da janela de cada detecção (portas reais, flags TCP, tamanho de pacote).
+    Percentuais por volume amostrado.</p>
+  <p><b>Vetor:</b> {{ an.vector }}</p>
+  {% if an.d.vectors and an.d.vectors|length > 1 %}<ul>{% for v in an.d.vectors %}<li>{{ v[0] }}: {{ (v[1]*100)|round|int }}%</li>{% endfor %}</ul>{% endif %}
+  {% set f = an.d.facts or {} %}
+  <div class="grid">
+    <div><b>Origens amostradas</b><br>{{ f.ips_remotos or 0 }} IPs{% if an.d.top_remotos %}<br><small>{% for r in an.d.top_remotos[:5] %}<code>{{ r.ip }}</code> {{ (r.share*100)|round|int }}%<br>{% endfor %}</small>{% endif %}</div>
+    <div><b>Redes de origem</b><br>{% for x in (an.d.top_asns or [])[:5] %}AS{{ x.asn }} {{ x.nome }}{% if x.pais %} ({{ x.pais }}){% endif %} — {{ (x.share*100)|round|int }}%<br>{% else %}—{% endfor %}</div>
+    <div><b>Pacotes</b><br>{{ f.bytes_por_pacote or '—' }} bytes em média{% if f.fragmentos %}<br>fragmentos: {{ (f.fragmentos*100)|round|int }}%{% endif %}
+      {% if f.flags_tcp %}<br><small>TCP: {% for kk, vv in f.flags_tcp.items() %}{{ kk }} {{ (vv*100)|round|int }}% {% endfor %}</small>{% endif %}</div>
+    <div><b>Bloco</b><br>{% if f.ips_do_bloco_atingidos %}{{ f.ips_do_bloco_atingidos }} IP(s) do {{ f.bloco }} com o mesmo vetor{% else %}—{% endif %}</div>
+  </div>
+  {% if d.analyses|length > 1 %}<details><summary>Outras detecções deste ataque ({{ d.analyses|length - 1 }})</summary>
+    <ul>{% for x in d.analyses[1:] %}<li>{{ ts(x.time, tz) }} — {{ x.summary }}</li>{% endfor %}</ul></details>{% endif %}
+</section>
+{% endif %}
 {% if d.error %}<p class="flash">{{ d.error }}</p>{% endif %}
 {% if fl %}
 <section class="card">

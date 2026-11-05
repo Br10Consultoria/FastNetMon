@@ -1,0 +1,21 @@
+[Unit]
+Description=OrbyFlow - analise automatica dos ataques detectados (vetor, origens, carpet bombing)
+After=network-online.target mariadb.service
+
+[Service]
+Type=oneshot
+User=orbymon
+Group=orbymon
+WorkingDirectory=/opt/orbymon
+EnvironmentFile=/etc/orbymon/pipeline.env
+Environment=PYTHONPATH=/opt/orbymon/src
+# telegram.env e editado pelo painel: lido como dado (--telegram-env), nunca como ambiente do processo
+ExecStart=/opt/orbymon/.venv/bin/python -m fmn_filters.attack_analysis --config /etc/orbymon/bidir.json \
+  --telegram-env /etc/orbymon/telegram.env
+Nice=10
+TimeoutStartSec=300
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX

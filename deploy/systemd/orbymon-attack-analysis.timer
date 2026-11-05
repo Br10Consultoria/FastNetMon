@@ -1,0 +1,11 @@
+[Unit]
+Description=OrbyFlow - analise dos ataques a cada 2 minutos
+
+[Timer]
+OnBootSec=3min
+OnUnitInactiveSec=2min
+AccuracySec=15s
+Unit=orbymon-attack-analysis.service
+
+[Install]
+WantedBy=timers.target

@@ -1198,9 +1198,25 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
                         remote_locals = click.locals_for_remote(f["remoto"], f["start"] - timedelta(hours=1), f["end"])
                     except Exception:
                         remote_locals = None
-                return at.fetch_events(cur, f, remote_locals), remote_locals
-            events, remote_locals = store.with_connection(run)
+                analyses = []
+                try:
+                    cur.execute("SELECT direction,rule_name,local_ip,subscriber_ip,event_time,vector FROM "
+                                "orby_attack_analysis WHERE event_time>=%s AND event_time<=%s ORDER BY event_time "
+                                "LIMIT 20000", (f["start"], f["end"]))
+                    analyses = cur.fetchall()
+                except Exception:
+                    pass
+                return at.fetch_events(cur, f, remote_locals), remote_locals, analyses
+            events, remote_locals, analyses = store.with_connection(run)
             attacks, total = at.group_events(events)
+            by_target = {}
+            for d_, rule_, lip, sip, t_, vec in analyses:
+                for ent in {lip, sip} - {""}:
+                    by_target.setdefault((d_, rule_, ent), []).append((t_, vec))
+            for x in attacks:                       # vetor da analise automatica mais recente dentro do ataque
+                found = [v for t_, v in by_target.get((x["direction"], x["rule"], x["entity"]), ())
+                         if x["start"] - timedelta(minutes=1) <= t_ <= x["last"]]
+                x["vector"] = found[-1] if found else ""
             if f["remoto"] and remote_locals is None:
                 note = ("IP remoto procurado entre os principais IPs de cada ataque. Com o ClickHouse ligado, "
                         "a busca considera todos os fluxos.")
@@ -1251,6 +1267,20 @@ def create_app(store: Store | None = None, config: ConfigStore | None = None, en
             except Exception:
                 pass
             d = at.build_detail(cur, k, at.MariaFlows(cur, cfg["source"]), click, geo(), remote)
+            d["analyses"] = []
+            try:                                     # analise automatica (attack_analysis), se instalada
+                col = "subscriber_ip" if k["entity_col"] == "subscriber_ip" else "local_ip"
+                cur.execute("SELECT event_time,vector,summary,details FROM orby_attack_analysis WHERE event_time>=%s "
+                            "AND event_time<%s AND direction=%s AND rule_name=%s AND " + col + "=%s ORDER BY "
+                            "event_time DESC LIMIT 12", (k["start"], k["end"], k["direction"], k["rule"], k["entity"]))
+                for t, vector, summ, det in cur.fetchall():
+                    try:
+                        det = json.loads(det) if isinstance(det, (str, bytes)) else (det or {})
+                    except ValueError:
+                        det = {}
+                    d["analyses"].append({"time": t, "vector": vector, "summary": summ, "d": det})
+            except Exception:
+                pass
             who = ""
             try:
                 ident = build_identifier(db, radius_path)

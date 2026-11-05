@@ -193,6 +193,33 @@ class NatPortsTests(unittest.TestCase):
         self.assertIn("UDP", crit[0]["value"])
 
 
+class NatDropTests(unittest.TestCase):
+    def test_sudden_drop(self):
+        from datetime import datetime, timedelta
+        from fmn_filters import health
+        now = datetime(2026, 11, 3, 18, 40)
+
+        def cur(last):
+            rows = [(now - timedelta(minutes=35 - i), 6000, 2900) for i in range(32)]
+            rows += [(now - timedelta(minutes=3 - i), last, last / 2) for i in range(3)]
+
+            class Cur:
+                def execute(self, sql, params=None):
+                    pass
+
+                def fetchall(self):
+                    return rows
+            return Cur()
+        self.assertEqual(health.check_nat_drop(cur(5800), now)[0]["status"], health.OK)
+        self.assertEqual(health.check_nat_drop(cur(2700), now)[0]["status"], health.WARN)
+        crit = health.check_nat_drop(cur(300), now)[0]
+        self.assertEqual(crit["status"], health.CRIT)
+        self.assertIn("sem navegar", crit["detail"])
+        night = NatPortsTests().cur([(now - timedelta(minutes=i), 50, 40) for i in range(30)])
+        self.assertEqual(health.check_nat_drop(night, now), [])          # madrugada: pouco trafego, nao avalia
+        self.assertEqual(health.check_nat_drop(NatPortsTests().cur([], fail=True), now), [])
+
+
 class NatCulpritTests(unittest.TestCase):
     def test_names_subscriber_holding_the_ip(self):
         from datetime import datetime

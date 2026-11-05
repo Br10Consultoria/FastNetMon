@@ -34,6 +34,7 @@ RUNTIME = {
     "orbymon-ddos-huawei.service": (60, 45, 90),
     "orbymon-telegram.service": (30, 30, 90),
     "orbymon-threat-intel.service": (600, 300, 600),
+    "orbymon-attack-analysis.service": (120, 200, 290),
     "orbymon-backup.service": (86400, 900, 1800),
 }
 
@@ -245,6 +246,45 @@ def check_nat_ports(cur, now):
                  detail)]
 
 
+NAT_DROP_WARN = float(os.environ.get("ORBYMON_NAT_DROP_WARN", "50"))     # % de queda das alocacoes
+NAT_DROP_CRIT = float(os.environ.get("ORBYMON_NAT_DROP_CRIT", "70"))
+NAT_DROP_MIN_ALLOCS = 300                                                  # abaixo disso (madrugada) nao avalia
+
+
+def check_nat_drop(cur, now):
+    """Queda brusca do CGNAT: alocacoes de porta por minuto (todos os IPs publicos) dos ultimos 3 minutos contra a
+    mediana dos 30 anteriores. Pega NAT parado, cota/configuracao errada no A10, pool fora: os clientes ficam sem
+    navegar e as alocacoes despencam antes de alguem ligar para o suporte."""
+    try:
+        cur.execute("SELECT bucket_utc,SUM(allocs),SUM(subscribers) FROM orby_nat_public_minute WHERE bucket_utc>=%s "
+                    "GROUP BY bucket_utc ORDER BY bucket_utc", (now - timedelta(minutes=40),))
+        rows = [(r[0], float(r[1] or 0), float(r[2] or 0)) for r in cur.fetchall()]
+    except Exception:
+        return []
+    if len(rows) < 15:
+        return []
+    recent, base = rows[-3:], rows[-33:-3]
+
+    def med(xs):
+        xs = sorted(xs)
+        return xs[len(xs) // 2]
+    b_alloc, b_subs = med([r[1] for r in base]), med([r[2] for r in base])
+    if b_alloc < NAT_DROP_MIN_ALLOCS:
+        return []
+    r_alloc = sum(r[1] for r in recent) / len(recent)
+    r_subs = sum(r[2] for r in recent) / len(recent)
+    drop = 100.0 * (1 - r_alloc / b_alloc)
+    drop_subs = 100.0 * (1 - r_subs / b_subs) if b_subs else 0.0
+    st = CRIT if drop >= NAT_DROP_CRIT else WARN if drop >= NAT_DROP_WARN else OK
+    detail = ""
+    if st != OK:
+        detail = ("Alocações de porta caíram de ~%d para ~%d por minuto e assinantes com NAT de ~%d para ~%d (%.0f%%). "
+                  "Clientes podem estar sem navegar: confira o A10 (show cgnv6 lsn statistics, lsn-lid, cota) e o "
+                  "dashboard CGNAT - Portas por IP público." % (b_alloc, r_alloc, b_subs, r_subs, drop_subs))
+    return [item("cgnat_drop", "CGNAT: queda brusca", st,
+                 "alocações %+.0f%% contra os 30 min anteriores" % (-drop), detail)]
+
+
 def check_db(cur, cfg, now, telegram_on=False, a10_on=True):
     src = cfg["source"]
     out = []
@@ -280,6 +320,7 @@ def check_db(cur, cfg, now, telegram_on=False, a10_on=True):
                             "" if st == OK else "o log NAT está incompleto ou atrasado em relação aos fluxos"))
     if a10_on:
         out += check_nat_ports(cur, now)
+        out += check_nat_drop(cur, now)
     try:
         cur.execute("SELECT r.name,s.last_bucket,s.last_error FROM orby_filter_rules r LEFT JOIN "
                     "orby_filter_rule_state s ON s.rule_id=r.id WHERE r.enabled=1")

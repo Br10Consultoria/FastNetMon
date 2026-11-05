@@ -41,7 +41,7 @@ Requisitos: 4 GB de RAM (recomendado 16 GB), 20 GB livres, repositório em `/opt
 9. Painel web (porta 8443) e o primeiro usuário, com **senha gerada** em `/root/orbyflow-painel-acesso.txt`
    (troca obrigatória e cadastro do 2FA no primeiro acesso).
 10. Backup diário cifrado (`/etc/orbymon/backup.key`: guarde uma cópia fora do servidor).
-11. Reputação, C2 e botnets (listas de ameaças a cada 10 min), alarmes por filtro (modelos desligados), clientes, linha de base, mitigação **em simulação** e saúde.
+11. Reputação, C2 e botnets (listas de ameaças a cada 10 min), análise automática de cada ataque (vetor, origens, carpet bombing) e resumo semanal no Telegram, alarmes por filtro (modelos desligados), clientes, linha de base, mitigação **em simulação** e saúde.
 12. Tabelas agregadas e uso de portas do CGNAT.
 13. ClickHouse (escolhe a versão certa para a CPU) e dashboards de tráfego nele.
 14. Verificação dos serviços e resumo.
